@@ -35,7 +35,8 @@ src/
 │       └── types.ts                  # Domain types (CardTag, parseTags, DEFAULT_TAGS)
 ├── lib/                              # Cross-cutting wiring (one entity per file)
 │   ├── prisma.ts                     # PrismaClient singleton + pg adapter
-│   └── auth.ts                       # NextAuth() config: { handlers, signIn, signOut, auth }
+│   ├── auth.config.ts                # EDGE-safe Auth.js config (providers + pages only). Imported by middleware.
+│   └── auth.ts                       # Full NextAuth() config (adds Prisma adapter + DB sessions). Node runtime only.
 ├── generated/prisma/                 # Prisma 7 generated client (DO NOT EDIT, committed)
 │   ├── client.ts                     # → `import { PrismaClient } from "@/generated/prisma/client"`
 │   └── models.ts                     # → `import type { CardModel } from "@/generated/prisma/models"`
@@ -61,7 +62,7 @@ prisma.config.ts                      # Datasource URL + migrations path (Prisma
 - **Validation in Server Actions uses Zod.** `formData.get(...)` → `schema.parse(...)`. Never trust client input. Auth check first via `await auth()` (see `requireAuth()` helper pattern in `features/board/actions.ts`).
 - **Reads via `features/*/queries.ts`**, writes via `features/*/actions.ts`. Pages should not call Prisma directly except trivially — that's what the feature layer is for. (For a 1-call read, inline is fine. When it grows past that, extract.)
 - **Types from Prisma** import as `CardModel`, `ColumnModel`, etc. from `@/generated/prisma/models`. The bare names (`Card`, `Column`) are React components, not types.
-- **Auth helper:** `import { auth, signIn, signOut } from "@/lib/auth"` (server only). The route handler lives at `src/app/api/auth/[...nextauth]/route.ts` and just re-exports `handlers`.
+- **Auth helper:** `import { auth, signIn, signOut } from "@/lib/auth"` (server-component/action only — Node runtime). The route handler lives at `src/app/api/auth/[...nextauth]/route.ts` and just re-exports `handlers`. **Never import `@/lib/auth` from `middleware.ts`** — middleware runs in Edge runtime and `@/lib/auth` transitively pulls in Prisma (which uses `node:*` modules). Middleware imports `@/lib/auth.config` instead.
 - **`revalidatePath("/")`** after every mutation so the board reflects changes on next render.
 - **No client-side data fetching libraries** (no SWR/React Query). Server Components + Server Actions + `revalidatePath` is enough for v1.
 - **Path alias** `@/*` → `./src/*`. Always prefer the alias over relative imports across folders.
@@ -129,6 +130,7 @@ npx auth secret                      # Generate AUTH_SECRET
 - **Auth.js v5 provider name is `microsoft-entra-id`**, not `azure-ad` (renamed). The redirect URI ends in `/api/auth/callback/microsoft-entra-id`.
 - **Tags field is JSON.** `Card.tags` is a JSON array of `{ name, applicable }`. Parse via `parseTags` (defensive — DB JSON is untyped). Don't put domain logic on tag arrays elsewhere; centralise it in `features/board/types.ts`.
 - **Middleware protects everything except `/login`, `/api/auth/*`, and static assets.** If you add a route that should be public (e.g. `/healthz`), update the matcher in `src/middleware.ts`.
+- **Auth.js v5 split config (Edge ↔ Node).** Middleware runs in Edge runtime and cannot import Prisma, so we split the Auth.js config in two: `lib/auth.config.ts` holds the Edge-safe parts (providers, pages — no adapter, no DB), and `lib/auth.ts` extends it with `PrismaAdapter` + `session: { strategy: "database" }`. **Middleware imports `auth.config`; everything else imports `auth`.** With database sessions, middleware can only check that a session cookie exists (it can't validate against the DB in Edge), and full validation happens in server components/actions when they call `auth()`. If you add a new auth provider or change `pages`, edit `auth.config.ts`; if you change adapter/session/callbacks, edit `auth.ts`.
 - **No `git commit` from automated tooling unless explicitly asked.** This project is local-only until pushed.
 
 ## Deployment to Vercel
