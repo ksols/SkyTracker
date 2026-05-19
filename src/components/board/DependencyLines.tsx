@@ -69,12 +69,18 @@ export function DependencyLines({
 
   useEffect(() => {
     measure();
-    const observer = new MutationObserver(measure);
+    let timerId: ReturnType<typeof setTimeout> | null = null;
+    const debouncedMeasure = () => {
+      if (timerId !== null) clearTimeout(timerId);
+      timerId = setTimeout(measure, 150);
+    };
+    const observer = new MutationObserver(debouncedMeasure);
     if (containerRef.current) {
       observer.observe(containerRef.current, { childList: true, subtree: true, attributes: true });
     }
     window.addEventListener("resize", measure);
     return () => {
+      if (timerId !== null) clearTimeout(timerId);
       observer.disconnect();
       window.removeEventListener("resize", measure);
     };

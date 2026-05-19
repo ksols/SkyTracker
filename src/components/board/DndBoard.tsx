@@ -30,10 +30,12 @@ export function DndBoard({
   dependencies: DependencyModel[];
 }) {
   const [columns, setColumns] = useState(initialColumns);
+  const [prevInitialColumns, setPrevInitialColumns] = useState(initialColumns);
   const [activeCard, setActiveCard] = useState<CardModel | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  if (initialColumns !== columns && !activeCard) {
+  if (initialColumns !== prevInitialColumns) {
+    setPrevInitialColumns(initialColumns);
     setColumns(initialColumns);
   }
 
