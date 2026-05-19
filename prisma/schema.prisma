@@ -66,9 +66,23 @@ model VerificationToken {
 // ─────────────────────────────────────────────────────────────
 // SkyTracker domain
 // One global board (v1). Multiple boards = future work.
-// Columns are arbitrary named lists. Cards live in a column with
-// freeform estimate text and a per-card tag list.
+// Columns = developer lanes. Cards = tasks stacked by priority.
 // ─────────────────────────────────────────────────────────────
+
+enum TaskType {
+  FEATURE
+  WORK_ITEM
+  BUG
+  MAINTENANCE
+  OTHER
+}
+
+enum EstimateType {
+  HARD_DATE
+  WEEKS
+  SCOPES
+  NONE
+}
 
 model Board {
   id        String   @id @default(cuid())
@@ -76,17 +90,19 @@ model Board {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  columns Column[]
-  cards   Card[]
+  columns   Column[]
+  cards     Card[]
+  auditLogs AuditLog[]
 }
 
 model Column {
-  id        String   @id @default(cuid())
-  boardId   String
-  title     String
-  position  Int
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id          String   @id @default(cuid())
+  boardId     String
+  title       String
+  description String?
+  position    Int
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
   board Board  @relation(fields: [boardId], references: [id], onDelete: Cascade)
   cards Card[]
@@ -95,20 +111,68 @@ model Column {
 }
 
 model Card {
-  id          String   @id @default(cuid())
-  boardId     String
-  columnId    String
-  title       String
-  description String?
-  estimate    String?  // freeform: "1 uke", "21. mai", "Scopes", "Q3 - Scopes"
-  position    Int
-  tags        Json     @default("[]")  // [{ name: "Backend", applicable: true }, ...]
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id             String       @id @default(cuid())
+  boardId        String
+  columnId       String
+  title          String
+  description    String?
+  taskType       TaskType     @default(OTHER)
+  estimate       String?      // freeform display label: "1 uke", "21. mai", "Scopes"
+  estimateType   EstimateType @default(NONE)
+  estimateDate   DateTime?    // populated when estimateType = HARD_DATE
+  estimateWeeks  Int?         // populated when estimateType = WEEKS
+  codeReview     Boolean      @default(false)
+  isGap          Boolean      @default(false)
+  gapSize        Int          @default(1)    // visual height in "slots" (1 slot ≈ 1 normal card)
+  position       Int
+  tags           Json         @default("[]") // [{ name: "Backend", applicable: true }, ...]
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
 
-  board  Board  @relation(fields: [boardId], references: [id], onDelete: Cascade)
-  column Column @relation(fields: [columnId], references: [id], onDelete: Cascade)
+  board          Board        @relation(fields: [boardId], references: [id], onDelete: Cascade)
+  column         Column       @relation(fields: [columnId], references: [id], onDelete: Cascade)
+  blockedBy      Dependency[] @relation("BlockedCard")
+  blocking       Dependency[] @relation("BlockerCard")
 
   @@index([columnId, position])
   @@index([boardId])
+}
+
+// ─────────────────────────────────────────────────────────────
+// Cross-lane dependencies
+// blockerCard must finish before blockedCard can start.
+// ─────────────────────────────────────────────────────────────
+
+model Dependency {
+  id            String   @id @default(cuid())
+  blockerCardId String
+  blockedCardId String
+  createdAt     DateTime @default(now())
+
+  blockerCard Card @relation("BlockerCard", fields: [blockerCardId], references: [id], onDelete: Cascade)
+  blockedCard Card @relation("BlockedCard", fields: [blockedCardId], references: [id], onDelete: Cascade)
+
+  @@unique([blockerCardId, blockedCardId])
+  @@index([blockedCardId])
+}
+
+// ─────────────────────────────────────────────────────────────
+// Audit log — records every mutation for accountability
+// ─────────────────────────────────────────────────────────────
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  boardId    String
+  userId     String?
+  userName   String?
+  action     String   // e.g. CARD_CREATED, CARD_MOVED, COLUMN_DELETED
+  targetType String   // e.g. Card, Column
+  targetId   String
+  details    Json?    // before/after or relevant context
+  createdAt  DateTime @default(now())
+
+  board Board @relation(fields: [boardId], references: [id], onDelete: Cascade)
+
+  @@index([boardId, createdAt])
+  @@index([targetType, targetId])
 }

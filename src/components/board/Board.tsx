@@ -1,15 +1,20 @@
 import type { ColumnModel, CardModel } from "@/generated/prisma/models";
-import { Column } from "./Column";
+import type { DependencyModel } from "@/generated/prisma/models";
+import { DndBoard } from "./DndBoard";
 import { AddColumnForm } from "./AddColumnForm";
 
-type ColumnWithCards = ColumnModel & { cards: CardModel[] };
+export type ColumnWithCards = ColumnModel & { cards: CardModel[] };
 
-export function Board({ columns }: { columns: ColumnWithCards[] }) {
+export function Board({
+  columns,
+  dependencies,
+}: {
+  columns: ColumnWithCards[];
+  dependencies: DependencyModel[];
+}) {
   return (
     <div className="flex gap-6 overflow-x-auto p-6 min-h-full items-start">
-      {columns.map((col) => (
-        <Column key={col.id} column={col} />
-      ))}
+      <DndBoard columns={columns} dependencies={dependencies} />
       <div className="shrink-0 w-72">
         <AddColumnForm />
       </div>

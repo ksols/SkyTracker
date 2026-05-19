@@ -1,59 +1,120 @@
-import type { CardModel } from "@/generated/prisma/models";
-import { deleteCard, toggleCardTag } from "@/features/board/actions";
-import { parseTags } from "@/features/board/types";
+"use client";
 
-export function Card({ card }: { card: CardModel }) {
+import { useState, useRef } from "react";
+import type { CardModel } from "@/generated/prisma/models";
+import type { DependencyModel } from "@/generated/prisma/models";
+import { parseTags, TASK_TYPE_LABELS, TASK_TYPE_COLORS } from "@/features/board/types";
+import { formatDate } from "@/features/board/dates";
+import { EditCardModal } from "./EditCardModal";
+
+export function Card({
+  card,
+  estimatedDone,
+  allCards,
+  dependencies,
+}: {
+  card: CardModel;
+  estimatedDone: Date | null;
+  allCards?: CardModel[];
+  dependencies?: DependencyModel[];
+}) {
+  const [editing, setEditing] = useState(false);
+  const pointerStart = useRef<{ x: number; y: number } | null>(null);
   const tags = parseTags(card.tags);
+  const typeColors = TASK_TYPE_COLORS[card.taskType] ?? TASK_TYPE_COLORS.OTHER;
+
+  function handlePointerDown(e: React.PointerEvent) {
+    pointerStart.current = { x: e.clientX, y: e.clientY };
+  }
+
+  function handleClick(e: React.MouseEvent) {
+    if (pointerStart.current) {
+      const dx = e.clientX - pointerStart.current.x;
+      const dy = e.clientY - pointerStart.current.y;
+      if (Math.abs(dx) > 5 || Math.abs(dy) > 5) return;
+    }
+    setEditing(true);
+  }
 
   return (
-    <article className="group border border-black dark:border-zinc-300 rounded-md bg-white dark:bg-zinc-950 px-3 py-2 flex gap-3 items-stretch">
-      <div className="flex-1 flex flex-col gap-1 min-w-0">
-        <div className="flex items-start justify-between gap-2">
-          <h3 className="font-semibold text-sm text-black dark:text-zinc-100 break-words">
-            {card.title}
-          </h3>
-          <form action={deleteCard}>
-            <input type="hidden" name="id" value={card.id} />
-            <button
-              type="submit"
-              className="opacity-0 group-hover:opacity-100 text-xs text-zinc-400 hover:text-red-500 transition"
-              aria-label={`Delete card ${card.title}`}
-              title="Delete card"
+    <>
+      <article
+        onPointerDown={handlePointerDown}
+        onClick={handleClick}
+        className={`group border border-slate-300 dark:border-ocean-4 rounded-md bg-white dark:bg-ocean-2 px-3 py-2 flex gap-3 items-stretch cursor-pointer hover:bg-slate-50 dark:hover:bg-ocean-3 transition-colors h-[84px] overflow-hidden ${typeColors.border ? `border-l-[3px] ${typeColors.border}` : ""}`}
+      >
+        <div className="flex-1 flex flex-col gap-1 min-w-0">
+          <div className="flex items-start justify-between gap-2">
+            <h3 className="font-semibold text-sm text-ocean-1 dark:text-white break-words">
+              {card.title}
+            </h3>
+          </div>
+          {card.description && (
+            <p
+              className="italic text-xs text-slate-500 dark:text-skyblue-3 truncate"
+              title={card.description}
             >
-              ✕
-            </button>
-          </form>
+              {card.description}
+            </p>
+          )}
+          <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+            {card.taskType !== "OTHER" && (
+              <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${typeColors.badge}`}>
+                {TASK_TYPE_LABELS[card.taskType] ?? card.taskType}
+              </span>
+            )}
+            {card.codeReview && (
+              <span className="text-[10px] px-1.5 py-0.5 rounded font-medium bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-300">
+                Review
+              </span>
+            )}
+          </div>
         </div>
-        {card.description && (
-          <p className="italic text-xs text-zinc-600 dark:text-zinc-400 break-words">
-            {card.description}
-          </p>
-        )}
-      </div>
 
-      <div className="shrink-0 flex flex-col text-[10px] border-l border-zinc-300 dark:border-zinc-700 pl-2 -my-2 -mr-1 py-1">
-        <div className="font-medium text-zinc-800 dark:text-zinc-200 min-h-[14px] mb-1">
-          {card.estimate ?? <span className="text-zinc-400">—</span>}
+        <div className="shrink-0 flex flex-col text-[10px] border-l border-slate-200 dark:border-ocean-4 -my-2 -mr-1 divide-y divide-slate-200 dark:divide-ocean-4">
+          {card.estimateType === "WEEKS" && card.estimateWeeks && (
+            <div className="flex-1 flex items-center pl-2 pr-1">
+              <span className="font-medium text-slate-700 dark:text-skyblue-3">
+                {card.estimateWeeks} {card.estimateWeeks === 1 ? "uke" : "uker"}
+              </span>
+            </div>
+          )}
+          {card.estimateType === "SCOPES" && (
+            <div className="flex-1 flex items-center pl-2 pr-1">
+              <span className="font-medium text-amber-500 dark:text-amber-400">Scopes</span>
+            </div>
+          )}
+          {tags.map((tag) => (
+            <div key={tag.name} className="flex-1 flex items-center pl-2 pr-1">
+              <span className={tag.applicable ? "text-slate-700 dark:text-skyblue-3" : "text-slate-400 dark:text-ocean-6 line-through"}>
+                {tag.name}
+              </span>
+            </div>
+          ))}
+          {card.estimateType === "HARD_DATE" && card.estimate ? (
+            <div className="flex-1 flex items-center pl-2 pr-1">
+              <span className="font-semibold text-ocean-5 dark:text-skyblue-1">{card.estimate}</span>
+            </div>
+          ) : estimatedDone ? (
+            <div className="flex-1 flex items-center pl-2 pr-1">
+              <span className="font-semibold text-ocean-5 dark:text-skyblue-1">{formatDate(estimatedDone)}</span>
+            </div>
+          ) : card.estimateType === "SCOPES" ? (
+            <div className="flex-1 flex items-center pl-2 pr-1">
+              <span className="font-semibold text-amber-500 dark:text-amber-400" title="Unscoped — no date estimate">?</span>
+            </div>
+          ) : null}
         </div>
-        {tags.map((tag) => (
-          <form key={tag.name} action={toggleCardTag} className="leading-tight">
-            <input type="hidden" name="id" value={card.id} />
-            <input type="hidden" name="tagName" value={tag.name} />
-            <button
-              type="submit"
-              className={
-                "block w-full text-left hover:bg-zinc-100 dark:hover:bg-zinc-800 px-1 -mx-1 rounded transition-colors " +
-                (tag.applicable
-                  ? "text-zinc-800 dark:text-zinc-200"
-                  : "text-zinc-400 line-through")
-              }
-              title={tag.applicable ? `Mark ${tag.name} N/A` : `Mark ${tag.name} applicable`}
-            >
-              {tag.name}
-            </button>
-          </form>
-        ))}
-      </div>
-    </article>
+      </article>
+
+      {editing && (
+        <EditCardModal
+          card={card}
+          onClose={() => setEditing(false)}
+          allCards={allCards ?? []}
+          dependencies={dependencies ?? []}
+        />
+      )}
+    </>
   );
 }

@@ -1,0 +1,2 @@
+-- AlterTable
+ALTER TABLE "Card" ADD COLUMN     "gapSize" INTEGER NOT NULL DEFAULT 1;

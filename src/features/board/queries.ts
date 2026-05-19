@@ -15,5 +15,10 @@ export async function getBoardWithContents() {
       cards: { orderBy: { position: "asc" } },
     },
   });
-  return { board, columns };
+  const dependencies = await prisma.dependency.findMany({
+    where: {
+      blockerCard: { boardId: board.id },
+    },
+  });
+  return { board, columns, dependencies };
 }

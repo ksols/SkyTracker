@@ -4,7 +4,7 @@ export function AddColumnForm() {
   return (
     <form
       action={createColumn}
-      className="border border-dashed border-zinc-400 dark:border-zinc-600 rounded-md p-3 flex flex-col gap-2 bg-zinc-50 dark:bg-zinc-900"
+      className="border border-dashed border-slate-300 dark:border-ocean-4 rounded-md p-3 flex flex-col gap-2 bg-slate-50 dark:bg-ocean-2"
     >
       <input
         name="title"
@@ -12,11 +12,11 @@ export function AddColumnForm() {
         required
         maxLength={80}
         placeholder="+ New column"
-        className="bg-transparent text-sm font-medium text-zinc-700 dark:text-zinc-200 placeholder:text-zinc-400 focus:outline-none border-b border-transparent focus:border-zinc-400 transition-colors py-1"
+        className="bg-transparent text-sm font-medium text-slate-700 dark:text-skyblue-3 placeholder:text-slate-400 dark:placeholder:text-ocean-5 focus:outline-none border-b border-transparent focus:border-ocean-5 transition-colors py-1"
       />
       <button
         type="submit"
-        className="text-xs self-start text-zinc-500 hover:text-black dark:hover:text-zinc-100"
+        className="text-xs self-start text-slate-500 dark:text-ocean-6 hover:text-ocean-5 dark:hover:text-skyblue-1"
       >
         Add
       </button>
