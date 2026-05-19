@@ -15,10 +15,12 @@ export function SortableColumn({
   column,
   allCards,
   dependencies,
+  canEdit = true,
 }: {
   column: ColumnWithCards;
   allCards: CardModel[];
   dependencies: DependencyModel[];
+  canEdit?: boolean;
 }) {
   const { setNodeRef } = useDroppable({ id: column.id });
   const cardIds = column.cards.map((c) => c.id);
@@ -30,7 +32,7 @@ export function SortableColumn({
 
   return (
     <div className="shrink-0 w-72 flex flex-col gap-3">
-      <ColumnHeader column={column} />
+      <ColumnHeader column={column} canEdit={canEdit} />
       <SortableContext items={cardIds} strategy={verticalListSortingStrategy}>
         <div ref={setNodeRef} className="flex flex-col gap-2 min-h-[40px]">
           {column.cards.map((card) => (
@@ -40,11 +42,12 @@ export function SortableColumn({
               estimatedDone={estimatedDates.get(card.id) ?? null}
               allCards={allCards}
               dependencies={dependencies}
+              canEdit={canEdit}
             />
           ))}
         </div>
       </SortableContext>
-      <AddCardForm columnId={column.id} />
+      {canEdit && <AddCardForm columnId={column.id} />}
     </div>
   );
 }

@@ -8,15 +8,26 @@ import { auth } from "@/lib/auth";
 import { getOrCreateBoard } from "@/features/board/queries";
 import { DEFAULT_TAGS, parseTags, type CardTag } from "@/features/board/types";
 
-async function requireAuth() {
+type AuthResult = {
+  user: { name?: string | null; email?: string | null };
+  role: "writer" | "reader";
+};
+
+async function requireAuth(): Promise<AuthResult> {
   const session = await auth();
   if (!session?.user) {
     if (process.env.NODE_ENV !== "production") {
-      return { user: { name: "Dev User", email: "dev@localhost" } };
+      return { user: { name: "Dev User", email: "dev@localhost" }, role: "writer" };
     }
     throw new Error("Unauthorized");
   }
-  return session;
+  return { user: session.user, role: session.role ?? "reader" };
+}
+
+function requireWriter(authResult: AuthResult) {
+  if (authResult.role !== "writer") {
+    throw new Error("Read-only access — you do not have write permissions");
+  }
 }
 
 async function audit(
@@ -67,6 +78,7 @@ const createColumnSchema = z.object({
 
 export async function createColumn(formData: FormData) {
   const session = await requireAuth();
+  requireWriter(session);
   const userName = session.user?.name ?? undefined;
   try {
     const { title } = createColumnSchema.parse({ title: formData.get("title") });
@@ -100,6 +112,7 @@ const updateColumnSchema = z.object({
 
 export async function updateColumn(formData: FormData) {
   const session = await requireAuth();
+  requireWriter(session);
   const userName = session.user?.name ?? undefined;
   try {
     const { id, title, description } = updateColumnSchema.parse({
@@ -122,6 +135,7 @@ export async function updateColumn(formData: FormData) {
 
 export async function deleteColumn(formData: FormData) {
   const session = await requireAuth();
+  requireWriter(session);
   const userName = session.user?.name ?? undefined;
   try {
     const { id } = idSchema.parse({ id: formData.get("id") });
@@ -145,6 +159,7 @@ const createCardSchema = z.object({
 
 export async function createCard(formData: FormData) {
   const session = await requireAuth();
+  requireWriter(session);
   const userName = session.user?.name ?? undefined;
   try {
     const { columnId, title } = createCardSchema.parse({
@@ -194,6 +209,7 @@ const updateCardSchema = z.object({
 
 export async function updateCard(formData: FormData) {
   const session = await requireAuth();
+  requireWriter(session);
   const userName = session.user?.name ?? undefined;
   try {
     const parsed = updateCardSchema.parse({
@@ -249,6 +265,7 @@ export async function updateCard(formData: FormData) {
 
 export async function deleteCard(formData: FormData) {
   const session = await requireAuth();
+  requireWriter(session);
   const userName = session.user?.name ?? undefined;
   try {
     const { id } = idSchema.parse({ id: formData.get("id") });
@@ -270,6 +287,7 @@ const toggleTagSchema = z.object({
 
 export async function toggleCardTag(formData: FormData) {
   const session = await requireAuth();
+  requireWriter(session);
   const userName = session.user?.name ?? undefined;
   try {
     const { id, tagName } = toggleTagSchema.parse({
@@ -295,6 +313,7 @@ export async function toggleCardTag(formData: FormData) {
 
 export async function updateGapSize(cardId: string, gapSize: number) {
   const session = await requireAuth();
+  requireWriter(session);
   const userName = session.user?.name ?? undefined;
   try {
     const size = Math.max(1, Math.round(gapSize));
@@ -315,6 +334,7 @@ export async function updateGapSize(cardId: string, gapSize: number) {
 
 export async function moveCard(cardId: string, targetColumnId: string, newPosition: number) {
   const session = await requireAuth();
+  requireWriter(session);
   const userName = session.user?.name ?? undefined;
   try {
     const card = await prisma.card.findUniqueOrThrow({ where: { id: cardId } });
@@ -384,6 +404,7 @@ export async function moveCard(cardId: string, targetColumnId: string, newPositi
 
 export async function createDependency(blockerCardId: string, blockedCardId: string) {
   const session = await requireAuth();
+  requireWriter(session);
   const userName = session.user?.name ?? undefined;
   try {
     if (blockerCardId === blockedCardId) throw new Error("A card cannot depend on itself");
@@ -412,6 +433,7 @@ export async function createDependency(blockerCardId: string, blockedCardId: str
 
 export async function deleteDependency(dependencyId: string) {
   const session = await requireAuth();
+  requireWriter(session);
   const userName = session.user?.name ?? undefined;
   try {
     const dep = await prisma.dependency.findUniqueOrThrow({

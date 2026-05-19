@@ -7,7 +7,7 @@ import { updateGapSize } from "@/features/board/actions";
 
 const SLOT_PX = 84;
 
-export function GapCard({ card, estimatedDone }: { card: CardModel; estimatedDone: Date | null }) {
+export function GapCard({ card, estimatedDone, canEdit = true }: { card: CardModel; estimatedDone: Date | null; canEdit?: boolean }) {
   const [visualSize, setVisualSize] = useState(card.gapSize);
   const dragState = useRef<{ startY: number; startSize: number } | null>(null);
 
@@ -55,7 +55,7 @@ export function GapCard({ card, estimatedDone }: { card: CardModel; estimatedDon
 
   return (
     <div
-      className="relative border border-dashed border-slate-300 dark:border-ocean-4 rounded-md bg-slate-50 dark:bg-ocean-1 px-3 py-2 flex justify-between cursor-pointer hover:border-ocean-5 dark:hover:border-ocean-5 transition-colors"
+      className={`relative border border-dashed border-slate-300 dark:border-ocean-4 rounded-md bg-slate-50 dark:bg-ocean-1 px-3 py-2 flex justify-between ${canEdit ? "cursor-pointer hover:border-ocean-5 dark:hover:border-ocean-5" : ""} transition-colors`}
       style={{ minHeight: `${height}px` }}
     >
       <div className="flex flex-col gap-0.5 min-w-0">
@@ -74,7 +74,7 @@ export function GapCard({ card, estimatedDone }: { card: CardModel; estimatedDon
             {card.estimateWeeks} {card.estimateWeeks === 1 ? "uke" : "uker"}
           </span>
         )}
-        {!hasEstimate && (
+        {!hasEstimate && canEdit && (
           <span className="text-[10px] text-slate-400 dark:text-ocean-5">click to edit</span>
         )}
         {card.estimateType === "HARD_DATE" && card.estimate ? (
@@ -85,12 +85,14 @@ export function GapCard({ card, estimatedDone }: { card: CardModel; estimatedDon
           </span>
         ) : null}
       </div>
-      <div
-        onPointerDown={handleResizeStart}
-        className="absolute bottom-0 left-0 right-0 h-4 cursor-ns-resize flex items-center justify-center"
-      >
-        <div className="w-10 h-1.5 rounded-full bg-slate-300 dark:bg-ocean-4 hover:bg-ocean-5 dark:hover:bg-ocean-6 transition-colors" />
-      </div>
+      {canEdit && (
+        <div
+          onPointerDown={handleResizeStart}
+          className="absolute bottom-0 left-0 right-0 h-4 cursor-ns-resize flex items-center justify-center"
+        >
+          <div className="w-10 h-1.5 rounded-full bg-slate-300 dark:bg-ocean-4 hover:bg-ocean-5 dark:hover:bg-ocean-6 transition-colors" />
+        </div>
+      )}
     </div>
   );
 }

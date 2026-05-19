@@ -4,33 +4,35 @@ import { useState } from "react";
 import type { ColumnModel } from "@/generated/prisma/models";
 import { updateColumn, deleteColumn } from "@/features/board/actions";
 
-export function ColumnHeader({ column }: { column: ColumnModel }) {
+export function ColumnHeader({ column, canEdit = true }: { column: ColumnModel; canEdit?: boolean }) {
   const [editing, setEditing] = useState(false);
 
-  if (editing) {
+  if (editing && canEdit) {
     return <ColumnEditForm column={column} onClose={() => setEditing(false)} />;
   }
 
   return (
     <header className="border border-slate-300 dark:border-ocean-4 rounded-md px-4 py-2 flex items-center justify-between bg-white dark:bg-ocean-3">
       <h2
-        className="font-semibold tracking-tight text-ocean-1 dark:text-white cursor-pointer hover:underline"
-        onClick={() => setEditing(true)}
+        className={`font-semibold tracking-tight text-ocean-1 dark:text-white ${canEdit ? "cursor-pointer hover:underline" : ""}`}
+        onClick={canEdit ? () => setEditing(true) : undefined}
         title={column.description || undefined}
       >
         {column.title}
       </h2>
-      <form action={deleteColumn}>
-        <input type="hidden" name="id" value={column.id} />
-        <button
-          type="submit"
-          className="text-xs text-slate-400 dark:text-ocean-6 hover:text-red-500 transition-colors"
-          aria-label={`Delete column ${column.title}`}
-          title="Delete column"
-        >
-          ✕
-        </button>
-      </form>
+      {canEdit && (
+        <form action={deleteColumn}>
+          <input type="hidden" name="id" value={column.id} />
+          <button
+            type="submit"
+            className="text-xs text-slate-400 dark:text-ocean-6 hover:text-red-500 transition-colors"
+            aria-label={`Delete column ${column.title}`}
+            title="Delete column"
+          >
+            ✕
+          </button>
+        </form>
+      )}
     </header>
   );
 }

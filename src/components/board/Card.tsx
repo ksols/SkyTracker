@@ -12,11 +12,13 @@ export function Card({
   estimatedDone,
   allCards,
   dependencies,
+  canEdit = true,
 }: {
   card: CardModel;
   estimatedDone: Date | null;
   allCards?: CardModel[];
   dependencies?: DependencyModel[];
+  canEdit?: boolean;
 }) {
   const [editing, setEditing] = useState(false);
   const pointerStart = useRef<{ x: number; y: number } | null>(null);
@@ -28,6 +30,7 @@ export function Card({
   }
 
   function handleClick(e: React.MouseEvent) {
+    if (!canEdit) return;
     if (pointerStart.current) {
       const dx = e.clientX - pointerStart.current.x;
       const dy = e.clientY - pointerStart.current.y;
@@ -41,7 +44,7 @@ export function Card({
       <article
         onPointerDown={handlePointerDown}
         onClick={handleClick}
-        className={`group border border-slate-300 dark:border-ocean-4 rounded-md bg-white dark:bg-ocean-2 px-3 py-2 flex gap-3 items-stretch cursor-pointer hover:bg-slate-50 dark:hover:bg-ocean-3 transition-colors h-[84px] overflow-hidden ${typeColors.border ? `border-l-[3px] ${typeColors.border}` : ""}`}
+        className={`group border border-slate-300 dark:border-ocean-4 rounded-md bg-white dark:bg-ocean-2 px-3 py-2 flex gap-3 items-stretch ${canEdit ? "cursor-pointer hover:bg-slate-50 dark:hover:bg-ocean-3" : ""} transition-colors h-[84px] overflow-hidden ${typeColors.border ? `border-l-[3px] ${typeColors.border}` : ""}`}
       >
         <div className="flex-1 flex flex-col gap-1 min-w-0">
           <div className="flex items-start justify-between gap-2">
@@ -107,7 +110,7 @@ export function Card({
         </div>
       </article>
 
-      {editing && (
+      {editing && canEdit && (
         <EditCardModal
           card={card}
           onClose={() => setEditing(false)}

@@ -25,9 +25,11 @@ import { DependencyLines } from "./DependencyLines";
 export function DndBoard({
   columns: initialColumns,
   dependencies,
+  canEdit = true,
 }: {
   columns: ColumnWithCards[];
   dependencies: DependencyModel[];
+  canEdit?: boolean;
 }) {
   const [columns, setColumns] = useState(initialColumns);
   const [prevInitialColumns, setPrevInitialColumns] = useState(initialColumns);
@@ -41,10 +43,9 @@ export function DndBoard({
 
   const allCards = columns.flatMap((col) => col.cards);
 
-  const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
-    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
-  );
+  const pointerSensor = useSensor(PointerSensor, { activationConstraint: { distance: 5 } });
+  const keyboardSensor = useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates });
+  const sensors = useSensors(...(canEdit ? [pointerSensor, keyboardSensor] : []));
 
   const findColumnByCardId = useCallback(
     (cardId: string) => columns.find((col) => col.cards.some((c) => c.id === cardId)),
@@ -148,7 +149,7 @@ export function DndBoard({
         onDragEnd={handleDragEnd}
       >
         {columns.map((col) => (
-          <SortableColumn key={col.id} column={col} allCards={allCards} dependencies={dependencies} />
+          <SortableColumn key={col.id} column={col} allCards={allCards} dependencies={dependencies} canEdit={canEdit} />
         ))}
         <DragOverlay>
           {activeCard ? <CardOverlay card={activeCard} /> : null}

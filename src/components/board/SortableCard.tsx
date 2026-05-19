@@ -14,11 +14,13 @@ export function SortableCard({
   estimatedDone,
   allCards,
   dependencies,
+  canEdit = true,
 }: {
   card: CardModel;
   estimatedDone: Date | null;
   allCards: CardModel[];
   dependencies: DependencyModel[];
+  canEdit?: boolean;
 }) {
   const [editing, setEditing] = useState(false);
   const pointerStart = useRef<{ x: number; y: number } | null>(null);
@@ -58,17 +60,17 @@ export function SortableCard({
         style={style}
         data-card-id={card.id}
         onPointerDown={handlePointerDown}
-        onClick={card.isGap ? handleClick : undefined}
+        onClick={card.isGap && canEdit ? handleClick : undefined}
         {...attributes}
         {...listeners}
       >
         {card.isGap ? (
-          <GapCard card={card} estimatedDone={estimatedDone} />
+          <GapCard card={card} estimatedDone={estimatedDone} canEdit={canEdit} />
         ) : (
-          <Card card={card} estimatedDone={estimatedDone} allCards={allCards} dependencies={dependencies} />
+          <Card card={card} estimatedDone={estimatedDone} allCards={allCards} dependencies={dependencies} canEdit={canEdit} />
         )}
       </div>
-      {editing && card.isGap && (
+      {editing && card.isGap && canEdit && (
         <EditCardModal
           card={card}
           onClose={() => setEditing(false)}
