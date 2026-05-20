@@ -7,7 +7,7 @@ export const dynamic = "force-dynamic";
 
 export default async function Home() {
   const session = await auth();
-  const role = session?.role ?? (process.env.NODE_ENV !== "production" ? "writer" : "reader");
+  const role = session?.role ?? "reader";
   const { board, columns, dependencies } = await getBoardWithContents();
   return (
     <main className="flex-1 flex flex-col">

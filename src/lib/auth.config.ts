@@ -15,12 +15,27 @@ export default {
   session: { strategy: "jwt" },
   pages: { signIn: "/login" },
   callbacks: {
-    jwt({ token, profile }) {
+    jwt({ token, profile, account }) {
       if (profile) {
-        const groups = (profile as Record<string, unknown>).groups;
+        // Decode raw ID token to get all claims including groups
+        let idTokenClaims: Record<string, unknown> = {};
+        if (account?.id_token) {
+          try {
+            const payload = account.id_token.split(".")[1];
+            idTokenClaims = JSON.parse(Buffer.from(payload, "base64url").toString());
+          } catch {}
+        }
+        console.log("[AUTH] profile keys:", Object.keys(profile));
+        console.log("[AUTH] id_token claims keys:", Object.keys(idTokenClaims));
+        console.log("[AUTH] id_token groups:", idTokenClaims.groups);
+        console.log("[AUTH] id_token _claim_names:", idTokenClaims._claim_names);
+
+        const groups = idTokenClaims.groups ?? (profile as Record<string, unknown>).groups;
         const groupIds = Array.isArray(groups) ? (groups as string[]) : [];
         const writersGroupId = process.env.SKYTRACKER_WRITERS_GROUP_ID;
+        console.log("[AUTH] groupIds:", groupIds, "writersGroupId:", writersGroupId);
         token.role = writersGroupId && groupIds.includes(writersGroupId) ? "writer" : "reader";
+        console.log("[AUTH] assigned role:", token.role);
       }
       return token;
     },

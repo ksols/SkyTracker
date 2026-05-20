@@ -16,9 +16,6 @@ type AuthResult = {
 async function requireAuth(): Promise<AuthResult> {
   const session = await auth();
   if (!session?.user) {
-    if (process.env.NODE_ENV !== "production") {
-      return { user: { name: "Dev User", email: "dev@localhost" }, role: "writer" };
-    }
     throw new Error("Unauthorized");
   }
   return { user: session.user, role: session.role ?? "reader" };
