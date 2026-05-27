@@ -126,6 +126,7 @@ model Card {
   gapSize        Int          @default(1)    // visual height in "slots" (1 slot ≈ 1 normal card)
   position       Int
   tags           Json         @default("[]") // [{ name: "Backend", applicable: true }, ...]
+  adoWorkItemId  Int?         // Azure DevOps work item id when linked
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
 
