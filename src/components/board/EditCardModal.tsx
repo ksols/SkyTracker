@@ -40,6 +40,13 @@ export function EditCardModal({
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
+      // The modal renders inside the dnd-kit draggable card wrapper, which
+      // carries the PointerSensor's drag listeners. Without this, pointerdowns
+      // on the modal's form controls bubble up to the sensor and (once the
+      // pointer moves past the 5px activation distance — easily triggered in
+      // Safari) start a drag, detaching the card and discarding the edit on the
+      // resulting revalidate. Stop the pointer event here so the sensor never sees it.
+      onPointerDown={(e) => e.stopPropagation()}
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
