@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import type { CardModel } from "@/generated/prisma/models";
 import type { DependencyModel } from "@/generated/prisma/models";
 import type { EstimateType } from "@/generated/prisma/client";
@@ -219,6 +220,7 @@ function AdoSection({ card }: { card: CardModel }) {
   const [sprint, setSprint] = useState("");
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const router = useRouter();
 
   if (card.adoWorkItemId) {
     return (
@@ -255,6 +257,7 @@ function AdoSection({ card }: { card: CardModel }) {
             const n = sprint ? parseInt(sprint, 10) : null;
             const res = await createCardInAdo(card.id, Number.isNaN(n as number) ? null : n);
             if (!res.ok) setError(res.error);
+            else router.refresh(); // server action's revalidatePath doesn't refresh this mounted client tree
           })
         }
         className="px-3 py-1.5 text-sm font-medium rounded bg-ocean-5 text-white hover:bg-ocean-6 transition disabled:opacity-50"
