@@ -5,6 +5,7 @@ import type { CardModel } from "@/generated/prisma/models";
 import type { DependencyModel } from "@/generated/prisma/models";
 import { parseTags, TASK_TYPE_LABELS, TASK_TYPE_COLORS } from "@/features/board/types";
 import { formatDate } from "@/features/board/dates";
+import { adoWorkItemEditUrl } from "@/features/ado/config";
 import { EditCardModal } from "./EditCardModal";
 
 export function Card({
@@ -70,6 +71,18 @@ export function Card({
               <span className="text-[10px] px-1.5 py-0.5 rounded font-medium bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-300">
                 Review
               </span>
+            )}
+            {card.adoWorkItemId && (
+              <a
+                href={adoWorkItemEditUrl(card.adoWorkItemId)}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={(e) => e.stopPropagation()}
+                onPointerDown={(e) => e.stopPropagation()}
+                className="text-[10px] px-1.5 py-0.5 rounded font-medium bg-sky-100 text-sky-700 dark:bg-ocean-4 dark:text-skyblue-2 hover:underline"
+              >
+                #{card.adoWorkItemId}
+              </a>
             )}
           </div>
         </div>

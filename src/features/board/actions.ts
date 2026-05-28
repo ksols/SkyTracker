@@ -7,6 +7,8 @@ import { prisma } from "@/lib/prisma";
 import { auth } from "@/lib/auth";
 import { getOrCreateBoard } from "@/features/board/queries";
 import { DEFAULT_TAGS, parseTags, type CardTag } from "@/features/board/types";
+import { createWorkItem, resolveIterationPath, addPredecessorLink } from "@/features/ado/client";
+import { cardTagsToAdoTags, buildAttributionDescription } from "@/features/ado/mappers";
 
 type AuthResult = {
   user: { name?: string | null; email?: string | null };
@@ -152,6 +154,8 @@ export async function deleteColumn(formData: FormData) {
 const createCardSchema = z.object({
   columnId: z.string().min(1),
   title: z.string().trim().min(1).max(200),
+  createInAdo: z.enum(["true", "false"]).optional(),
+  sprintNumber: z.string().optional().or(z.literal("")),
 });
 
 export async function createCard(formData: FormData) {
@@ -159,9 +163,11 @@ export async function createCard(formData: FormData) {
   requireWriter(session);
   const userName = session.user?.name ?? undefined;
   try {
-    const { columnId, title } = createCardSchema.parse({
+    const { columnId, title, createInAdo, sprintNumber } = createCardSchema.parse({
       columnId: formData.get("columnId"),
       title: formData.get("title"),
+      createInAdo: formData.get("createInAdo") ?? undefined,
+      sprintNumber: formData.get("sprintNumber") ?? undefined,
     });
     const col = await prisma.column.findUniqueOrThrow({ where: { id: columnId } });
     const last = await prisma.card.findFirst({
@@ -180,10 +186,77 @@ export async function createCard(formData: FormData) {
     });
     log("CARD_CREATED", userName, { cardId: card.id, columnId, title });
     await audit(col.boardId, session, "CARD_CREATED", "Card", card.id, { columnId, title });
+
+    if (createInAdo === "true") {
+      const n = sprintNumber ? parseInt(sprintNumber, 10) : null;
+      try {
+        // Never block local card creation on ADO availability.
+        await syncCardToAdo(card.id, Number.isNaN(n as number) ? null : n, userName ?? "Unknown");
+      } catch (e) {
+        logError("ADO_SYNC_FAILED", userName, e);
+      }
+    }
     revalidatePath("/");
   } catch (error) {
     logError("CARD_CREATED", userName, error);
     throw error;
+  }
+}
+
+/**
+ * Best-effort sync of a card to a new ADO work item. Throws on failure so
+ * callers can decide whether to surface or swallow. Writes adoWorkItemId back.
+ */
+async function syncCardToAdo(
+  cardId: string,
+  sprintNumber: number | null,
+  userName: string,
+): Promise<number> {
+  const card = await prisma.card.findUniqueOrThrow({
+    where: { id: cardId },
+    include: { blockedBy: { include: { blockerCard: true } } },
+  });
+  if (card.adoWorkItemId) return card.adoWorkItemId;
+
+  const iterationPath = sprintNumber ? await resolveIterationPath(sprintNumber) : null;
+  const workItemId = await createWorkItem({
+    title: card.title,
+    description: buildAttributionDescription(card.description, userName),
+    tags: cardTagsToAdoTags(parseTags(card.tags)),
+    iterationPath,
+  });
+
+  // Link blockers that already exist in ADO (Predecessor). Skip the rest.
+  for (const dep of card.blockedBy) {
+    if (dep.blockerCard.adoWorkItemId) {
+      try {
+        await addPredecessorLink(workItemId, dep.blockerCard.adoWorkItemId);
+      } catch (e) {
+        logError("ADO_LINK_FAILED", userName, e);
+      }
+    }
+  }
+
+  await prisma.card.update({ where: { id: cardId }, data: { adoWorkItemId: workItemId } });
+  return workItemId;
+}
+
+export type AdoSyncResult = { ok: true; workItemId: number } | { ok: false; error: string };
+
+export async function createCardInAdo(cardId: string, sprintNumber: number | null): Promise<AdoSyncResult> {
+  const session = await requireAuth();
+  requireWriter(session);
+  const userName = session.user?.name ?? undefined;
+  try {
+    const workItemId = await syncCardToAdo(cardId, sprintNumber, userName ?? "Unknown");
+    const card = await prisma.card.findUniqueOrThrow({ where: { id: cardId }, select: { boardId: true } });
+    await audit(card.boardId, session, "ADO_WORK_ITEM_CREATED", "Card", cardId, { workItemId, sprintNumber });
+    log("ADO_WORK_ITEM_CREATED", userName, { cardId, workItemId });
+    revalidatePath("/");
+    return { ok: true, workItemId };
+  } catch (e) {
+    logError("ADO_WORK_ITEM_CREATED", userName, e);
+    return { ok: false, error: e instanceof Error ? e.message : "ADO sync failed" };
   }
 }
 
