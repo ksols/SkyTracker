@@ -1,6 +1,8 @@
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { mergePlans, type Plan } from "@/features/timeline/merge";
+import { planDelta } from "@/features/timeline/plan-delta";
+import { bufferStatuses } from "@/features/timeline/plan-tools";
 import type { Prisma } from "@/generated/prisma/client";
 
 // Shared state for the /timeline tool. One row (id "default").
@@ -65,8 +67,71 @@ export async function PUT(req: Request) {
       data: { data: merged as unknown as Prisma.InputJsonValue, version: { increment: 1 }, updatedBy },
     });
     if (updated.count === 1) {
+      await logChanges(stored.data as unknown as Plan, merged, updatedBy);
+      await snapshotBuffers(merged);
       return Response.json({ version: stored.version + 1, data: merged });
     }
   }
   return Response.json({ error: "contention — try again" }, { status: 409 });
+}
+
+// The change log is best-effort: a failed log write must never fail the save.
+async function logChanges(before: Plan, after: Plan, editor: string | null) {
+  try {
+    const changes = planDelta(before, after);
+    if (!changes.length) return;
+    await prisma.timelineChange.createMany({
+      data: changes.map((c) => ({
+        taskId: c.taskId,
+        taskLabel: c.taskLabel,
+        kind: c.kind,
+        groups: c.groups?.join(",") ?? null,
+        before: (c.before ?? undefined) as Prisma.InputJsonValue | undefined,
+        after: (c.after ?? undefined) as Prisma.InputJsonValue | undefined,
+        editor,
+      })),
+    });
+  } catch {
+    // tabellen kan mangle før migrasjonen er kjørt — lagringen skal uansett lykkes
+  }
+}
+
+function isoWeek(d: Date): string {
+  const date = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+  const day = date.getUTCDay() || 7;
+  date.setUTCDate(date.getUTCDate() + 4 - day);
+  const yearStart = new Date(Date.UTC(date.getUTCFullYear(), 0, 1));
+  const week = Math.ceil(((date.getTime() - yearStart.getTime()) / 86400000 + 1) / 7);
+  return `${date.getUTCFullYear()}-W${String(week).padStart(2, "0")}`;
+}
+
+// Weekly buffer trend (føring 1.5): latest state per ISO week per milestone.
+// Best-effort like the change log.
+async function snapshotBuffers(plan: Plan) {
+  try {
+    const statuses = bufferStatuses(plan);
+    if (!statuses.length) return;
+    const week = isoWeek(new Date());
+    for (const s of statuses) {
+      await prisma.bufferSnapshot.upsert({
+        where: { week_milestoneId: { week, milestoneId: s.taskId } },
+        create: {
+          week,
+          milestoneId: s.taskId,
+          label: s.label,
+          bufferWeeks: s.bufferWeeks,
+          usedWeeks: s.usedWeeks,
+          overrunWeeks: s.overrunWeeks,
+        },
+        update: {
+          label: s.label,
+          bufferWeeks: s.bufferWeeks,
+          usedWeeks: s.usedWeeks,
+          overrunWeeks: s.overrunWeeks,
+        },
+      });
+    }
+  } catch {
+    // tabellen kan mangle før migrasjonen er kjørt
+  }
 }

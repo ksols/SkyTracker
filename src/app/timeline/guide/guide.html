@@ -67,54 +67,54 @@
 
   <h1>Oppdater tidslinjen <span class="accent">sammen med Claude.</span></h1>
   <p class="lede">
-    Tidslinjeverktøyet er bygget for å vedlikeholdes med Claude Code: du peker på dokumentasjonen
-    du har på maskinen — referater, feature-specs, veikart — og Claude oversetter den til
-    oppdaterte rader, datoer og avhengigheter. Mappen inneholder en <code>CLAUDE.md</code> som
-    lærer Claude datamodellen automatisk når en økt startes her.
+    Tidslinjeverktøyet er bygget for å vedlikeholdes med Claude Code: du peker på dokumentasjon —
+    referater, feature-specs, veikart — og Claude oversetter den til oppdaterte rader, datoer og
+    avhengigheter. Du trenger ikke kunne JSON: instruksjonsfilen i Claude-pakken forklarer alt til
+    Claude, og importen viser alltid en <b>forhåndsvisning</b> av endringene før noe lagres.
   </p>
 
   <h2>Slik gjør du det</h2>
   <div class="steps">
     <div class="step">
-      <h3>Eksporter arbeidsflaten din</h3>
-      <p>Åpne tidslinjeverktøyet — lokalt (<code>gantt.html</code>) eller via SkyTracker-adressen — og
-      trykk <b>Eksporter</b>. Legg <code>skytale-telenor-plan.json</code> i denne mappen
-      (<code>~/Skytale/ClaudeReports/telenor-timeline/</code>). Dette er nødvendig fordi endringene
-      dine lagres i nettleseren — Claude kan ikke lese dem uten eksporten.</p>
+      <h3>Last ned Claude-pakken</h3>
+      <p>Åpne tidslinjen i SkyTracker og trykk <b>Oppdater med Claude</b> →
+      <b>Last ned Claude-pakken</b>. Du får to filer i nedlastingsmappen: planen
+      (<code>skytale-telenor-plan.json</code>) og instruksjonene til Claude
+      (<code>claude-instruksjoner.md</code>).</p>
     </div>
     <div class="step">
-      <h3>Start Claude Code i mappen</h3>
-      <p>Åpne terminalen og kjør <code>cd ~/Skytale/ClaudeReports/telenor-timeline && claude</code>
-      — eller start i <code>~/Skytale</code> og be Claude lese
-      <code>ClaudeReports/telenor-timeline/CLAUDE.md</code> først.</p>
+      <h3>Start en Claude-økt der filene ligger</h3>
+      <p>Åpne terminalen i mappen med de to filene (typisk Nedlastinger) og kjør <code>claude</code>.
+      Ingen forkunnskaper trengs — be Claude lese <code>claude-instruksjoner.md</code> først, så
+      kjenner den både formatet og reglene.</p>
     </div>
     <div class="step">
-      <h3>Pek på dokumentasjonen og si hva du vil</h3>
-      <p>Claude leser dokumentene, oppdaterer JSON-filen etter datamodellen, og sier fra når den er klar.
-      Se eksempler under.</p>
+      <h3>Si hva du vil ha endret</h3>
+      <p>Pek på referater eller dokumenter, eller beskriv endringene med egne ord. Claude oppdaterer
+      JSON-filen og oppsummerer hva som ble endret og hvorfor. Se eksempler under.</p>
     </div>
     <div class="step">
-      <h3>Importer resultatet</h3>
-      <p>Tilbake i <code>gantt.html</code>: trykk <b>Importer</b> og velg den oppdaterte
-      JSON-filen. Verktøyet rydder selv opp i avhengigheter og delmål. Se over resultatet —
-      og eksporter gjerne på nytt som sikkerhetskopi.</p>
+      <h3>Importer — og se over forhåndsvisningen</h3>
+      <p>Tilbake i tidslinjen: trykk <b>Importer</b> og velg filen. Du får en liste over nøyaktig
+      hva som endres — nye rader, flyttede datoer, slettinger — og ingenting lagres før du trykker
+      <b>Bruk endringene</b>. I delt modus lagres det da for hele teamet.</p>
     </div>
   </div>
 
   <h2>Eksempler på ting du kan be om</h2>
   <pre>
 <span class="c"># Fra møtereferat til plan:</span>
-Les referatet i ~/Skytale/ClaudeReports/feature-specs/... og oppdater
-tidslinje-JSON-en: F-24 vår del er utsatt to uker, legg inn beslutningen
-om vaktplan som ny rad under Sikkerhet med start i oktober.
+Les claude-instruksjoner.md. Oppdater skytale-telenor-plan.json:
+F-24 vår del er utsatt to uker, og legg inn beslutningen om vaktplan
+som ny rad under Sikkerhet med start i oktober.
 
-<span class="c"># Konsistenssjekk mot dokumentasjon:</span>
-Sammenlign tidslinjen med delivery-planen i ClaudeReports/delivery-plan/
-og list opp avvikene før du endrer noe.
+<span class="c"># Fra et dokument du har på maskinen:</span>
+Les claude-instruksjoner.md og referatet jeg peker på. Oppdater planen
+med det som ble besluttet, og oppsummer hva du endret og hvorfor.
 
-<span class="c"># Baseline-endring (det Nullstill går tilbake til):</span>
-Oppdater SEED i gantt.html og den redaksjonelle index.html slik at
-ARR-målet flyttes til januar — begge skal fortelle samme historie.</pre>
+<span class="c"># Konsistenssjekk før endring:</span>
+Sammenlign skytale-telenor-plan.json med vedlagte veikartdokument og
+list opp avvikene — ikke endre noe enda.</pre>
 
   <div class="callout">
     <b>SkyTracker-radene er speil.</b> Rader merket <b>ST</b> kommer fra SkyTracker-synken og
@@ -124,25 +124,51 @@ ARR-målet flyttes til januar — begge skal fortelle samme historie.</pre>
     synken for deg: «kjør SkyTracker-synken og fortell meg hva som er endret».
   </div>
 
-  <h2>Gjelder dette også SkyTracker-versjonen?</h2>
-  <p>Ja. Verktøyet finnes i to utgaver: HTML-filen i denne mappen (privat arbeidsflate i din nettleser)
-  og siden <code>/timeline</code> i SkyTracker (bak Microsoft-innloggingen), der planen er <b>delt og
-  autolagres for alle</b> med writer-rolle. Claude-arbeidsflyten er identisk — <b>Eksporter → Claude
-  redigerer → Importer</b> — og i SkyTracker-utgaven blir importen automatisk lagret for hele teamet.</p>
-  <p>Jobber du fra en maskin som ikke har denne mappen (f.eks. et teammedlem som bruker
-  SkyTracker-versjonen): eksporten er selvforklarende JSON. Be Claude lese den eksporterte filen
-  direkte og beskriv endringene du vil ha — feltene (<code>lanes</code>, <code>tasks</code> med
-  <code>start</code>/<code>end</code> i måneder siden 1. august 2026, <code>deps</code>,
-  <code>subtasks</code>) står forklart i <code>CLAUDE.md</code>, som også kan sendes med som kontekst.</p>
+  <h2>Trygt å prøve</h2>
+  <ul>
+    <li><b>Forhåndsvisningen er porten:</b> ingenting endres i planen før du har sett listen over
+    endringer og trykket «Bruk endringene». Avbryt forkaster alt.</li>
+    <li><b>Versjonering er automatisk:</b> importen finner selv ut hvilke felter som er endret og
+    håndterer samtidige redigeringer fra andre — Claude trenger aldri (og skal aldri) røre
+    <code>fv</code>- eller <code>deleted</code>-feltene.</li>
+    <li><b>ST-rader kan ikke slettes ved uhell:</b> rader som speiler SkyTracker-tavlen bevares
+    automatisk selv om de mangler i filen Claude lagde.</li>
+    <li><b>Angre:</b> eksporter planen før du starter, så har du en sikkerhetskopi du kan importere
+    tilbake.</li>
+  </ul>
 
-  <h2>Hva Claude vet fra før</h2>
+  <h2>Hva Claude kan berike planen med</h2>
+  <p>Utover å flytte datoer og legge til rader kan en Claude-økt fylle planen med felter som
+  gjør «Hva nå»-visningen og dashboardet rikere — pek på dokumentasjonen som inneholder tallene:</p>
+  <ul>
+    <li><b>Definisjon av ferdig</b> og <b>dokumentlenker</b> på milepæler («legg referatets
+    beslutninger som lenker på delmål 2»).</li>
+    <li><b>Buffer</b> (uker) per milepæl — føring 1.5-tallet som gir bufferforbruk i Gantt-en
+    og dashboardet.</li>
+    <li><b>Kostnad</b> og <b>forventet inntjening</b> (NOK, estimater) — «les budsjettarket og
+    legg kostnadene på riktige rader». Baner og milepæler summeres automatisk; investorvisningen
+    viser aldri kost.</li>
+    <li><b>Statussignaler</b> med årsak fra den faste kategorilisten.</li>
+  </ul>
+
+  <h2>Hva instruksjonsfilen dekker</h2>
   <ul>
     <li><b>Tidsmodellen</b> — måneder siden 1. august 2026, akse til desember 2027.</li>
-    <li><b>Datamodellen</b> — lanes, tasks, delmål, avhengigheter (finish-to-start), T1/T2-merking.</li>
-    <li><b>Grensene</b> — aldri håndredigere <code>skytracker-data.js</code>, aldri røre ST-rader manuelt,
-    holde <code>gantt.html</code> og eksport-scriptet enige om tidsmodellen.</li>
+    <li><b>Datamodellen</b> — lanes, tasks, delmål, avhengigheter (finish-to-start), T1/T2- og
+    milepælsmerking, statussignal med de seks faste årsakskategoriene.</li>
+    <li><b>Grensene</b> — ST-rader er speil og redigeres i SkyTracker; id-er holdes stabile;
+    ingen sirkulære avhengigheter.</li>
   </ul>
-  <p>Alt dette står i <code>CLAUDE.md</code> i denne mappen — den er kontrakten mellom verktøyet og Claude.</p>
+  <p><code>claude-instruksjoner.md</code> er selvforsynt — den forutsetter ingen mappe, intet repo
+  og ingen forhåndskunnskap hos Claude-økten.</p>
+
+  <h2>Jobber du i verktøymappen? (avansert)</h2>
+  <p>På maskinen som har <code>~/Skytale/ClaudeReports/telenor-timeline/</code> trengs ingen pakke:
+  mappen har en <code>CLAUDE.md</code> som leses automatisk når en Claude-økt startes der. Eksporter
+  planen til mappen, kjør <code>cd ~/Skytale/ClaudeReports/telenor-timeline && claude</code>, og be
+  om endringene. Skal <b>baseline</b> endres (det «Nullstill til plan» går tilbake til), er det også
+  her det gjøres — Claude redigerer da <code>SEED</code> i <code>gantt.html</code> og den
+  redaksjonelle <code>index.html</code> i samme økt.</p>
 
   <footer>
     <span>Skytale AS · Telenor-tidslinjen</span>
