@@ -74,3 +74,12 @@ describe("mergePlans - field-level versioning", () => {
     expect(revived.lanes.map((l) => l.key)).toEqual(["y"]);
   });
 });
+
+describe("mergePlans - root flags", () => {
+  it("incoming example:false overrides stored example:true (a deleted key would not)", () => {
+    const m = mergePlans(plan([], { example: true }), plan([], { example: false }));
+    expect(m.example).toBe(false);
+    const kept = mergePlans(plan([], { example: true }), plan([]));
+    expect(kept.example).toBe(true);
+  });
+});

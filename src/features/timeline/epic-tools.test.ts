@@ -115,3 +115,25 @@ describe("exampleSeed", () => {
     expect(resolveDeps(s)).toEqual([]); // the seed is already consistent
   });
 });
+
+describe("exampleSeed(prev) over a plan that was emptied by deletes", () => {
+  it("bumps lanes and tasks past the old tombstones so the server merge keeps the seed", async () => {
+    const { mergePlans } = await import("./merge");
+    const prev = normalizePlan({ lanes: [], tasks: [], deleted: { iam: 3, roller: 1 }, deletedLanes: { org: 2, telenor: 1 } });
+    const seed = exampleSeed(prev);
+    expect(seed.lanes.find((l) => l.key === "org")!.v).toBe(3);
+    expect(seed.lanes.find((l) => l.key === "samtaler")!.v).toBeUndefined();
+    expect(seed.tasks.find((t) => t.id === "iam")!.fv).toEqual({ tid: 4 });
+    expect(seed.deleted).toEqual({ iam: 3, roller: 1 });
+    const merged = mergePlans(prev, seed);
+    expect(merged.lanes.map((l) => l.key)).toEqual(seed.lanes.map((l) => l.key));
+    expect(merged.tasks.map((t) => t.id)).toEqual(seed.tasks.map((t) => t.id));
+  });
+
+  it("without prev the seed is unchanged (no versions, no tombstones)", () => {
+    const s = exampleSeed();
+    expect(s.lanes.every((l) => l.v === undefined)).toBe(true);
+    expect(s.tasks.every((t) => Object.keys(t.fv!).length === 0)).toBe(true);
+    expect(s.deleted).toEqual({});
+  });
+});

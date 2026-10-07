@@ -141,8 +141,11 @@ function goalText(lane) {
 }
 
 /* ---------- example seed (deck slides 6, 22, 23, 24) ---------- */
+// `prev` is the plan the seed replaces. Its tombstones are carried over and every
+// seeded lane/task that was deleted before is versioned PAST its tombstone, so the
+// server merge keeps the seed instead of silently dropping it again.
 const D = (y, m, d) => dateToUnit(new Date(y, m - 1, d));
-function exampleSeed() {
+function exampleSeed(prev) {
   const est = (id, lane, label, start, likelyW, lateW, extra) =>
     Object.assign(
       { id, lane, label, kind: "estimate", start, endLikely: start + likelyW * WEEK, end: start + lateW * WEEK, deps: [], fv: {} },
@@ -151,7 +154,7 @@ function exampleSeed() {
   const disc = (id, lane, label, start, end, extra) =>
     Object.assign({ id, lane, label, kind: "discovery", start, end, deps: [], fv: {} }, extra || {});
   const lane = (key, name, extra) => Object.assign({ key, name, owner: OWNER_DEFAULT }, extra || {});
-  return normalizePlan({
+  const p = normalizePlan({
     schema: SCHEMA,
     example: true,
     lanes: [
@@ -185,6 +188,15 @@ function exampleSeed() {
     ],
     deleted: {},
   });
+  if (prev && typeof prev === "object") {
+    const deleted = prev.deleted && typeof prev.deleted === "object" ? prev.deleted : {};
+    const deletedLanes = prev.deletedLanes && typeof prev.deletedLanes === "object" ? prev.deletedLanes : {};
+    p.lanes.forEach((l) => { if (deletedLanes[l.key]) l.v = deletedLanes[l.key] + 1; });
+    p.tasks.forEach((t) => { if (deleted[t.id]) t.fv = { tid: deleted[t.id] + 1 }; });
+    p.deleted = Object.assign({}, deleted);
+    p.deletedLanes = Object.assign({}, deletedLanes);
+  }
+  return p;
 }
 
 if (typeof module !== "undefined") {

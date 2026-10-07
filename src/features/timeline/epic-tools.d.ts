@@ -18,4 +18,4 @@ export declare function resolveDeps(plan: Plan): string[];
 export declare function rangeWeeks(task: PlanTask): { likely: number; late: number } | null;
 export declare function rangeLabel(task: PlanTask): string;
 export declare function goalText(lane: PlanLane): string;
-export declare function exampleSeed(): Plan;
+export declare function exampleSeed(prev?: Plan): Plan;

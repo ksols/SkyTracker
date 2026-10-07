@@ -333,7 +333,7 @@
         <b>rød</b> = hele spennet etter. <b>Venter på utredning</b> så lenge en feature utredes.</p></div>
       <div class="help-card"><h4>Flytt og juster</h4>
         <p><b>Dra en linje</b> for å flytte den i tid. Dra i <b>venstre ende</b> for start, <b>høyre ende</b> for senest,
-        og i <b>skillet</b> mellom mørk og lys del for sannsynlig. Alt fester seg til uke.</p></div>
+        og i <b>skillet</b> mellom mørk og lys del for sannsynlig. Dra fester til uke; datoer du skriver inn i redigeringen beholdes eksakt.</p></div>
       <div class="help-card"><h4>Avhengigheter</h4>
         <p>Klikk <b>⇢</b> på featuren som må bli <b>ferdig først</b>, deretter på den som venter. Sprekker en blokker,
         flyttes alt som venter på den, og epicen kan skifte farge. Klikk pilen for å fjerne koblingen.</p></div>
@@ -450,21 +450,6 @@
   </div>
 </div>
 
-<!-- Delt logikk (epic-tools.js): samme fil kjøres her, i den hostede utgaven (/timeline/epic-tools.js) og i
-     vitest. Lastes først; siden starter når modulen er på plass. -->
-<script>
-(function(){
-  var s = document.createElement('script');
-  s.src = location.protocol === 'file:' ? 'epic-tools.js' : 'timeline/epic-tools.js';
-  s.onload = function(){ window.__bootTimeline(); };
-  s.onerror = function(){
-    document.getElementById('emptyState').hidden = false;
-    document.getElementById('gantt').hidden = true;
-    document.getElementById('emptyNote').textContent = 'Kunne ikke laste epic-tools.js.';
-  };
-  document.head.appendChild(s);
-})();
-</script>
 <script>
 window.__bootTimeline = function(){
   "use strict";
@@ -502,7 +487,8 @@ window.__bootTimeline = function(){
   const fromDateInput = s => {   // datoer som skrives inn beholdes eksakt; bare dra fester til uke
     const p = String(s || '').split('-').map(Number);
     if(p.length !== 3 || !p[0] || !p[1] || !p[2]) return null;
-    return Math.max(0, Math.min(N_MONTHS, dateToUnit(new Date(p[0], p[1] - 1, p[2]))));
+    // aksen starter i okt 2026: en tidligere dato ville tegnet linjen under navnekolonnen
+    return Math.max(VIEW_FROM, Math.min(N_MONTHS, dateToUnit(new Date(p[0], p[1] - 1, p[2]))));
   };
   function initials(name){
     const parts = String(name).trim().split(/[\s.@]+/).filter(Boolean);
@@ -527,7 +513,7 @@ window.__bootTimeline = function(){
   /* ================== tilstand ================== */
   let state = loadState();
   let linkSource = null;          // id under kobling
-  let myName = null, canWrite = false, serverReady = false, serverVersion = null, applyingRemote = false;
+  let myName = null, canWrite = false, serverReady = false, serverFailed = false, serverVersion = null, applyingRemote = false;
   let drag = null, colDrag = null, saveTimer = null, pendingSave = false, pushing = false;
 
   function emptyPlan(){ return normalizePlan({ lanes: [], tasks: [], deleted: {} }); }
@@ -578,6 +564,7 @@ window.__bootTimeline = function(){
     gantt.hidden = empty;
     seedBtn.hidden = !(empty && (canWrite || !HOSTED));
     emptyNote.textContent = !empty ? ''
+      : HOSTED && serverFailed ? 'Kunne ikke hente den delte planen – last siden på nytt.'
       : HOSTED && !serverReady ? 'Henter delt plan …'
       : HOSTED && !canWrite ? 'Kun lesetilgang – be en med skrivetilgang legge inn epics.'
       : 'Legg til en epic med ＋ Epic, eller last inn eksempelet fra ledermøtedecken.';
@@ -1045,7 +1032,7 @@ window.__bootTimeline = function(){
   function addEpic(){
     const key = 'e' + Date.now().toString(36) + Math.random().toString(36).slice(2, 4);
     state.lanes.push({ key, name: 'Ny epic', owner: OWNER_DEFAULT, v: 1 });
-    delete state.example;
+    state.example = false;   // eksplisitt false: en slettet nøkkel overlever flettingen på serveren
     save(); render();
     openEpicEditor(key);
   }
@@ -1095,7 +1082,7 @@ window.__bootTimeline = function(){
     laneTasks(key).map(t => t.id).forEach(doRemoveTaskSilent);
     state.deletedLanes[key] = (l.v || 0) + 1;
     state.lanes = state.lanes.filter(v => v.key !== key);
-    delete state.example;
+    state.example = false;   // eksplisitt false: en slettet nøkkel overlever flettingen på serveren
     save(); render();
   });
   $('addEpicBtn').addEventListener('click', addEpic);
@@ -1131,6 +1118,7 @@ window.__bootTimeline = function(){
         setSaveNote(canWrite ? 'ingen delt plan ennå' : 'ingen delt plan ennå – kun lesetilgang');
       }
     }catch(err){
+      serverFailed = true;
       setSaveNote('frakoblet – kunne ikke hente planen');
       render();
     }
@@ -1152,8 +1140,14 @@ window.__bootTimeline = function(){
       if(r.status === 409){ setSaveNote('travelt – prøver igjen'); scheduleServerSave(); return; }
       if(!r.ok) throw new Error('HTTP ' + r.status);
       const j = await r.json();
-      serverVersion = j.version;
       const tid = new Date().toLocaleTimeString('nb-NO', {hour:'2-digit', minute:'2-digit'});
+      if(drag || colDrag){
+        // brukeren drar: ikke bytt ut tilstanden under hånden. serverVersion holdes gammel,
+        // så pollTick henter den flettede planen når draget er ferdig (eller neste lagring gjør det).
+        setSaveNote('lagret for alle ' + tid);
+        return;
+      }
+      serverVersion = j.version;
       // serveren fletter felt-for-felt og returnerer resultatet; ta det inn
       // med mindre brukeren alt har rukket å endre mer (neste push rydder da opp)
       if(!pendingSave && JSON.stringify(j.data) !== JSON.stringify(state)){
@@ -1196,7 +1190,7 @@ window.__bootTimeline = function(){
   /* ================== eksempel, eksport, hjelp, kolonnebredde ================== */
   seedBtn.addEventListener('click', async () => {
     if(!(await confirmDialog('Last inn eksempel', 'Legger inn de sju eksempel-epicene fra ledermøtedecken.' + (HOSTED ? ' Det blir den delte planen for alle.' : ''), {confirmText:'Last inn'}))) return;
-    state = exampleSeed();
+    state = exampleSeed(state);   // bumper forbi gamle tombstones, ellers sletter flettingen eksempelet igjen
     save(); render();
   });
   function downloadFile(name, text, mime){
@@ -1257,6 +1251,21 @@ window.__bootTimeline = function(){
   initServerPlan();
   if(HOSTED) setInterval(pollTick, POLL_MS);
 };
+</script>
+<!-- Delt logikk (epic-tools.js): samme fil kjøres her, i den hostede utgaven (/timeline/epic-tools.js) og i
+     vitest. Lastes etter at __bootTimeline er definert; siden starter når modulen er på plass. -->
+<script>
+(function(){
+  var s = document.createElement('script');
+  s.src = location.protocol === 'file:' ? 'epic-tools.js' : 'timeline/epic-tools.js';
+  s.onload = function(){ window.__bootTimeline(); };
+  s.onerror = function(){
+    document.getElementById('emptyState').hidden = false;
+    document.getElementById('gantt').hidden = true;
+    document.getElementById('emptyNote').textContent = 'Kunne ikke laste epic-tools.js.';
+  };
+  document.head.appendChild(s);
+})();
 </script>
 </body>
 </html>
