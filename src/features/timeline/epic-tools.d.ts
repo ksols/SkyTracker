@@ -1,0 +1,21 @@
+import type { Plan, PlanLane, PlanTask } from "./merge";
+
+export declare const BASE_Y: number;
+export declare const BASE_M: number;
+export declare const N_MONTHS: number;
+export declare const WEEK: number;
+export declare const SCHEMA: "epics-v1";
+export declare const OWNER_DEFAULT: string;
+export type EpicStatusCode = "gronn" | "gul" | "rod" | "venter" | "ingen-mal" | "tom";
+export declare const STATUS_LABEL: Record<EpicStatusCode, string>;
+export declare function dateToUnit(d: Date): number;
+export declare function unitToDate(u: number): Date;
+export declare function fmtDate(d: Date): string;
+export declare function normalizePlan(plan: unknown): Plan;
+export declare function epicStatus(plan: Plan, laneKey: string): { code: EpicStatusCode; likely?: number; late?: number };
+export declare function shiftTask(task: PlanTask, delta: number): number;
+export declare function resolveDeps(plan: Plan): string[];
+export declare function rangeWeeks(task: PlanTask): { likely: number; late: number } | null;
+export declare function rangeLabel(task: PlanTask): string;
+export declare function goalText(lane: PlanLane): string;
+export declare function exampleSeed(): Plan;
