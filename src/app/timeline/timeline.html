@@ -499,10 +499,10 @@ window.__bootTimeline = function(){
     const d = unitToDate(u);
     return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
   };
-  const fromDateInput = s => {
+  const fromDateInput = s => {   // datoer som skrives inn beholdes eksakt; bare dra fester til uke
     const p = String(s || '').split('-').map(Number);
     if(p.length !== 3 || !p[0] || !p[1] || !p[2]) return null;
-    return snapTo(dateToUnit(new Date(p[0], p[1] - 1, p[2])), SNAP);
+    return Math.max(0, Math.min(N_MONTHS, dateToUnit(new Date(p[0], p[1] - 1, p[2]))));
   };
   function initials(name){
     const parts = String(name).trim().split(/[\s.@]+/).filter(Boolean);
@@ -577,9 +577,10 @@ window.__bootTimeline = function(){
     emptyState.hidden = !empty;
     gantt.hidden = empty;
     seedBtn.hidden = !(empty && (canWrite || !HOSTED));
-    emptyNote.textContent = empty
-      ? (HOSTED && !canWrite ? 'Kun lesetilgang – be en med skrivetilgang legge inn epics.' : 'Legg til en epic med ＋ Epic, eller last inn eksempelet fra ledermøtedecken.')
-      : '';
+    emptyNote.textContent = !empty ? ''
+      : HOSTED && !serverReady ? 'Henter delt plan …'
+      : HOSTED && !canWrite ? 'Kun lesetilgang – be en med skrivetilgang legge inn epics.'
+      : 'Legg til en epic med ＋ Epic, eller last inn eksempelet fra ledermøtedecken.';
   }
 
   function render(){
