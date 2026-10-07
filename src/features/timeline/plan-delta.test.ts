@@ -5,18 +5,19 @@ import type { Plan, PlanTask } from "./merge";
 function task(over: Partial<PlanTask>): PlanTask {
   return {
     id: "t1",
-    lane: "produkt",
+    lane: "x",
     label: "Oppgave",
+    kind: "estimate",
     start: 1,
+    endLikely: 1.5,
     end: 2,
     deps: [],
-    subtasks: [],
     fv: {},
     ...over,
   };
 }
 const plan = (tasks: PlanTask[]): Plan => ({
-  lanes: [{ key: "produkt", name: "Produkt" }],
+  lanes: [{ key: "x", name: "Epic X" }],
   tasks,
   deleted: {},
 });
@@ -27,7 +28,7 @@ describe("planDelta — hva endret en lagring", () => {
   });
 
   it("flyttet oppgave rapporteres som endret med tid-gruppen", () => {
-    const d = planDelta(plan([task({ start: 1, end: 2 })]), plan([task({ start: 3, end: 4 })]));
+    const d = planDelta(plan([task({ start: 1, end: 2 })]), plan([task({ start: 3, endLikely: 3.5, end: 4 })]));
     expect(d).toEqual([
       expect.objectContaining({ kind: "endret", taskId: "t1", groups: ["tid"] }),
     ]);
@@ -36,11 +37,8 @@ describe("planDelta — hva endret en lagring", () => {
   });
 
   it("flere grupper på samme oppgave samles i én oppføring", () => {
-    const d = planDelta(
-      plan([task({})]),
-      plan([task({ label: "Nytt", status: "gul", statusCause: "Ekstern blokkering" })]),
-    );
-    expect(d[0].groups).toEqual(["label", "status"]);
+    const d = planDelta(plan([task({})]), plan([task({ label: "Nytt", adoId: 4742 })]));
+    expect(d[0].groups).toEqual(["label", "meta"]);
   });
 
   it("ny og slettet oppgave rapporteres", () => {

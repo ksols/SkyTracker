@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Skytale × Telenor — Planleggingsverktøy (Gantt)</title>
+<title>Skytale veikart – epics</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Archivo:wght@400;500;600;700&family=Spline+Sans+Mono:wght@400;500;600&display=swap" rel="stylesheet">
@@ -18,14 +18,18 @@
     --line-soft:#e9e3d7;
     --accent:#c3441c;
     --sea:#0e5a72;
-    --pine:#2e5d3f;
     --gold:#8a6d1f;
-    --steel:#31586b;
-    --plomme:#6b3151;   /* Sikkerhet-banen — aksentrøden er reservert status/fare/i-dag */
     --card:#fffdf9;
+    --disc-a:#e8a06a;
+    --disc-b:#f3c9a6;
+    --likely:#2f6e9e;
+    --late:#9dbfd9;
+    --goal:#15233b;
+    --today:#a9531a;
     --month-w:96px;
     --row-h:46px;
-    --label-w:296px;
+    --lane-h:52px;
+    --label-w:360px;
   }
   *{margin:0;padding:0;box-sizing:border-box}
   body{
@@ -49,10 +53,11 @@
   }
   .meta-row .brand{font-weight:600;color:var(--ink)}
   .meta-row .brand em{font-style:normal;color:var(--accent)}
+  .example-badge{margin-left:10px;padding:2px 8px;border:1px solid var(--gold);color:var(--gold);border-radius:2px}
   .titlebar{display:flex;justify-content:space-between;align-items:flex-end;gap:24px;flex-wrap:wrap;margin:26px 0 8px}
   h1{font-family:'Fraunces',serif;font-weight:500;font-size:clamp(28px,4vw,42px);letter-spacing:-.015em;line-height:1.05}
   h1 .accent{color:var(--accent);font-style:italic;font-weight:400}
-  .hint{font-size:12.5px;color:var(--ink-soft);max-width:58ch;margin-top:10px}
+  .hint{font-size:12.5px;color:var(--ink-soft);max-width:62ch;margin-top:10px}
   .hint b{color:var(--ink)}
   .toolbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
   button{
@@ -64,97 +69,33 @@
   button:disabled{opacity:.4;cursor:default;pointer-events:none}
   button.ghost{border-color:var(--line);color:var(--ink-soft)}
   button.ghost:hover{border-color:var(--ink);background:var(--card);color:var(--ink)}
+  button.danger-ghost{border-color:var(--line);color:var(--accent)}
+  button.danger-ghost:hover{background:var(--accent);border-color:var(--accent);color:#fff}
   .dirty-note{font-family:'Spline Sans Mono',monospace;font-size:11px;color:var(--gold);min-width:120px;text-align:right}
 
-  /* ---------- seksjonsnavigasjon ---------- */
-  .tabs{display:flex;gap:2px;margin:20px 0 0;border-bottom:2px solid var(--ink);flex-wrap:wrap;align-items:flex-end}
-  .tabs button{
-    border:1px solid transparent;border-bottom:none;background:transparent;color:var(--ink-soft);
-    padding:9px 18px;border-radius:2px 2px 0 0;font-size:11.5px;
+  /* ---------- lesemodus ---------- */
+  .ro-banner{
+    margin:14px 0 0;border:1px solid var(--gold);background:var(--card);color:var(--ink-soft);
+    padding:9px 14px;font-family:'Spline Sans Mono',monospace;font-size:11.5px;letter-spacing:.04em;
   }
-  .tabs button:hover{background:var(--paper-deep);color:var(--ink)}
-  .tabs button.active{background:var(--ink);color:var(--paper)}
-  .tabs a{
-    margin-left:auto;align-self:center;font-family:'Spline Sans Mono',monospace;font-size:11px;
-    letter-spacing:.06em;text-transform:uppercase;color:var(--ink-soft);text-decoration:none;padding:8px 6px;
-  }
-  .tabs a:hover{color:var(--ink)}
-  section.view{margin-top:22px}
-  section.view[hidden]{display:none}
-  .view-empty{
-    border:1px dashed var(--line);background:var(--card);padding:46px 30px;text-align:center;
-    font-family:'Fraunces',serif;font-size:17px;color:var(--ink-soft);
-  }
-
-  /* ---------- Data-meny ---------- */
-  .menu-wrap{position:relative;display:inline-block}
-  .menu{
-    display:none;position:absolute;right:0;top:calc(100% + 6px);z-index:70;min-width:250px;
-    background:var(--card);border:1px solid var(--ink);border-radius:3px;
-    box-shadow:0 10px 30px rgba(19,32,47,.25);padding:6px 0;text-align:left;
-  }
-  .menu.open{display:block}
-  .menu button{
-    display:block;width:100%;text-align:left;border:none;background:none;border-radius:0;
-    font-family:'Archivo',sans-serif;font-size:13px;text-transform:none;letter-spacing:0;
-    padding:9px 16px;color:var(--ink);position:relative;
-  }
-  .menu button:hover{background:var(--paper-deep);color:var(--ink)}
-  .menu hr{border:none;border-top:1px solid var(--line);margin:6px 0}
-  .menu button.danger{color:var(--accent)}
-  .menu button.danger:hover{background:var(--accent);color:#fff}
-  #dataBtn{position:relative}
-  #dataBtn.has-new::after{
-    content:"";position:absolute;top:-4px;right:-4px;width:9px;height:9px;border-radius:50%;
-    background:var(--accent);border:1.5px solid var(--paper);
-  }
-
-  .legend{display:flex;gap:16px;flex-wrap:wrap;margin:16px 0 24px;font-size:12px;color:var(--ink-soft);align-items:center}
-  .legend span{display:inline-flex;align-items:center;gap:7px}
-  .sw{width:22px;height:11px;border-radius:2px;flex:none}
-  .sw.styring{background:var(--pine)}
-  .sw.org{background:var(--gold)}
-  .sw.produkt{background:var(--steel)}
-  .sw.kommers{background:var(--sea)}
-  .sw.sikkerhet{background:var(--plomme)}
-  .sw.t2sw{background:repeating-linear-gradient(135deg,#fff, #fff 3px, #d8c98f 3px, #d8c98f 6px);border:1px dashed var(--gold)}
-  .sw.depsw{width:26px;height:0;border-top:1.5px solid var(--ink-faint);position:relative}
-  .sw.depsw::after{content:"";position:absolute;right:-1px;top:-4px;border:4px solid transparent;border-left-color:var(--ink-faint)}
+  .ro-banner b{color:var(--gold)}
 
   /* ---------- hjelpepanel ---------- */
-  .help{
-    display:none;margin:0 0 22px;border:1px solid var(--ink);background:var(--card);
-    padding:20px 22px 22px;position:relative;
-  }
+  .help{display:none;margin:18px 0 0;border:1px solid var(--ink);background:var(--card);padding:20px 22px 22px;position:relative}
   .help.open{display:block}
-  .help h3{
-    font-family:'Fraunces',serif;font-weight:600;font-size:19px;letter-spacing:-.01em;margin-bottom:14px;
-  }
-  .help .close-help{
-    position:absolute;top:14px;right:14px;width:26px;height:26px;padding:0;line-height:1;font-size:14px;
-  }
+  .help h3{font-family:'Fraunces',serif;font-weight:600;font-size:19px;letter-spacing:-.01em;margin-bottom:14px}
+  .help .close-help{position:absolute;top:14px;right:14px;width:26px;height:26px;padding:0;line-height:1;font-size:14px}
   .help-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
   .help-card{border:1px solid var(--line);background:var(--paper);padding:14px 16px}
-  .help-card .hc-head{display:flex;align-items:center;gap:9px;margin-bottom:6px}
-  .help-card .ico{
-    flex:none;width:26px;height:26px;display:flex;align-items:center;justify-content:center;
-    background:var(--ink);color:var(--paper);border-radius:3px;font-size:13px;
-  }
-  .help-card h4{font-size:13px;font-weight:700;letter-spacing:-.005em}
+  .help-card h4{font-size:13px;font-weight:700;margin-bottom:6px}
   .help-card p{font-size:12.5px;color:var(--ink-soft);line-height:1.55}
   .help-card p b{color:var(--ink)}
-  .help-card kbd{
-    font-family:'Spline Sans Mono',monospace;font-size:10.5px;background:var(--paper-deep);
-    border:1px solid var(--line);border-radius:3px;padding:0 5px;color:var(--ink);
-  }
   @media (max-width:900px){.help-grid{grid-template-columns:1fr}}
-  .help:not(.expanded) .help-card.adv{display:none}
-  #helpMore{margin-top:14px}
 
-  /* ---------- link-modus banner ---------- */
+  /* ---------- koble-modus ---------- */
   .link-banner{
     display:none;position:sticky;top:0;z-index:50;
-    background:var(--ink);color:var(--paper);padding:10px 18px;margin:0 0 14px;
+    background:var(--ink);color:var(--paper);padding:10px 18px;margin:14px 0 0;
     font-family:'Spline Sans Mono',monospace;font-size:12px;letter-spacing:.04em;
     border-radius:2px;align-items:center;justify-content:space-between;gap:14px;
   }
@@ -164,490 +105,188 @@
   body.linking .bar, body.linking .task-label{cursor:crosshair !important}
   body.linking .bar.link-source{outline:2px solid var(--accent);outline-offset:2px}
 
+  /* ---------- tegnforklaring ---------- */
+  .legend{display:flex;gap:18px;flex-wrap:wrap;margin:16px 0 20px;font-size:12px;color:var(--ink-soft);align-items:center}
+  .legend span{display:inline-flex;align-items:center;gap:7px}
+  .sw{width:22px;height:11px;border-radius:2px;flex:none}
+  .sw.discovery{background:repeating-linear-gradient(45deg,var(--disc-a) 0 4px,var(--disc-b) 4px 8px)}
+  .sw.likely{background:var(--likely)}
+  .sw.late{background:var(--late)}
+  .sw.goal{width:4px;height:16px;background:var(--goal)}
+  .sw.today{width:3px;height:16px;background:var(--today)}
+  .sw.depsw{width:26px;height:0;border-top:1.5px solid var(--ink-faint);position:relative}
+  .sw.depsw::after{content:"";position:absolute;right:-1px;top:-4px;border:4px solid transparent;border-left-color:var(--ink-faint)}
+  .tl-summary{font-family:'Spline Sans Mono',monospace;font-size:11px;color:var(--ink-soft);display:inline-flex;gap:12px;align-items:center;margin-left:auto}
+  .tl-summary i{width:9px;height:9px;border-radius:50%;display:inline-block;margin-right:4px}
+
+  /* ---------- tom plan ---------- */
+  .empty{
+    border:1px dashed var(--line);background:var(--card);padding:44px 30px;text-align:center;
+    font-family:'Fraunces',serif;font-size:18px;color:var(--ink-soft);margin-bottom:18px;
+  }
+  .empty button{margin:14px 0 8px}
+  .empty .note{display:block;font-family:'Spline Sans Mono',monospace;font-size:11px;letter-spacing:.04em}
+
   /* ---------- gantt ---------- */
   .gantt{
     border:1px solid var(--line);background:var(--card);
     display:grid;grid-template-columns:var(--label-w) 1fr;
-    box-shadow:0 1px 0 rgba(19,32,47,.04);
-    position:relative;
+    box-shadow:0 1px 0 rgba(19,32,47,.04);position:relative;
   }
-  .col-resizer{
-    position:absolute;top:0;bottom:0;left:calc(var(--label-w) - 4px);width:9px;
-    cursor:col-resize;z-index:20;touch-action:none;
-  }
-  .col-resizer::after{
-    content:"";position:absolute;left:3px;top:0;bottom:0;width:3px;
-    background:transparent;transition:background .15s ease;
-  }
+  .gantt[hidden]{display:none}
+  .col-resizer{position:absolute;top:0;bottom:0;left:calc(var(--label-w) - 4px);width:9px;cursor:col-resize;z-index:20;touch-action:none}
+  .col-resizer::after{content:"";position:absolute;left:3px;top:0;bottom:0;width:3px;background:transparent;transition:background .15s ease}
   .col-resizer:hover::after,.col-resizer.active::after{background:var(--accent)}
-  .labels{border-right:2px solid var(--ink)}
+  .labels{border-right:2px solid var(--ink);min-width:0}
   .labels .corner{
     height:58px;border-bottom:1px solid var(--line);display:flex;align-items:flex-end;
     padding:0 16px 8px;font-family:'Spline Sans Mono',monospace;font-size:10.5px;
     letter-spacing:.1em;text-transform:uppercase;color:var(--ink-faint);
   }
   .lane-label{
-    height:34px;display:flex;align-items:center;justify-content:space-between;padding:0 10px 0 16px;
-    background:var(--ink);color:var(--paper);
-    font-family:'Spline Sans Mono',monospace;font-size:11px;letter-spacing:.12em;text-transform:uppercase;
+    height:var(--lane-h);display:flex;flex-direction:column;justify-content:center;gap:3px;padding:0 16px;
+    background:var(--ink);color:var(--paper);position:relative;
   }
-  .lane-label .add-task{
+  .lane-label .ln{font-weight:700;font-size:13px;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;align-self:flex-start;max-width:calc(100% - 34px)}
+  .lane-label .ln:hover{text-decoration:underline}
+  .lane-label .lm{display:flex;gap:8px;align-items:center;font-size:11px;color:rgba(247,244,238,.8);white-space:nowrap;overflow:hidden;padding-right:34px}
+  .chip{font-family:'Spline Sans Mono',monospace;font-size:9.5px;letter-spacing:.06em;padding:1px 7px;border-radius:8px;text-transform:uppercase;flex:none}
+  .chip.st-gronn{background:#2e7d4f;color:#fff}
+  .chip.st-gul{background:#c9932f;color:#fff}
+  .chip.st-rod{background:#b23a3a;color:#fff}
+  .chip.st-venter,.chip.st-ingen-mal,.chip.st-tom{background:#dcd6cb;color:var(--ink)}
+  .lane-label .add-feature{
+    position:absolute;right:10px;top:50%;transform:translateY(-50%);
     background:transparent;border:1px solid rgba(247,244,238,.4);color:var(--paper);
     width:22px;height:22px;padding:0;line-height:1;font-size:14px;border-radius:2px;
   }
-  .lane-label .add-task:hover{background:var(--paper);color:var(--ink)}
+  .lane-label .add-feature:hover{background:var(--paper);color:var(--ink)}
   .task-label{
-    height:var(--row-h);display:flex;flex-direction:column;justify-content:center;padding:0 16px 0 34px;
-    border-bottom:1px solid var(--line-soft);position:relative;
+    height:var(--row-h);display:flex;flex-direction:column;justify-content:center;padding:0 16px 0 22px;
+    border-bottom:1px solid var(--line-soft);position:relative;cursor:pointer;
   }
-  .tl-dot{
-    position:absolute;left:9px;top:50%;transform:translateY(-50%);
-    width:17px;height:17px;border-radius:50%;cursor:pointer;flex:none;
-    border:1.5px solid rgba(19,32,47,.25);transition:transform .12s ease;
-  }
-  .tl-dot:hover{transform:translateY(-50%) scale(1.25)}
-  .tl-dot.gronn{background:#2e7d43}
-  .tl-dot.gul{background:#d9a416}
-  .tl-dot.rod{background:var(--accent)}
-  .task-label .t{font-weight:600;font-size:12.6px;letter-spacing:-.005em;line-height:1.25;
-    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:text;padding-right:76px}
-  .task-label .d{font-family:'Spline Sans Mono',monospace;font-size:10.5px;color:var(--ink-soft);margin-top:2px;display:flex;gap:8px;align-items:center}
-  .task-label .chip{
-    font-size:10.5px;letter-spacing:.05em;padding:1px 7px;border-radius:8px;
-    background:var(--paper-deep);color:var(--ink-soft);border:1px solid var(--line);
-  }
-  .task-label .chip.who{
-    background:var(--ink);color:var(--paper);border-color:var(--ink);
-    font-family:'Spline Sans Mono',monospace;font-weight:600;cursor:default;
-  }
-  .task-label .chip.ext{
-    background:transparent;border:1px solid var(--gold);color:var(--gold);font-weight:700;
-  }
-  .row-actions button.vis.on{border-color:var(--gold);color:var(--gold)}
-  .lane-label .lane-vis{
-    background:transparent;border:1px solid rgba(247,244,238,.4);color:var(--paper);
-    width:22px;height:22px;padding:0;line-height:1;font-size:11px;border-radius:2px;margin-right:4px;
-  }
-  .lane-label .lane-vis:hover{background:var(--paper);color:var(--ink)}
-
-  /* ---------- presentasjonsmodus (investorvisning) ---------- */
-  #presentExit{
-    display:none;position:fixed;top:14px;right:16px;z-index:80;
-    background:var(--card);border:1px solid var(--line);color:var(--ink-faint);
-  }
-  #presentExit:hover{border-color:var(--ink);color:var(--ink);background:var(--card)}
-  body.presenting #presentExit{display:block}
-  body.presenting .toolbar, body.presenting .legend, body.presenting .hint,
-  body.presenting .link-banner, body.presenting .help, body.presenting .col-resizer,
-  body.presenting .row-actions, body.presenting .tl-dot, body.presenting .task-label .chip,
-  body.presenting .sub-ind, body.presenting .lane-label .add-task,
-  body.presenting .lane-label .lane-vis, body.presenting footer{display:none !important}
-  body.presenting .task-label{padding-left:16px}
-  body.presenting .bar, body.presenting .bar:hover{cursor:default;filter:none;box-shadow:0 1px 2px rgba(19,32,47,.22)}
-  body.presenting .bar .h{display:none}
-  body.presenting .bar.st-gul, body.presenting .bar.st-rod{outline:none;animation:none}
-  body.presenting .titlebar{margin:34px 0 26px}
-  body.presenting .tabs button[data-view="whatnow"],
-  body.presenting .tabs button[data-view="log"],
-  body.presenting .tabs a{display:none}
-  body.presenting h1{font-size:clamp(34px,4.5vw,52px)}
-  body.presenting .gantt{box-shadow:0 2px 24px rgba(19,32,47,.08)}
-  .present-empty{
-    padding:60px 40px;text-align:center;font-family:'Fraunces',serif;font-size:19px;color:var(--ink-soft);
-  }
-  .task-label input{
-    font-family:'Archivo',sans-serif;font-weight:600;font-size:12.6px;width:100%;
-    border:1px solid var(--accent);background:#fff;padding:2px 6px;border-radius:2px;outline:none;
-  }
-  .row-actions{
-    position:absolute;right:8px;top:50%;transform:translateY(-50%);
-    display:none;gap:3px;
-  }
+  .task-label:hover{background:var(--paper)}
+  .task-label .t{font-weight:600;font-size:12.6px;letter-spacing:-.005em;line-height:1.25;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding-right:60px}
+  .task-label .d{font-family:'Spline Sans Mono',monospace;font-size:10.5px;color:var(--ink-soft);margin-top:2px;display:flex;gap:8px;align-items:center;white-space:nowrap;overflow:hidden}
+  .task-label .chip{text-transform:none;letter-spacing:.05em;font-size:10.5px;background:var(--paper-deep);color:var(--ink-soft);border:1px solid var(--line)}
+  .task-label .chip.who{background:var(--ink);color:var(--paper);border-color:var(--ink);font-weight:600;cursor:default}
+  .task-label .chip.ado{background:transparent;border-color:var(--sea);color:var(--sea);text-decoration:none}
+  .task-label .chip.ado:hover{background:var(--sea);color:#fff}
+  .row-actions{position:absolute;right:8px;top:50%;transform:translateY(-50%);display:none;gap:3px}
   .task-label:hover .row-actions{display:flex}
-  .row-actions button{
-    width:22px;height:22px;padding:0;font-size:12px;line-height:1;
-    border:1px solid var(--line);color:var(--ink-soft);background:var(--card);border-radius:2px;
-  }
+  .row-actions button{width:22px;height:22px;padding:0;font-size:12px;line-height:1;border:1px solid var(--line);color:var(--ink-soft);background:var(--card);border-radius:2px}
   .row-actions button:hover{border-color:var(--ink);color:var(--ink);background:var(--card)}
   .row-actions button.del:hover{border-color:var(--accent);color:var(--accent)}
 
   .chart-scroll{overflow-x:auto;overscroll-behavior-x:contain}
-  .chart{position:relative;width:calc(var(--month-w) * 17)}
-  .axis{
-    height:58px;border-bottom:1px solid var(--line);position:sticky;top:0;display:flex;
-    background:var(--card);z-index:5;
-  }
+  .chart{position:relative;width:calc(var(--month-w) * 15)}
+  .axis{height:58px;border-bottom:1px solid var(--line);position:sticky;top:0;display:flex;background:var(--card);z-index:5}
   .axis .mth{width:var(--month-w);flex:none;border-left:1px solid var(--line-soft);padding:9px 0 0 9px}
   .axis .mth:first-child{border-left:none}
   .axis .mth .mm{font-family:'Spline Sans Mono',monospace;font-size:11.5px;font-weight:600;text-transform:uppercase;letter-spacing:.05em}
   .axis .mth .yy{font-family:'Spline Sans Mono',monospace;font-size:9.5px;color:var(--ink-faint)}
   .axis .mth.jan{border-left:2px solid var(--ink)}
-
   .grid{position:absolute;inset:0;top:58px;pointer-events:none}
   .grid .v{position:absolute;top:0;bottom:0;width:1px;background:var(--line-soft)}
   .grid .v.jan{width:2px;background:var(--ink);opacity:.55}
-  .t2zone{
-    position:absolute;top:58px;bottom:0;pointer-events:none;
-    background:repeating-linear-gradient(135deg, transparent, transparent 7px, rgba(138,109,31,.07) 7px, rgba(138,109,31,.07) 14px);
-    border-left:1px dashed rgba(138,109,31,.55);border-right:1px dashed rgba(138,109,31,.55);
-  }
-  .t2zone .zl{
-    position:absolute;top:6px;left:8px;font-family:'Spline Sans Mono',monospace;font-size:9.5px;
-    letter-spacing:.1em;text-transform:uppercase;color:var(--gold);
-  }
-  .today{position:absolute;top:58px;bottom:0;width:2px;background:var(--accent);z-index:4;pointer-events:none}
+  .today{position:absolute;top:58px;bottom:0;width:3px;background:var(--today);z-index:4;pointer-events:none}
   .today .tl{
-    position:absolute;top:-1px;left:5px;background:var(--accent);color:#fff;
+    position:absolute;top:-1px;left:5px;background:var(--today);color:#fff;
     font-family:'Spline Sans Mono',monospace;font-size:9px;letter-spacing:.08em;
     padding:2px 6px;border-radius:2px;white-space:nowrap;
   }
-
-  .lane-band{height:34px;border-bottom:1px solid var(--line-soft);background:rgba(19,32,47,.035)}
+  .lane-band{height:var(--lane-h);border-bottom:1px solid var(--line-soft);background:rgba(19,32,47,.04);position:relative}
+  .lane-band .goal-lbl{
+    position:absolute;top:8px;margin-left:7px;
+    font-family:'Spline Sans Mono',monospace;font-size:9px;letter-spacing:.08em;text-transform:uppercase;
+    color:var(--goal);white-space:nowrap;background:var(--paper);padding:1px 6px;border:1px solid var(--goal);border-radius:2px;
+  }
+  .goal-line{position:absolute;top:0;bottom:0;width:3px;margin-left:-1px;background:var(--goal);z-index:3;pointer-events:none}
   .row{height:var(--row-h);position:relative;border-bottom:1px solid var(--line-soft)}
 
   .bar{
-    position:absolute;top:8px;height:30px;border-radius:3px;cursor:grab;
-    display:flex;align-items:center;
-    color:#fff;font-size:11px;font-weight:600;letter-spacing:.01em;
-    user-select:none;touch-action:none;
-    box-shadow:0 1px 2px rgba(19,32,47,.22);
-    transition:box-shadow .15s ease, filter .15s ease;
+    position:absolute;top:8px;height:30px;border-radius:3px;cursor:grab;z-index:2;
+    display:flex;align-items:center;color:#fff;font-size:11px;font-weight:600;letter-spacing:.01em;
+    user-select:none;touch-action:none;transition:filter .15s ease;
   }
-  .bar:hover{filter:brightness(1.07);box-shadow:0 2px 8px rgba(19,32,47,.3)}
-  .bar.dragging{cursor:grabbing;box-shadow:0 4px 14px rgba(19,32,47,.35);z-index:10;filter:brightness(1.05)}
-  .bar .bl{padding:0 10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;pointer-events:none;display:flex;align-items:center;gap:6px}
-  .bar .sub-ind{
-    flex:none;display:inline-block;font-size:9px;background:rgba(255,255,255,.28);
-    border-radius:8px;padding:0 6px;line-height:14px;
+  .bar:hover{filter:brightness(1.06)}
+  .bar.dragging{cursor:grabbing;z-index:10;filter:brightness(1.04)}
+  .bar.discovery{
+    background:repeating-linear-gradient(45deg,var(--disc-a) 0 8px,var(--disc-b) 8px 16px);
+    color:var(--ink);box-shadow:0 1px 2px rgba(19,32,47,.22);
   }
-  .bar .h{position:absolute;top:0;bottom:0;width:9px;cursor:ew-resize;opacity:0;transition:opacity .12s ease}
+  .bar .seg{position:absolute;top:0;bottom:0;pointer-events:none;box-shadow:0 1px 2px rgba(19,32,47,.22)}
+  .bar .seg.likely{left:0;background:var(--likely);border-radius:3px 0 0 3px}
+  .bar .seg.late{right:0;background:var(--late);border-radius:0 3px 3px 0}
+  .bar .bl{position:relative;z-index:1;padding:0 10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;pointer-events:none}
+  .bar .h{position:absolute;top:0;bottom:0;width:9px;cursor:ew-resize;opacity:0;transition:opacity .12s ease;z-index:2}
   .bar .h::after{content:"";position:absolute;top:7px;bottom:7px;width:3px;border-radius:2px;background:rgba(255,255,255,.85)}
+  .bar.discovery .h::after{background:rgba(19,32,47,.55)}
   .bar .h.l{left:0}.bar .h.l::after{left:3px}
   .bar .h.r{right:0}.bar .h.r::after{right:3px}
+  .bar .h.m{margin-left:-4px}.bar .h.m::after{left:3px;background:rgba(19,32,47,.55)}
   .bar:hover .h{opacity:1}
-  .bar.locked .h{display:none}
-  .bar.styring{background:var(--pine)}
-  .bar.org{background:var(--gold)}
-  .bar.produkt{background:var(--steel)}
-  .bar.kommers{background:var(--sea)}
-  .bar.sikkerhet{background:var(--plomme)}
-  .bar.skytracker{background:#4c5578}
-  .sw.skytracker{background:#4c5578}
-  #syncStBtn{position:relative}
-  #syncStBtn.has-new::after{
-    content:"";position:absolute;top:-4px;right:-4px;width:9px;height:9px;border-radius:50%;
-    background:var(--accent);border:1.5px solid var(--paper);
+  .range-lbl{
+    position:absolute;top:0;height:var(--row-h);display:flex;align-items:center;padding-left:8px;
+    font-family:'Spline Sans Mono',monospace;font-size:10.5px;color:var(--ink-soft);white-space:nowrap;pointer-events:none;z-index:1;
   }
-  .bar.t2b{
-    background-image:repeating-linear-gradient(135deg, rgba(255,255,255,0), rgba(255,255,255,0) 6px, rgba(255,255,255,.22) 6px, rgba(255,255,255,.22) 12px);
-    outline:1.5px dashed rgba(255,255,255,.75);outline-offset:-3px;
-  }
-  .bar.milestone{border-radius:15px}
-  .bar.milestone .bl{padding:0 12px}
-  /* statussignal-belysning av linjene */
-  .bar.st-gul{outline:3px solid #d9a416;outline-offset:2px}
-  .bar.st-rod{outline:3px solid var(--accent);outline-offset:2px;animation:tl-pulse 1.8s ease-in-out infinite}
-  .bar .st-dot{
-    position:absolute;right:5px;top:50%;transform:translateY(-50%);
-    width:9px;height:9px;border-radius:50%;border:1.5px solid rgba(255,255,255,.85);pointer-events:none;
-  }
-  .bar .st-dot.gul{background:#d9a416}
-  .bar .st-dot.rod{background:#ffd9cb}
-  body.presenting .bar .st-dot{display:none}
-  @keyframes tl-pulse{
-    0%,100%{box-shadow:0 0 0 0 rgba(195,68,28,.38)}
-    50%{box-shadow:0 0 0 8px rgba(195,68,28,0)}
-  }
-  .tl-summary{
-    font-family:'Spline Sans Mono',monospace;font-size:11px;color:var(--ink-soft);
-    display:inline-flex;gap:12px;align-items:center;
-  }
-  .tl-summary i{width:9px;height:9px;border-radius:50%;display:inline-block;margin-right:4px}
-  /* årsaksmeny (fast liste fra føring 1.5) */
-  .cause-menu{
-    position:fixed;z-index:120;display:none;min-width:250px;
-    background:var(--card);border:1px solid var(--ink);border-radius:3px;
-    box-shadow:0 10px 30px rgba(19,32,47,.3);padding:6px 0;
-  }
-  .cause-menu .cm-head{
-    font-family:'Spline Sans Mono',monospace;font-size:10px;letter-spacing:.1em;text-transform:uppercase;
-    color:var(--ink-faint);padding:6px 14px 6px;
-  }
-  .cause-menu button{
-    display:block;width:100%;text-align:left;border:none;background:none;
-    font-family:'Archivo',sans-serif;font-size:13px;text-transform:none;letter-spacing:0;
-    padding:7px 14px;cursor:pointer;color:var(--ink);
-  }
-  .cause-menu button:hover{background:var(--paper-deep);color:var(--ink)}
-  .cause-menu button.none{color:var(--ink-faint);font-style:italic}
 
-  /* avhengighetspiler */
   svg.deps{position:absolute;left:0;top:0;pointer-events:none;z-index:6;overflow:visible}
   svg.deps path.vis{fill:none;stroke:var(--ink-faint);stroke-width:1.5;marker-end:url(#arrow)}
   svg.deps path.hit{fill:none;stroke:transparent;stroke-width:11;pointer-events:stroke;cursor:pointer}
   svg.deps g:hover path.vis{stroke:var(--accent);marker-end:url(#arrowA)}
 
-  /* dato-tooltip under drag */
   .drag-tip{
     position:fixed;z-index:100;pointer-events:none;display:none;
-    background:var(--ink);color:var(--paper);
-    font-family:'Spline Sans Mono',monospace;font-size:11px;letter-spacing:.03em;
-    padding:6px 10px;border-radius:3px;white-space:nowrap;
-    box-shadow:0 4px 14px rgba(19,32,47,.35);
+    background:var(--ink);color:var(--paper);font-family:'Spline Sans Mono',monospace;font-size:11px;letter-spacing:.03em;
+    padding:6px 10px;border-radius:3px;white-space:nowrap;box-shadow:0 4px 14px rgba(19,32,47,.35);
   }
   .drag-tip b{color:#e8a184}
 
-  /* ---------- detaljvisning (zoom) ---------- */
-  .modal-back{
-    display:none;position:fixed;inset:0;z-index:60;background:rgba(19,32,47,.55);
-    align-items:center;justify-content:center;padding:30px;
-  }
+  /* ---------- modaler ---------- */
+  .modal-back{display:none;position:fixed;inset:0;z-index:60;background:rgba(19,32,47,.55);align-items:center;justify-content:center;padding:30px}
   .modal-back.open{display:flex}
-  .modal{
-    background:var(--paper);border:1px solid var(--ink);border-radius:3px;
-    width:min(1100px,100%);max-height:88vh;display:flex;flex-direction:column;
-    box-shadow:0 24px 60px rgba(19,32,47,.4);
-  }
-  .modal-head{
-    display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap;
-    padding:18px 22px 14px;border-bottom:2px solid var(--ink);
-  }
+  #dlgBack{z-index:80}
+  .modal{background:var(--paper);border:1px solid var(--ink);border-radius:3px;width:min(1100px,100%);max-height:88vh;display:flex;flex-direction:column;box-shadow:0 24px 60px rgba(19,32,47,.4)}
+  .modal-head{display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap;padding:18px 22px 14px;border-bottom:2px solid var(--ink)}
   .modal-head h2{font-family:'Fraunces',serif;font-weight:600;font-size:22px;letter-spacing:-.01em}
   .modal-head .md{font-family:'Spline Sans Mono',monospace;font-size:11.5px;color:var(--accent);margin-top:2px}
-  .modal-head .mh-note{font-size:11.5px;color:var(--ink-soft);max-width:34ch}
   .modal-body{overflow:auto;padding:0}
-  .mini{display:grid;grid-template-columns:220px 1fr}
-  .mini .mlabels{border-right:2px solid var(--ink)}
-  .mini .mcorner{height:44px;border-bottom:1px solid var(--line);display:flex;align-items:flex-end;
-    padding:0 14px 6px;font-family:'Spline Sans Mono',monospace;font-size:10px;
-    letter-spacing:.1em;text-transform:uppercase;color:var(--ink-faint)}
-  .mini .mtask{height:var(--row-h);display:flex;flex-direction:column;justify-content:center;
-    padding:0 14px;border-bottom:1px solid var(--line-soft);position:relative}
-  .mini .mtask .t{font-weight:600;font-size:12.2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:text;padding-right:26px}
-  .mini .mtask .d{font-family:'Spline Sans Mono',monospace;font-size:9.5px;color:var(--ink-faint);margin-top:2px}
-  .mini .mtask input{font-family:'Archivo',sans-serif;font-weight:600;font-size:12.2px;width:100%;
-    border:1px solid var(--accent);background:#fff;padding:2px 6px;border-radius:2px;outline:none}
-  .mini .mtask .mdel{
-    position:absolute;right:6px;top:50%;transform:translateY(-50%);display:none;
-    width:20px;height:20px;padding:0;font-size:11px;line-height:1;border:1px solid var(--line);
-    color:var(--ink-soft);background:var(--card);border-radius:2px;
-  }
-  .mini .mtask:hover .mdel{display:block}
-  .mini .mtask .mdel:hover{border-color:var(--accent);color:var(--accent)}
-  .mini-scroll{overflow-x:auto}
-  .mini-chart{position:relative}
-  .maxis{height:44px;border-bottom:1px solid var(--line);display:flex;background:var(--card)}
-  .maxis .mth{flex:none;border-left:1px solid var(--line-soft);padding:6px 0 0 8px}
-  .maxis .mth .mm{font-family:'Spline Sans Mono',monospace;font-size:10.5px;font-weight:600;text-transform:uppercase}
-  .maxis .mth .yy{font-family:'Spline Sans Mono',monospace;font-size:9px;color:var(--ink-faint)}
-  .mgrid{position:absolute;inset:0;top:44px;pointer-events:none}
-  .mgrid .v{position:absolute;top:0;bottom:0;width:1px;background:var(--line-soft)}
-  .mgrid .v.w{opacity:.55}
-  .mgrid .v.m{background:var(--line);width:1px}
-  .mrow{height:var(--row-h);position:relative;border-bottom:1px solid var(--line-soft)}
-  .modal-foot{
-    display:flex;justify-content:space-between;align-items:center;gap:12px;
-    padding:12px 22px;border-top:1px solid var(--line);flex-wrap:wrap;
-  }
-  .modal-foot .note{font-size:11px;color:var(--ink-faint);font-family:'Spline Sans Mono',monospace}
+  .modal-foot{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:12px 22px;border-top:1px solid var(--line);flex-wrap:wrap}
   .modal-foot .btns{display:flex;gap:8px;align-items:center}
-
-  /* ---------- import-forhåndsvisning + Claude-pakke ---------- */
-  .imp-sum{
-    display:flex;gap:18px;flex-wrap:wrap;padding:14px 22px;border-bottom:1px solid var(--line);
-    font-family:'Spline Sans Mono',monospace;font-size:11px;letter-spacing:.05em;text-transform:uppercase;
-    color:var(--ink-soft);
-  }
-  .imp-sum b{font-size:16px;margin-right:5px;color:var(--ink)}
-  .imp-list{list-style:none;margin:0;padding:6px 0;max-height:46vh;overflow:auto}
-  .imp-list li{display:flex;gap:10px;align-items:baseline;padding:8px 22px;border-bottom:1px solid var(--line-soft);font-size:13px}
-  .imp-list li:last-child{border-bottom:none}
-  .imp-kind{
-    flex:none;font-family:'Spline Sans Mono',monospace;font-size:9.5px;letter-spacing:.08em;
-    text-transform:uppercase;padding:1px 8px;border-radius:8px;border:1px solid var(--line);color:var(--ink-soft);
-  }
-  .imp-kind.ny{background:var(--pine);color:#fff;border-color:var(--pine)}
-  .imp-kind.endret{background:var(--paper-deep);color:var(--ink)}
-  .imp-kind.slettet{background:var(--accent);color:#fff;border-color:var(--accent)}
-  .imp-name{font-weight:600;flex:none;max-width:34ch;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-  .imp-det{color:var(--ink-soft);font-size:12px}
-  .claude-steps{padding:14px 22px 18px;max-width:72ch}
-  .claude-steps p{font-size:13.5px;color:var(--ink-soft);margin:0 0 6px}
-  .claude-steps p b, .claude-steps li b{color:var(--ink)}
-  .claude-steps ol{margin:8px 0 0 20px}
-  .claude-steps li{font-size:13.5px;color:var(--ink-soft);margin:8px 0}
-  .claude-steps code{
-    font-family:'Spline Sans Mono',monospace;font-size:.85em;background:var(--paper-deep);
-    border:1px solid var(--line);border-radius:3px;padding:0 5px;color:var(--ink);
-  }
-  .modal-foot a.btnlike{
-    font-family:'Spline Sans Mono',monospace;font-size:11px;letter-spacing:.06em;text-transform:uppercase;
-    border:1px solid var(--line);color:var(--ink-soft);padding:8px 14px;border-radius:2px;text-decoration:none;
-  }
-  .modal-foot a.btnlike:hover{border-color:var(--ink);color:var(--ink)}
-
-  /* ---------- oppgave-editor ---------- */
   .ed-body{padding:18px 22px;display:grid;gap:16px}
-  .ed-field > span{
-    display:block;font-family:'Spline Sans Mono',monospace;font-size:10px;letter-spacing:.1em;
-    text-transform:uppercase;color:var(--ink-faint);margin-bottom:6px;
-  }
-  .ed-field input[type=text]{
+  .ed-field > span{display:block;font-family:'Spline Sans Mono',monospace;font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-faint);margin-bottom:6px}
+  .ed-field input[type=text],.ed-field input[type=number],.ed-field input[type=date]{
     width:100%;font-family:'Archivo',sans-serif;font-size:14px;padding:8px 10px;
     border:1px solid var(--line);border-radius:2px;background:#fff;color:var(--ink);
   }
-  .ed-field input[type=text]:focus{outline:none;border-color:var(--ink)}
-  .ed-field input[type=text]:disabled{background:var(--paper-deep);color:var(--ink-soft)}
-  .ed-status{display:flex;gap:6px;flex-wrap:wrap}
-  .ed-status button{padding:7px 12px}
-  .ed-status button.on[data-s=gronn]{background:#2e7d43;border-color:#2e7d43;color:#fff}
-  .ed-status button.on[data-s=gul]{background:#d9a416;border-color:#d9a416;color:#fff}
-  .ed-status button.on[data-s=rod]{background:var(--accent);border-color:var(--accent);color:#fff}
-  #edCause{
-    margin-top:8px;width:100%;font-family:'Archivo',sans-serif;font-size:13px;padding:7px 8px;
-    border:1px solid var(--line);border-radius:2px;background:#fff;color:var(--ink);
-  }
-  .ed-check{display:flex;gap:9px;align-items:center;font-size:13.5px;cursor:pointer}
+  .ed-field input:focus{outline:none;border-color:var(--ink)}
+  .ed-field[hidden]{display:none}
+  .ed-row{display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end}
+  .ed-row .ed-field{flex:1;min-width:140px}
+  .ed-kind{display:flex;gap:6px;flex-wrap:wrap}
+  .ed-kind button{padding:7px 12px}
+  .ed-kind button.on[data-k=discovery]{background:var(--disc-a);border-color:var(--disc-a);color:var(--ink)}
+  .ed-kind button.on[data-k=estimate]{background:var(--likely);border-color:var(--likely);color:#fff}
+  .ed-check{display:flex;gap:9px;align-items:center;font-size:13.5px;cursor:pointer;padding-bottom:9px}
   .ed-deps{display:flex;gap:6px;flex-wrap:wrap}
-  .ed-deps .depchip{
-    display:inline-flex;gap:7px;align-items:center;font-size:12px;border:1px solid var(--line);
-    background:var(--paper-deep);padding:3px 9px;border-radius:9px;
-  }
+  .ed-deps .depchip{display:inline-flex;gap:7px;align-items:center;font-size:12px;border:1px solid var(--line);background:var(--paper-deep);padding:3px 9px;border-radius:9px}
   .ed-deps .depchip button{border:none;background:none;padding:0;font-size:13px;color:var(--ink-soft);line-height:1}
   .ed-deps .depchip button:hover{color:var(--accent)}
   .ed-deps .none{font-size:12px;color:var(--ink-faint)}
-  .ed-row{display:flex;gap:8px;flex-wrap:wrap}
-  .ed-field textarea{
-    width:100%;font-family:'Archivo',sans-serif;font-size:13.5px;padding:8px 10px;resize:vertical;
-    border:1px solid var(--line);border-radius:2px;background:#fff;color:var(--ink);
-  }
-  .ed-field textarea:focus{outline:none;border-color:var(--ink)}
-  .linkrow{display:flex;gap:6px;margin-bottom:6px}
-  .linkrow input{
-    font-family:'Archivo',sans-serif;font-size:12.5px;padding:6px 8px;
-    border:1px solid var(--line);border-radius:2px;background:#fff;color:var(--ink);
-  }
-  .linkrow input:focus{outline:none;border-color:var(--ink)}
-  .linkrow .l-label{width:34%}
-  .linkrow .l-url{flex:1}
-  .linkrow button{width:28px;padding:0}
-  #edAddLink{margin-top:2px}
-  .ed-field input[type=number]{
-    width:120px;font-family:'Archivo',sans-serif;font-size:14px;padding:8px 10px;
-    border:1px solid var(--line);border-radius:2px;background:#fff;color:var(--ink);
-  }
-  .ed-field input[type=number]:focus{outline:none;border-color:var(--ink)}
-
-  /* buffersegment før milepæl (føring 1.5) */
-  .buffer-seg{
-    position:absolute;top:13px;height:20px;border-radius:2px;
-    background:repeating-linear-gradient(135deg, rgba(138,109,31,.13), rgba(138,109,31,.13) 5px, transparent 5px, transparent 10px);
-    border:1px dashed var(--gold);overflow:hidden;
-  }
-  .buffer-seg i{position:absolute;left:0;top:0;bottom:0;background:rgba(217,164,22,.5)}
-  .buffer-seg.overrun{border-color:var(--accent)}
-  .buffer-seg.overrun i{background:rgba(195,68,28,.5)}
-  button.danger-ghost{border-color:var(--line);color:var(--accent)}
-  button.danger-ghost:hover{background:var(--accent);border-color:var(--accent);color:#fff}
   .ed-note{font-size:12px;color:var(--ink-soft);border-left:3px solid var(--gold);padding:6px 12px;background:var(--paper)}
-
-  /* ---------- dialog (erstatter confirm/alert) ---------- */
-  #dlgBack{z-index:80}
   .dlg-body{padding:16px 22px 18px;font-size:14px;color:var(--ink-soft);max-width:60ch;white-space:pre-line}
-  .dlg-body input{
-    margin-top:12px;width:100%;font-family:'Spline Sans Mono',monospace;font-size:13px;padding:8px 10px;
-    border:1px solid var(--line);border-radius:2px;background:#fff;color:var(--ink);
-  }
-  .dlg-body input:focus{outline:none;border-color:var(--ink)}
+  .dlg-body input{margin-top:12px;width:100%;font-family:'Spline Sans Mono',monospace;font-size:13px;padding:8px 10px;border:1px solid var(--line);border-radius:2px;background:#fff;color:var(--ink)}
   #dlgYes.danger{border-color:var(--accent);color:var(--accent)}
   #dlgYes.danger:hover{background:var(--accent);color:#fff}
 
-  /* ---------- lesemodus ---------- */
-  .ro-banner{
-    margin:14px 0 0;border:1px solid var(--gold);background:var(--card);color:var(--ink-soft);
-    padding:9px 14px;font-family:'Spline Sans Mono',monospace;font-size:11.5px;letter-spacing:.04em;
-  }
-  .ro-banner b{color:var(--gold)}
-
-  /* ---------- hva nå ---------- */
-  .wn-h{font-family:'Fraunces',serif;font-weight:600;font-size:22px;letter-spacing:-.01em;margin:26px 0 12px}
-  .wn-h:first-child{margin-top:0}
-  .wn-card{border:1px solid var(--line);background:var(--card)}
-  .wn-row{display:flex;gap:10px;align-items:center;padding:9px 20px;border-top:1px solid var(--line-soft);font-size:13px;flex-wrap:wrap}
-  .wn-row:first-child{border-top:none}
-  .wn-dot{width:10px;height:10px;border-radius:50%;flex:none}
-  .wn-name{font-weight:600}
-  .wn-lane{font-family:'Spline Sans Mono',monospace;font-size:9.5px;text-transform:uppercase;letter-spacing:.08em;color:var(--ink-faint);flex:none}
-  .wn-when{font-family:'Spline Sans Mono',monospace;font-size:11px;color:var(--ink-soft);margin-left:auto;flex:none}
-  .wn-wait{flex-basis:100%;padding-left:20px;font-size:11.5px;color:var(--gold)}
-  .ms-card{border:1px solid var(--line);background:var(--card);margin-bottom:16px}
-  .ms-head{display:flex;justify-content:space-between;gap:12px;align-items:baseline;padding:16px 20px 6px;flex-wrap:wrap}
-  .ms-head h3{font-family:'Fraunces',serif;font-size:19px;font-weight:600;letter-spacing:-.01em}
-  .ms-when{font-family:'Spline Sans Mono',monospace;font-size:11.5px;color:var(--accent)}
-  .ms-dod{padding:0 20px 10px;font-size:13.5px;color:var(--ink-soft);max-width:75ch}
-  .ms-dod b{color:var(--ink)}
-  .ms-links{padding:0 20px 12px;display:flex;gap:8px;flex-wrap:wrap}
-  .ms-links a{
-    font-size:12px;border:1px solid var(--line);border-radius:9px;padding:2px 10px;
-    color:var(--sea);text-decoration:none;background:var(--paper);
-  }
-  .ms-links a:hover{border-color:var(--sea)}
-  .ms-progress{height:6px;background:var(--paper-deep);margin:0 20px 8px;border-radius:3px;overflow:hidden}
-  .ms-progress i{display:block;height:100%;background:var(--pine)}
-  .ms-meta{padding:0 20px 8px;font-family:'Spline Sans Mono',monospace;font-size:10.5px;color:var(--ink-soft)}
-  .ms-rest{padding:0 20px 16px;font-size:12.5px;color:var(--ink-soft);max-width:90ch}
-  .ms-rest b{color:var(--ink)}
-
-  /* ---------- dashboard ---------- */
-  .dash-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(175px,1fr));gap:14px;margin-bottom:18px}
-  .stat{border:1px solid var(--line);background:var(--card);padding:16px 18px 14px}
-  .stat .n{font-family:'Fraunces',serif;font-weight:600;font-size:clamp(28px,3vw,40px);letter-spacing:-.02em;line-height:1}
-  .stat .l{font-family:'Spline Sans Mono',monospace;font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-soft);margin-top:7px}
-  .stat .s{font-size:11px;color:var(--ink-faint);margin-top:2px}
-  .dash-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;align-items:start}
-  @media(max-width:1050px){.dash-grid{grid-template-columns:1fr}}
-  .dash-card{border:1px solid var(--line);background:var(--card)}
-  .dash-card h3{font-family:'Fraunces',serif;font-weight:600;font-size:17px;padding:14px 18px 2px;letter-spacing:-.01em}
-  .dash-card .dc-sub{font-size:11.5px;color:var(--ink-soft);padding:0 18px 10px}
-  .dash-card .dc-body{padding:0 18px 16px}
-  .spark{width:100%;height:56px;display:block}
-  .horizon{grid-column:1 / -1}
-  .hz-svg{width:100%;height:86px;display:block}
-  .hz-list{display:flex;gap:16px;flex-wrap:wrap;padding:4px 18px 14px;font-family:'Spline Sans Mono',monospace;font-size:10.5px;color:var(--ink-soft)}
-  .hz-list b{color:var(--ink)}
-  .buf-row{display:flex;gap:10px;align-items:center;padding:8px 0;border-top:1px solid var(--line-soft);font-size:12.5px;flex-wrap:wrap}
-  .buf-row:first-child{border-top:none}
-  .buf-name{font-weight:600;flex:none;max-width:24ch;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-  .buf-bar{flex:1;min-width:110px;height:7px;border-radius:3px;background:var(--paper-deep);overflow:hidden;position:relative}
-  .buf-bar i{position:absolute;left:0;top:0;bottom:0;background:#d9a416}
-  .buf-bar.overrun i{background:var(--accent)}
-  .buf-num{font-family:'Spline Sans Mono',monospace;font-size:10.5px;color:var(--ink-soft);flex:none}
-  .red-row{display:flex;gap:8px;align-items:baseline;padding:6px 0;border-top:1px solid var(--line-soft);font-size:12.5px}
-  .red-row:first-child{border-top:none}
-  .eco-row{display:flex;justify-content:space-between;gap:10px;padding:7px 0;border-top:1px solid var(--line-soft);font-size:12.5px}
-  .eco-row:first-child{border-top:none}
-  .eco-row b{font-family:'Spline Sans Mono',monospace;font-size:11.5px}
-  .dash-note{margin-top:16px;font-size:10.5px;color:var(--ink-faint);font-family:'Spline Sans Mono',monospace;line-height:1.8}
-
-  /* ---------- endringslogg ---------- */
-  .log-list{border:1px solid var(--line);background:var(--card);padding:6px 0 14px}
-  .log-day{font-family:'Fraunces',serif;font-weight:600;font-size:16px;padding:18px 22px 8px}
-  .log-day::first-letter{text-transform:uppercase}
-  .log-row{display:flex;gap:10px;align-items:baseline;padding:7px 22px;border-bottom:1px solid var(--line-soft);font-size:13px}
-  .log-row:last-child{border-bottom:none}
-  .log-when{font-family:'Spline Sans Mono',monospace;font-size:11px;color:var(--ink-faint);flex:none;width:42px}
-  .log-body b{font-weight:600}
-
   footer{
     margin-top:34px;display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap;
-    font-family:'Spline Sans Mono',monospace;font-size:10.5px;letter-spacing:.06em;
-    text-transform:uppercase;color:var(--ink-faint);
+    font-family:'Spline Sans Mono',monospace;font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-faint);
     border-top:1px solid var(--line);padding-top:14px;
   }
-  footer a{color:var(--ink-soft)}
-
   @media (max-width:860px){
-    :root{--label-w:190px;--month-w:76px}
+    :root{--label-w:200px;--month-w:76px}
     .wrap{padding:24px 14px 60px}
     .task-label .t{font-size:11.5px}
   }
@@ -657,123 +296,51 @@
 <div class="wrap">
 
   <div class="meta-row">
-    <span class="brand">SKYTALE <em>×</em> TELENOR</span>
-    <span id="metaRight">Planleggingsverktøy · August 2026</span>
+    <span class="brand">SKYTALE <em>·</em> VEIKART</span>
+    <span id="metaRight">Utviklingsavdelingen <span class="example-badge" id="exampleBadge" hidden>Eksempel, ikke en plan</span></span>
   </div>
 
   <div class="titlebar">
     <div>
-      <h1 id="mainTitle">Tidslinjen — <span class="accent">planlegging.</span></h1>
+      <h1>Veikartet – <span class="accent">epics.</span></h1>
       <p class="hint">
-        Levende planleggingsversjon av Telenor-tidslinjen — dra i linjene, koble avhengigheter,
-        zoom inn i delmål. Trykk <b>Hjelp</b> for en kort forklaring på bruk.
+        Én rad per epic. Utredning er stripet med en sluttdato, estimater er et spenn: mørk del = sannsynlig,
+        lys del = usikker. Statusen regnes ut fra spennet mot måldatoen. Trykk <b>Hjelp</b> for bruk.
       </p>
     </div>
     <div class="toolbar">
       <span class="dirty-note" id="dirtyNote"></span>
-      <div class="menu-wrap">
-        <button class="ghost" id="dataBtn">Data ▾</button>
-        <div class="menu" id="dataMenu">
-          <button id="syncStBtn" title="Hent inn siste synkede SkyTracker-data">Synk SkyTracker</button>
-          <button id="exportBtn">Eksporter (JSON)</button>
-          <button id="importBtn">Importer …</button>
-          <button id="claudeBtn" title="Last ned plan + instruksjoner og oppdater planen i en lokal Claude-økt">Oppdater med Claude …</button>
-          <hr>
-          <button id="resetBtn" class="danger">Nullstill til plan …</button>
-        </div>
-      </div>
-      <button id="presentBtn" title="Investorvisning: viser kun spor og oppgaver merket eksternt">Presentasjon</button>
+      <button id="addEpicBtn">＋ Epic</button>
+      <button class="ghost" id="exportBtn">Eksporter (JSON)</button>
       <button class="ghost" id="helpBtn">Hjelp</button>
-      <input type="file" id="importFile" accept="application/json" style="display:none">
     </div>
   </div>
 
-  <div class="ro-banner" id="roBanner" hidden><b>👁 Lesetilgang</b> — endringene dine lagres kun i din nettleser og deles ikke med andre.</div>
-
-  <nav class="tabs" id="tabs">
-    <button data-view="plan" class="active">Plan</button>
-    <button data-view="whatnow">Hva nå</button>
-    <button data-view="dash">Dashboard</button>
-    <button data-view="log">Logg</button>
-    <a href="claude-guide.html">Guide →</a>
-  </nav>
-
-  <section class="view" id="view-plan">
+  <div class="ro-banner" id="roBanner" hidden><b>👁 Lesetilgang</b> – endringer du gjør deles ikke og forsvinner når siden lastes på nytt.</div>
 
   <div class="help" id="helpPanel">
-    <h3>Slik bruker du verktøyet</h3>
+    <h3>Slik bruker du veikartet</h3>
     <button class="ghost close-help" id="helpClose" title="Lukk">×</button>
     <div class="help-grid">
-      <div class="help-card">
-        <div class="hc-head"><span class="ico">↔</span><h4>Flytt og juster</h4></div>
-        <p><b>Dra en linje</b> for å flytte oppgaven i tid. <b>Dra i venstre eller høyre ende</b> for å endre
-        start eller slutt. Alt fester seg til ukesnivå, og datoene vises mens du drar.
-        Skillelinjen mellom navnekolonnen og diagrammet kan også dras for å justere kolonnebredden.</p>
-      </div>
-      <div class="help-card">
-        <div class="hc-head"><span class="ico">✎</span><h4>Rediger</h4></div>
-        <p><b>Klikk på et oppgavenavn</b> for å åpne redigeringspanelet: navn, statussignal,
-        ekstern-merking, avhengigheter, delmål og sletting — alt på ett sted.
-        Arbeidsstrømnavn endres med <b>dobbeltklikk</b>.</p>
-      </div>
-      <div class="help-card adv">
-        <div class="hc-head"><span class="ico">＋</span><h4>Legg til og slett rader</h4></div>
-        <p><b>＋</b> i den svarte arbeidsstrøm-linjen legger til en ny rad. Hold musen over et
-        oppgavenavn og bruk <b>×</b> for å slette raden.</p>
-      </div>
-      <div class="help-card adv">
-        <div class="hc-head"><span class="ico">⇢</span><h4>Avhengigheter</h4></div>
-        <p>Klikk <b>⇢</b> på oppgaven som må bli <b>ferdig først</b>, og deretter på oppgaven som venter på den.
-        Pilen viser koblingen — <b>klikk pilen</b> for å fjerne den. Drar du forgjengeren ut i tid,
-        flyttes de avhengige automatisk med.</p>
-      </div>
-      <div class="help-card adv">
-        <div class="hc-head"><span class="ico">⌕</span><h4>Zoom inn i delmål</h4></div>
-        <p>Klikk <b>⌕</b> på raden, eller <b>dobbeltklikk selve linjen</b>, for å åpne delmålene med
-        ukesoppløsning. Hovedlinjen spenner alltid fra første til siste delmål — endrer du her,
-        oppdateres hovedbildet.</p>
-      </div>
-      <div class="help-card">
-        <div class="hc-head"><span class="ico">⭳</span><h4>Lagring og deling</h4></div>
-        <p>Åpnet <b>via SkyTracker</b> er planen felles: alt du gjør <b>autolagres for alle</b>
-        (☁-status øverst), og andres endringer dukker opp av seg selv innen ~10 sekunder. Dere kan
-        trygt jobbe samtidig — endringer flettes egenskap for egenskap, og initial-merket bak datoene
-        viser hvem som endret raden sist. Åpnet <b>lokalt fra fil</b> lagres alt kun i din nettleser.
-        Detaljene om flettingen står i guiden.</p>
-      </div>
-      <div class="help-card adv">
-        <div class="hc-head"><span class="ico">⟳</span><h4>Synk SkyTracker</h4></div>
-        <p>Trykk <b>Synk SkyTracker</b>: utviklerbanene legges inn som egen arbeidsstrøm (merket <b>ST</b>),
-        med kortene som delmål. Fullførte kort holdes utenfor. Åpner du verktøyet <b>via SkyTracker-adressen</b>
-        hentes siste tavle direkte — du er allerede innlogget. Åpner du HTML-filen <b>lokalt fra disk</b>:
-        dobbeltklikk <b>sync-skytracker.command</b> i mappen først og last siden på nytt (rød prikk = nyere
-        data ligger klar).</p>
-      </div>
-      <div class="help-card">
-        <div class="hc-head"><span class="ico">●</span><h4>Statussignal</h4></div>
-        <p>Klikk <b>prikken foran oppgavenavnet</b> for å sette statussignal:
-        <b>grønn</b> = som avtalt, <b>gul</b> = utfordringer (avdelingen eier løsningen),
-        <b>rød</b> = krever beslutning. Ved gul/rød velger du årsak fra den faste listen —
-        det er kategoriene som summeres over kvartaler. Gule og røde linjer lyses opp i diagrammet,
-        og tellingen vises øverst. Signalet overlever SkyTracker-resynk.
-        (Samme fargelogikk som trafikklysmodellen i ukesrapporteringen, men eget navn — dette er per oppgave.)</p>
-      </div>
-      <div class="help-card adv">
-        <div class="hc-head"><span class="ico">◉</span><h4>Presentasjon for investormøter</h4></div>
-        <p>Alt er <b>internt</b> som standard. Merk oppgaver eksterne med <b>○-knappen</b> på raden
-        (blir ◉), eller hele strømmer med ○ i den svarte strømlinjen. <b>Presentasjon</b>-knappen åpner
-        investorvisningen: kun eksternt merkede spor, uten statussignaler, redigeringsknapper og interne
-        merker. Avslutt med Esc. Direktelenke: legg <b>?present=1</b> på adressen.</p>
-      </div>
-      <div class="help-card adv">
-        <div class="hc-head"><span class="ico">✳</span><h4>Oppdater med Claude</h4></div>
-        <p>Tidslinjen kan vedlikeholdes sammen med Claude Code på bakgrunn av dokumentasjon:
-        trykk <b>Oppdater med Claude</b> for å laste ned planen + instruksjonene og få oppskriften.
-        Importen viser alltid en <b>forhåndsvisning</b> av endringene før noe lagres — du trenger
-        aldri lese JSON selv. <a href="claude-guide.html"><b>Les hvordan →</b></a></p>
-      </div>
+      <div class="help-card"><h4>Epic og måldato</h4>
+        <p>Hver svart rad er en <b>epic</b>: et resultat ledelsen vil ha, eid av PM + CTO. Klikk navnet for å sette
+        navn, måldato (eller foreløpig mål) og ADO-id. <b>＋ Epic</b> øverst lager en ny. Måldatoen tegnes som en mørk strek.</p></div>
+      <div class="help-card"><h4>Utredning og estimat</h4>
+        <p><b>＋</b> på epic-raden legger til en feature. I redigeringen velger du <b>Utredning</b> (stripet, med sluttdato)
+        eller <b>Estimert</b> (spenn: sannsynlig i uker + senest i uker). Klikk et feature-navn for å redigere. Utredning tar utviklertid og vises derfor.</p></div>
+      <div class="help-card"><h4>Status</h4>
+        <p>Regnes ut, aldri skrevet inn: <b>grønn</b> = hele spennet før måldato, <b>gul</b> = måldatoen inne i spennet,
+        <b>rød</b> = hele spennet etter. <b>Venter på utredning</b> så lenge en feature utredes.</p></div>
+      <div class="help-card"><h4>Flytt og juster</h4>
+        <p><b>Dra en linje</b> for å flytte den i tid. Dra i <b>venstre ende</b> for start, <b>høyre ende</b> for senest,
+        og i <b>skillet</b> mellom mørk og lys del for sannsynlig. Dra fester til uke; datoer du skriver inn i redigeringen beholdes eksakt.</p></div>
+      <div class="help-card"><h4>Avhengigheter</h4>
+        <p>Klikk <b>⇢</b> på featuren som må bli <b>ferdig først</b>, deretter på den som venter. Sprekker en blokker,
+        flyttes alt som venter på den, og epicen kan skifte farge. Klikk pilen for å fjerne koblingen.</p></div>
+      <div class="help-card"><h4>Lagring og deling</h4>
+        <p>Alt du gjør <b>autolagres for alle</b> (☁-status øverst), og andres endringer dukker opp innen ~10 sekunder.
+        Endringer flettes egenskap for egenskap, så dere kan jobbe samtidig. Lesetilgang gir en lokal, flyktig kopi.</p></div>
     </div>
-    <button class="ghost" id="helpMore">Vis alle emner</button>
   </div>
 
   <div class="link-banner" id="linkBanner">
@@ -782,367 +349,192 @@
   </div>
 
   <div class="legend">
-    <span><i class="sw styring"></i>Styring</span>
-    <span><i class="sw org"></i>Organisasjon</span>
-    <span><i class="sw produkt"></i>Produkt</span>
-    <span><i class="sw kommers"></i>Kommersielt</span>
-    <span><i class="sw sikkerhet"></i>Sikkerhet</span>
-    <span><i class="sw t2sw"></i>Forutsetter transje 2</span>
-    <span><i class="sw skytracker"></i>SkyTracker (synket)</span>
+    <span><i class="sw discovery"></i>Utredning</span>
+    <span><i class="sw likely"></i>Sannsynlig</span>
+    <span><i class="sw late"></i>Usikker del av spennet</span>
+    <span><i class="sw goal"></i>Måldato</span>
+    <span><i class="sw today"></i>I dag</span>
     <span><i class="sw depsw"></i>Avhengighet</span>
-    <span class="tl-summary" id="tlSummary" title="Statussignaler: klikk prikken foran et oppgavenavn for å endre"></span>
+    <span class="tl-summary" id="tlSummary" title="Status per epic"></span>
   </div>
 
-  <div class="gantt">
+  <div class="empty" id="emptyState" hidden>
+    <p>Planen er tom.</p>
+    <button id="seedBtn" hidden>Last inn eksempel-epics</button>
+    <span class="note" id="emptyNote"></span>
+  </div>
+
+  <div class="gantt" id="gantt">
     <div class="labels" id="labels"></div>
     <div class="chart-scroll" id="chartScroll">
       <div class="chart" id="chart"></div>
     </div>
     <div class="col-resizer" id="colResizer" title="Dra for å justere kolonnebredden · dobbeltklikk for standard"></div>
   </div>
-  </section>
-
-  <section class="view" id="view-whatnow" hidden></section>
-  <section class="view" id="view-dash" hidden></section>
-  <section class="view" id="view-log" hidden></section>
 
   <footer>
-    <span>Skytale AS · Grunnlag: Oppstart del 2 · Samling 1 · V1.7</span>
-    <span><a href="claude-guide.html">→ Oppdatere tidslinjen med Claude</a></span>
-    <span><a href="index.html">→ Redaksjonell versjon</a></span>
+    <span>Skytale AS · Veikart for utviklingsavdelingen</span>
+    <span>Estimater og avhengigheter bor her · ADO speiler dem og eier stories og sprinter</span>
   </footer>
 </div>
 
 <div class="drag-tip" id="dragTip"></div>
-<div class="cause-menu" id="causeMenu"></div>
-<button class="ghost" id="presentExit">Avslutt presentasjon (Esc)</button>
 
-<!-- Delt import-logikk (smart import): samme fil kjøres i nettleseren her, i den
-     hostede utgaven (/timeline/import-diff.js) og i vitest — én kilde, null drift.
-     Lokal modus (fil på disk): last også skytracker-data.js fra sync-skytracker.command.
-     Hostet i SkyTracker hentes data i stedet live fra /api/timeline-export ved knappetrykk. -->
-<script>
-(function(){
-  var __id = document.createElement('script');
-  __id.src = location.protocol === 'file:' ? 'plan-tools.js' : 'timeline/plan-tools.js';
-  document.head.appendChild(__id);
-})();
-if (location.protocol === 'file:') {
-  var __st = document.createElement('script');
-  __st.src = 'skytracker-data.js';
-  __st.onload = function(){ if (window.__stDataLoaded) window.__stDataLoaded(); };
-  document.head.appendChild(__st);
-}
-</script>
-
-<!-- detaljvisning -->
-<div class="modal-back" id="modalBack">
-  <div class="modal">
-    <div class="modal-head">
-      <div>
-        <h2 id="modalTitle"></h2>
-        <div class="md" id="modalDates"></div>
-      </div>
-      <div class="mh-note">Endringer her oppdaterer hovedtidslinjen. Hovedlinjen spenner alltid fra første til siste delmål.</div>
-      <button id="modalClose">Lukk</button>
-    </div>
-    <div class="modal-body">
-      <div class="mini">
-        <div class="mlabels" id="mLabels"></div>
-        <div class="mini-scroll">
-          <div class="mini-chart" id="mChart"></div>
-        </div>
-      </div>
-    </div>
-    <div class="modal-foot">
-      <button class="ghost" id="addSubBtn">＋ Nytt delmål</button>
-      <span class="note">Oppløsning: uke · dobbeltklikk navn for å redigere · × sletter delmål</span>
-    </div>
-  </div>
-</div>
-
-<!-- import-forhåndsvisning -->
-<div class="modal-back" id="importBack">
-  <div class="modal" style="width:min(780px,100%)">
-    <div class="modal-head">
-      <div>
-        <h2>Forhåndsvisning av import</h2>
-        <div class="md" id="impSub"></div>
-      </div>
-      <div class="mh-note">Ingenting lagres før du trykker «Bruk endringene».</div>
-      <button id="impCloseX">Lukk</button>
-    </div>
-    <div class="modal-body">
-      <div class="imp-sum" id="impSum"></div>
-      <ul class="imp-list" id="impList"></ul>
-    </div>
-    <div class="modal-foot">
-      <span class="note" id="impNote"></span>
-      <span class="btns">
-        <button class="ghost" id="impCancel">Avbryt</button>
-        <button id="impApply">Bruk endringene</button>
-      </span>
-    </div>
-  </div>
-</div>
-
-<!-- oppgave-editor -->
+<!-- feature-editor -->
 <div class="modal-back" id="editorBack">
   <div class="modal" style="width:min(580px,100%)">
     <div class="modal-head">
-      <div>
-        <h2 id="edTitle">Rediger oppgave</h2>
-        <div class="md" id="edDates"></div>
-      </div>
+      <div><h2 id="edTitle">Rediger feature</h2><div class="md" id="edDates"></div></div>
       <button id="edClose">Lukk</button>
     </div>
     <div class="modal-body">
       <div class="ed-body">
-        <div class="ed-note" id="edStNote" hidden>Denne raden speiler SkyTracker-tavlen — navn og datoer
-        endres der og overskrives ved neste synk. Statussignal og ekstern-merking kan settes her.</div>
         <label class="ed-field"><span>Navn</span><input id="edName" type="text"></label>
-        <div class="ed-field">
-          <span>Statussignal</span>
-          <div class="ed-status" id="edStatus">
-            <button type="button" data-s="gronn">● Grønn — som avtalt</button>
-            <button type="button" data-s="gul">● Gul</button>
-            <button type="button" data-s="rod">● Rød</button>
+        <div class="ed-field"><span>Type</span>
+          <div class="ed-kind" id="edKind">
+            <button type="button" data-k="discovery">Utredning – sluttdato</button>
+            <button type="button" data-k="estimate">Estimert – spenn i uker</button>
           </div>
-          <select id="edCause" hidden></select>
-        </div>
-        <label class="ed-check"><input type="checkbox" id="edExt"> Ekstern — vises i investorpresentasjonen</label>
-        <label class="ed-check"><input type="checkbox" id="edMilestone"> Milepæl — pilleform, kan få definisjon av ferdig</label>
-        <div class="ed-field" id="edDodField" hidden>
-          <span>Definisjon av ferdig</span>
-          <textarea id="edDod" rows="2" placeholder="Hva må være sant for at milepælen er nådd?"></textarea>
-        </div>
-        <div class="ed-field" id="edBufferField" hidden>
-          <span>Buffer før måldato (uker — føring 1.5)</span>
-          <input id="edBuffer" type="number" min="0" step="1" placeholder="f.eks. 4">
         </div>
         <div class="ed-row">
-          <div class="ed-field">
-            <span>Kostnad (NOK, estimat)</span>
-            <input id="edCost" type="number" min="0" step="1000" placeholder="valgfritt">
-          </div>
-          <div class="ed-field">
-            <span>Forventet inntjening (NOK, estimat)</span>
-            <input id="edRevenue" type="number" min="0" step="1000" placeholder="mest på milepæler">
-          </div>
+          <label class="ed-field"><span>Start</span><input id="edStart" type="date"></label>
+          <label class="ed-field" id="edEndField"><span>Utredning ferdig</span><input id="edEnd" type="date"></label>
+          <label class="ed-field" id="edLikelyField"><span>Sannsynlig (uker)</span><input id="edLikely" type="number" min="1" step="1"></label>
+          <label class="ed-field" id="edLateField"><span>Senest (uker)</span><input id="edLate" type="number" min="1" step="1"></label>
         </div>
-        <div class="ed-field">
-          <span>Dokumentlenker (beslutninger, referater, spesifikasjoner)</span>
-          <div id="edLinks"></div>
-          <button class="ghost" type="button" id="edAddLink">＋ Lenke</button>
-        </div>
-        <div class="ed-field">
-          <span>Venter på (avhengigheter)</span>
-          <div class="ed-deps" id="edDeps"></div>
-        </div>
-        <div class="ed-row">
-          <button class="ghost" type="button" id="edSubs">Delmål …</button>
-          <button class="ghost" type="button" id="edLink">Koble avhengighet …</button>
-        </div>
+        <label class="ed-field"><span>ADO-id (Feature)</span><input id="edAdo" type="number" min="1" step="1" placeholder="f.eks. 4742"></label>
+        <div class="ed-field"><span>Venter på (blokkere)</span><div class="ed-deps" id="edDeps"></div></div>
+        <div class="ed-row"><button class="ghost" type="button" id="edLink">Koble avhengighet …</button></div>
       </div>
     </div>
     <div class="modal-foot">
-      <button class="danger-ghost" id="edDelete">Slett oppgave …</button>
-      <span class="btns">
-        <button class="ghost" id="edCancel">Avbryt</button>
-        <button id="edSave">Lagre</button>
-      </span>
+      <button class="danger-ghost" id="edDelete">Slett feature …</button>
+      <span class="btns"><button class="ghost" id="edCancel">Avbryt</button><button id="edSave">Lagre</button></span>
     </div>
   </div>
 </div>
 
-<!-- generell bekreftelses-/inndata-dialog -->
+<!-- epic-editor -->
+<div class="modal-back" id="epicBack">
+  <div class="modal" style="width:min(540px,100%)">
+    <div class="modal-head">
+      <div><h2 id="epTitle">Rediger epic</h2><div class="md" id="epSub">Eies av PM + CTO</div></div>
+      <button id="epClose">Lukk</button>
+    </div>
+    <div class="modal-body">
+      <div class="ed-body">
+        <label class="ed-field"><span>Navn (resultatet ledelsen vil ha)</span><input id="epName" type="text"></label>
+        <div class="ed-row">
+          <label class="ed-field"><span>Måldato</span><input id="epGoal" type="date"></label>
+          <label class="ed-check"><input type="checkbox" id="epProvisional"> Foreløpig – settes endelig etter utredning</label>
+        </div>
+        <label class="ed-field"><span>ADO-id (Epic)</span><input id="epAdo" type="number" min="1" step="1" placeholder="valgfritt"></label>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="danger-ghost" id="epDelete">Slett epic …</button>
+      <span class="btns"><button class="ghost" id="epCancel">Avbryt</button><button id="epSave">Lagre</button></span>
+    </div>
+  </div>
+</div>
+
+<!-- bekreftelses-/inndata-dialog -->
 <div class="modal-back" id="dlgBack">
   <div class="modal" style="width:min(480px,100%)">
     <div class="modal-head"><div><h2 id="dlgTitle"></h2></div></div>
     <div class="modal-body"><div class="dlg-body"><span id="dlgMsg"></span><input id="dlgInput" type="text" hidden></div></div>
     <div class="modal-foot">
       <span></span>
-      <span class="btns">
-        <button class="ghost" id="dlgNo">Avbryt</button>
-        <button id="dlgYes"></button>
-      </span>
-    </div>
-  </div>
-</div>
-
-<!-- Claude-pakke -->
-<div class="modal-back" id="claudeBack">
-  <div class="modal" style="width:min(660px,100%)">
-    <div class="modal-head">
-      <div>
-        <h2>Oppdater med Claude</h2>
-        <div class="md">Eksporter → Claude-økt → Importer med forhåndsvisning</div>
-      </div>
-      <button id="claudeClose">Lukk</button>
-    </div>
-    <div class="modal-body">
-      <div class="claude-steps" id="claudeSteps"></div>
-    </div>
-    <div class="modal-foot">
-      <a class="btnlike" href="claude-guide.html">Åpne full guide →</a>
-      <span class="btns">
-        <button id="claudePkgBtn">Last ned Claude-pakken</button>
-      </span>
+      <span class="btns"><button class="ghost" id="dlgNo">Avbryt</button><button id="dlgYes"></button></span>
     </div>
   </div>
 </div>
 
 <script>
-(function(){
+window.__bootTimeline = function(){
   "use strict";
 
-  /* ================== tidsmodell: enhet = måneder fra 1. aug 2026 ================== */
-  const BASE_Y = 2026, BASE_M = 7;
-  const N_MONTHS = 17;
-  const MONTH_W = cssNum('--month-w');
-  const ROW_H = cssNum('--row-h');
-  const SNAP = 0.25;          // hovedvisning: ~uke
-  const SNAP_D = 0.125;       // detaljvisning: ~halv uke
-  const MIN_DUR = 0.25;
-  const MND = ['jan','feb','mar','apr','mai','jun','jul','aug','sep','okt','nov','des'];
-  const STORE_V2 = 'skytale-telenor-gantt-v2';
-  const STORE_V1 = 'skytale-telenor-gantt-v1';
+  /* ================== konstanter ================== */
+  const MONTH_W = cssNum('--month-w'), ROW_H = cssNum('--row-h'), LANE_H = cssNum('--lane-h');
+  const VIEW_FROM = 2;                        // aksen starter okt 2026 (enhet 2)
+  const VIEW_MONTHS = N_MONTHS - VIEW_FROM;   // 15 måneder til des 2027
+  const CHART_W = VIEW_MONTHS * MONTH_W;
+  const SNAP = WEEK, MIN_DUR = WEEK;
+  const STORE = 'skytale-veikart-v1';
+  const LABELW_KEY = 'skytale-veikart-labelw';
   const HOSTED = location.protocol !== 'file:';   // åpnet via SkyTracker → delt lagring + live synk
+  const POLL_MS = 10000;
+  const ADO_URL = id => 'https://dev.azure.com/SkytaleAS/Skytale/_workitems/edit/' + id;
+  const MND_UP = ['JAN','FEB','MAR','APR','MAI','JUN','JUL','AUG','SEP','OKT','NOV','DES'];
+  const MND_S = ['jan','feb','mar','apr','mai','jun','jul','aug','sep','okt','nov','des'];
+  const FV_FIELDS = ['tid','label','deps','meta'];
 
   function cssNum(v){ return parseFloat(getComputedStyle(document.documentElement).getPropertyValue(v)); }
-  function monthInfo(i){
-    const m = (BASE_M + i) % 12, y = BASE_Y + Math.floor((BASE_M + i)/12);
-    return {m, y};
-  }
-  function unitToDate(u){
-    u = Math.max(0, Math.min(N_MONTHS, u));
-    const i = Math.min(N_MONTHS-1, Math.floor(u));
-    const {m, y} = monthInfo(i);
-    const dim = new Date(y, m+1, 0).getDate();
-    const day = Math.min(dim, 1 + Math.round((u - i) * dim));
-    return new Date(y, m, day);
-  }
-  function fmt(d){ return d.getDate() + '. ' + MND[d.getMonth()] + ' ' + String(d.getFullYear()).slice(2); }
-  function todayUnit(){
-    const n = new Date();
-    const dim = new Date(n.getFullYear(), n.getMonth()+1, 0).getDate();
-    const u = (n.getFullYear() - BASE_Y) * 12 + (n.getMonth() - BASE_M) + (n.getDate() - 1) / dim;
-    return Math.max(0, Math.min(N_MONTHS, u));
-  }
-  function rangeText(t){
-    const a = unitToDate(t.start), b = unitToDate(t.end);
-    b.setDate(b.getDate() - 1);
-    return fmt(a) + ' – ' + fmt(b < a ? a : b);
+  const x = u => (u - VIEW_FROM) * MONTH_W;                       // enhet → px i diagrammet
+  const monthInfo = i => ({ m: (BASE_M + i) % 12, y: BASE_Y + Math.floor((BASE_M + i) / 12) });
+  function todayUnit(){ return Math.max(VIEW_FROM, Math.min(N_MONTHS, dateToUnit(new Date()))); }
+  function rangeText(t){   // årstall står på aksen; kolonnen holder seg kort
+    if(t.kind === 'discovery') return 'Utredning ' + fmtDate(unitToDate(t.start)) + ' – ' + fmtDate(unitToDate(t.end));
+    return fmtDate(unitToDate(t.start)) + ' → ' + fmtDate(unitToDate(t.endLikely)) + ', senest ' + fmtDate(unitToDate(t.end));
   }
   const snapTo = (v, s) => Math.round(v / s) * s;
-  const uid = () => 'u' + Date.now().toString(36) + Math.random().toString(36).slice(2,5);
+  const uid = () => 'f' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
   const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
-
-  /* ================== plandata (fra V1.7-dokumentet) ==================
-     deps  : id-er som må være ferdige før denne kan starte (finish-to-start)
-     source: reservert for integrasjoner (f.eks. 'skytracker')            */
-  const SEED = {
-    lanes: [
-      {key:'styring',   name:'Styring'},
-      {key:'org',       name:'Organisasjon'},
-      {key:'produkt',   name:'Produkt'},
-      {key:'kommers',   name:'Kommersielt'},
-      {key:'sikkerhet', name:'Sikkerhet'}
-    ],
-    tasks: [
-      {id:'lederprogram', lane:'styring', label:'Lederprogram: fire samlinger',            start:0.25, end:2,    deps:[], subtasks:[]},
-      {id:'trafikklys',   lane:'styring', label:'Trafikklys + tidslinje som forpliktelse', start:0,    end:1.5,  deps:[], subtasks:[]},
-      {id:'estimering',   lane:'styring', label:'Ny estimeringspraksis m/ synlig buffer',  start:0,    end:2,    deps:[], subtasks:[]},
-      {id:'selskapsplan', lane:'styring', label:'Konsolidert selskapsplan (T1/T2-merket)', start:2,    end:3.25, deps:['lederprogram'], subtasks:[]},
-
-      {id:'ai',           lane:'org', label:'AI-integrasjon: augustmilepælen',              start:0,    end:0.5,  milestone:true, deps:[], subtasks:[]},
-      {id:'cfo',          lane:'org', label:'Innleid CFO om bord',                          start:0,    end:1.5,  deps:[], subtasks:[]},
-      {id:'rekruttering', lane:'org', label:'Rekruttering senior .NET/React → medior',      start:0,    end:5,    deps:[], subtasks:[
-        {id:'rk1', label:'Søk og utvelgelse',        start:0,   end:1.5},
-        {id:'rk2', label:'Oppsigelsestid (3 mnd)',   start:1.5, end:4.5},
-        {id:'rk3', label:'Onboarding',               start:4.5, end:5}
-      ]},
-      {id:'innleie',      lane:'org', label:'Innleid kapasitet (vinduet 0–3 mnd)',          start:0.25, end:3.5,  deps:[], subtasks:[]},
-      {id:'redundans',    lane:'org', label:'Backend-redundans lukkes',                     start:0.5,  end:5,    deps:[], subtasks:[]},
-      {id:'orgbygg',      lane:'org', label:'Org-utbygging per kompetanseområde',           start:5,    end:11,   t2:true, deps:['selskapsplan'], subtasks:[]},
-      {id:'vekstorg',     lane:'org', label:'Vekstorganisasjon i drift',                    start:11,   end:17,   t2:true, deps:['orgbygg'], subtasks:[]},
-
-      {id:'react',        lane:'produkt', label:'React-konsolidering: sluttspurt + buffer', start:0,    end:1.5,  deps:[], subtasks:[
-        {id:'rc1', label:'QA-runde',                          start:0,    end:0.75},
-        {id:'rc2', label:'Omarbeiding kryptering',            start:0.25, end:1.25},
-        {id:'rc3', label:'Parvis arbeid på kjernen',          start:0.25, end:1.25},
-        {id:'rc4', label:'Buffer (synlig)',                   start:1.25, end:1.5}
-      ]},
-      {id:'f24api',       lane:'produkt', label:'F-24 API-integrasjonsklient (31. aug)',    start:0,    end:1,   milestone:true, deps:[], subtasks:[]},
-      {id:'f24var',       lane:'produkt', label:'F-24: vår del levert (ut Q3)',             start:1,    end:2,   deps:['f24api'], subtasks:[]},
-      {id:'f24deres',     lane:'produkt', label:'F-24: deres side ferdig (Q4)',             start:2,    end:5,   deps:['f24var'], subtasks:[]},
-      {id:'integrasjoner',lane:'produkt', label:'Integrasjoner: Raven, T-kartor, P360',     start:5,    end:11,  deps:[], subtasks:[]},
-      {id:'retning',      lane:'produkt', label:'Produktretning: API-klient / SDK',         start:11,   end:17,  deps:[], subtasks:[]},
-
-      {id:'t1',           lane:'kommers', label:'Telenor T1 — 10 MNOK',                     start:0,    end:0.5, milestone:true, deps:[], subtasks:[]},
-      {id:'nsr',          lane:'kommers', label:'NSR-utrulling: 380 virksomheter',          start:1,    end:5,   deps:[], subtasks:[
-        {id:'ns1', label:'Utrullingsplan + prognose',   start:1,   end:2},
-        {id:'ns2', label:'Bølge 1: aktivering',         start:2,   end:3.5},
-        {id:'ns3', label:'Bølge 2: aktivering',         start:3.5, end:5}
-      ]},
-      {id:'arr',          lane:'kommers', label:'ARR-mål 4–6 MNOK',                         start:4.5,  end:5,   milestone:true, deps:[], subtasks:[]},
-      {id:'segmenter',    lane:'kommers', label:'Nye segmenter via NSR/Telenor',            start:5,    end:11,  deps:['nsr'], subtasks:[]},
-      {id:'t2',           lane:'kommers', label:'Telenor T2 — opsjonsvindu 30–40 MNOK',     start:6,    end:10,  t2:true, deps:[], subtasks:[]},
-
-      {id:'telefoner',    lane:'sikkerhet', label:'To telefoner i ledelsen (1. sep)',       start:0,    end:1,   deps:[], subtasks:[]},
-      {id:'audit',        lane:'sikkerhet', label:'Ekstern sikkerhetsaudit',                start:1,    end:4,   deps:[], subtasks:[]},
-      {id:'beredskap',    lane:'sikkerhet', label:'Gjennomgangsberedskap: ISO 9001 m.m.',   start:1,    end:5,   deps:[], subtasks:[]},
-      {id:'mdr',          lane:'sikkerhet', label:'MDR / SOAR / responsberedskap',          start:6,    end:11,  t2:true, deps:[], subtasks:[]}
-    ]
+  const toDateInput = u => {
+    const d = unitToDate(u);
+    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
   };
-  const clone = o => JSON.parse(JSON.stringify(o));
-  const SEED_JSON = JSON.stringify(normalize(clone(SEED)));   // normalize hoistes
+  const fromDateInput = s => {   // datoer som skrives inn beholdes eksakt; bare dra fester til uke
+    const p = String(s || '').split('-').map(Number);
+    if(p.length !== 3 || !p[0] || !p[1] || !p[2]) return null;
+    // aksen starter i okt 2026: en tidligere dato ville tegnet linjen under navnekolonnen
+    return Math.max(VIEW_FROM, Math.min(N_MONTHS, dateToUnit(new Date(p[0], p[1] - 1, p[2]))));
+  };
+  function initials(name){
+    const parts = String(name).trim().split(/[\s.@]+/).filter(Boolean);
+    if(parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase();
+    return String(name).slice(0, 2).toUpperCase();
+  }
+  function el(tag, cls, text){
+    const e = document.createElement(tag);
+    if(cls) e.className = cls;
+    if(text !== undefined) e.textContent = text;
+    return e;
+  }
+  const $ = id => document.getElementById(id);
 
-  /* ================== state ================== */
+  /* ================== DOM ================== */
+  const labels = $('labels'), chart = $('chart'), chartScroll = $('chartScroll'), gantt = $('gantt'), tip = $('dragTip');
+  const emptyState = $('emptyState'), seedBtn = $('seedBtn'), emptyNote = $('emptyNote'), exampleBadge = $('exampleBadge');
+  const roBanner = $('roBanner'), dirtyNote = $('dirtyNote'), tlSummary = $('tlSummary');
+  const editorBack = $('editorBack'), epicBack = $('epicBack'), dlgBack = $('dlgBack');
+  const helpPanel = $('helpPanel'), linkText = $('linkText');
+
+  /* ================== tilstand ================== */
   let state = loadState();
   let linkSource = null;          // id under kobling
-  let openTaskId = null;          // åpen i detaljvisning
-  let presenting = false;         // investorvisning: kun eksternt merkede spor
+  let myName = null, canWrite = false, serverReady = false, serverFailed = false, serverVersion = null, applyingRemote = false;
+  let drag = null, colDrag = null, saveTimer = null, pendingSave = false, pushing = false;
 
+  function emptyPlan(){ return normalizePlan({ lanes: [], tasks: [], deleted: {} }); }
   function loadState(){
+    if(HOSTED) return emptyPlan();          // serveren er sannheten; lastes i initServerPlan
     try{
-      const raw = localStorage.getItem(STORE_V2);
-      if(raw){
-        const s = JSON.parse(raw);
-        if(s && Array.isArray(s.lanes) && Array.isArray(s.tasks)) return normalize(s);
-      }
-      const v1 = localStorage.getItem(STORE_V1);   // migrer gamle dra-endringer
-      if(v1){
-        const saved = JSON.parse(v1), s = clone(SEED);
-        s.tasks.forEach(t => { const m = saved[t.id]; if(m){ t.start = m.start; t.end = m.end; } });
-        localStorage.removeItem(STORE_V1);
-        return normalize(s);
-      }
+      const raw = localStorage.getItem(STORE);
+      if(raw){ const s = JSON.parse(raw); if(s && Array.isArray(s.lanes)) return normalizePlan(s); }
     }catch(e){}
-    return normalize(clone(SEED));
+    return exampleSeed();                   // lokal fil: vis eksempelet med en gang
   }
-  function normalize(s){
-    s.deleted = (s.deleted && typeof s.deleted === 'object') ? s.deleted : {};
-    s.tasks.forEach(t => {
-      t.deps = Array.isArray(t.deps) ? t.deps : [];
-      t.subtasks = Array.isArray(t.subtasks) ? t.subtasks : [];
-      t.fv = (t.fv && typeof t.fv === 'object') ? t.fv : {};
-      if(!['gronn','gul','rod'].includes(t.status)) t.status = 'gronn';
-    });
-    const ids = new Set(s.tasks.map(t => t.id));
-    s.tasks.forEach(t => { t.deps = t.deps.filter(d => ids.has(d)); });
-    return s;
-  }
+  const getTask = id => state.tasks.find(t => t.id === id);
+  const getLane = key => state.lanes.find(l => l.key === key);
+  const laneTasks = key => state.tasks.filter(t => t.lane === key);
 
-  /* Feltversjoner: hver oppgave har fv = {tid, label, status, deps, subtasks, meta}.
-     Klienten bumper feltet den endrer; serveren fletter per felt (høyest vinner).
-     Endringer markeres her og flushes én gang per save(). */
-  const FV_FIELDS = ['tid','label','status','deps','subtasks','meta','buffer','okonomi'];
-  const pendingTouch = new Map();   // task → Set(felt)
+  /* Feltversjoner: klienten bumper gruppen den endrer; serveren fletter per gruppe (høyest vinner). */
+  const pendingTouch = new Map();
   function touch(t, field){
-    let set = pendingTouch.get(t);
-    if(!set){ set = new Set(); pendingTouch.set(t, set); }
-    set.add(field);
+    let s = pendingTouch.get(t);
+    if(!s){ s = new Set(); pendingTouch.set(t, s); }
+    s.add(field);
   }
   function flushTouches(){
     pendingTouch.forEach((fields, t) => {
@@ -1152,308 +544,139 @@ if (location.protocol === 'file:') {
     });
     pendingTouch.clear();
   }
-  function initials(name){
-    const parts = String(name).trim().split(/[\s.@]+/).filter(Boolean);
-    if(parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase();
-    return String(name).slice(0, 2).toUpperCase();
-  }
   const maxFvOf = t => Math.max(0, ...FV_FIELDS.map(f => (t.fv && t.fv[f]) || 0));
+  function bumpLane(l){ l.v = (l.v || 0) + 1; }
   function save(){
     flushTouches();
-    localStorage.setItem(STORE_V2, JSON.stringify(state));
-    if(HOSTED){
-      scheduleServerSave();
-    } else {
-      document.getElementById('dirtyNote').textContent =
-        JSON.stringify(state) === SEED_JSON ? '' : '● endret fra plan';
-    }
+    if(HOSTED){ scheduleServerSave(); }
+    else { try{ localStorage.setItem(STORE, JSON.stringify(state)); }catch(e){} }
   }
-  const getTask = id => state.tasks.find(t => t.id === id);
-  const hasSubs = t => t.subtasks && t.subtasks.length > 0;
-
-  /* ================== statussignal (fargelogikk fra føring 1.2 + årsaksliste 1.5) ================== */
-  const STATUS_LABEL = { gronn:'GRØNN — som avtalt', gul:'GUL — utfordringer, avdelingen eier løsningen', rod:'RØD — krever beslutning' };
-  const CAUSES = [
-    'Undervurdert kompleksitet',
-    'Avhengighet til andre',
-    'Fravær eller kapasitetstap',
-    'Omfang lagt til underveis',
-    'Ekstern blokkering',
-    'Omarbeid som følge av kvalitet'
-  ];
-  const causeMenu = document.getElementById('causeMenu');
-  function cycleStatus(t, e){
-    const next = { gronn:'gul', gul:'rod', rod:'gronn' }[t.status] || 'gul';
-    t.status = next;
-    t.statusAt = new Date().toISOString();
-    touch(t, 'status');
-    if(next === 'gronn'){
-      delete t.statusCause;
-      save(); render();
-    } else {
-      openCauseMenu(t, e.clientX, e.clientY);
-    }
-  }
-  function openCauseMenu(t, x, y){
-    causeMenu.innerHTML = '<div class="cm-head">' + (t.status === 'gul' ? 'GUL' : 'RØD') +
-      ' — årsak (fast liste, føring 1.5)</div>' +
-      CAUSES.map((c,i) => '<button data-i="'+i+'">'+c+'</button>').join('') +
-      '<button class="none" data-i="-1">Uten årsak foreløpig</button>';
-    causeMenu.style.display = 'block';
-    causeMenu.style.left = Math.min(window.innerWidth - causeMenu.offsetWidth - 10, x + 6) + 'px';
-    causeMenu.style.top = Math.min(window.innerHeight - causeMenu.offsetHeight - 10, y + 6) + 'px';
-    causeMenu.querySelectorAll('button').forEach(b => b.addEventListener('click', () => {
-      const i = parseInt(b.dataset.i, 10);
-      if(i >= 0) t.statusCause = CAUSES[i]; else delete t.statusCause;
-      touch(t, 'status');
-      closeCauseMenu();
-      save(); render();
-    }));
-  }
-  function closeCauseMenu(){ causeMenu.style.display = 'none'; causeMenu.innerHTML = ''; }
-  document.addEventListener('pointerdown', e => {
-    if(causeMenu.style.display === 'block' && !e.target.closest('.cause-menu')){
-      closeCauseMenu(); save(); render();   // status står, uten årsak
-    }
-  });
-  function updateTlSummary(){
-    const n = { gronn:0, gul:0, rod:0 };
-    state.tasks.forEach(t => n[t.status] !== undefined && n[t.status]++);
-    document.getElementById('tlSummary').innerHTML =
-      '<span><i style="background:#2e7d43"></i>' + n.gronn + '</span>' +
-      '<span><i style="background:#d9a416"></i>' + n.gul + '</span>' +
-      '<span><i style="background:#c3441c"></i>' + n.rod + '</span>';
-  }
-
-  /* ================== avhengigheter ================== */
-  function dependsOn(aId, bId){       // avhenger a (transitivt) av b?
-    const seen = new Set();
-    const walk = id => {
-      if(id === bId) return true;
-      if(seen.has(id)) return false;
-      seen.add(id);
-      const t = getTask(id);
-      return t ? t.deps.some(walk) : false;
-    };
-    return walk(aId);
-  }
-  function shiftTask(t, d){
-    d = Math.max(d, -t.start);
-    d = Math.min(d, N_MONTHS - t.end);
-    if(!d) return;
-    t.start += d; t.end += d;
-    if(hasSubs(t)){
-      t.subtasks.forEach(s => { s.start += d; s.end += d; });
-      touch(t, 'subtasks');
-    } else {
-      touch(t, 'tid');
-    }
-  }
-  function resolveDeps(){             // dytt avhengige framover (finish-to-start)
-    let guard = 0, changed = true;
-    while(changed && guard++ < 200){
-      changed = false;
-      for(const t of state.tasks){
-        if(!t.deps.length) continue;
-        let req = 0;
-        t.deps.forEach(d => { const p = getTask(d); if(p) req = Math.max(req, p.end); });
-        if(req > t.start + 1e-9){
-          shiftTask(t, req - t.start);
-          changed = true;
-        }
-      }
-    }
+  function pushDeps(){
+    resolveDeps(state).forEach(id => { const t = getTask(id); if(t) touch(t, 'tid'); });
   }
 
   /* ================== hovedvisning ================== */
-  const labels = document.getElementById('labels');
-  const chart = document.getElementById('chart');
-  const chartScroll = document.getElementById('chartScroll');
-  const tip = document.getElementById('dragTip');
-  let barRefs = {}, labelDateRefs = {}, rowRefs = {}, depSvg = null;
+  let barRefs = {}, rowRefs = {}, rangeRefs = {}, labelDateRefs = {}, depSvg = null;
+
+  function showEmpty(){
+    const empty = !state.lanes.length;
+    emptyState.hidden = !empty;
+    gantt.hidden = empty;
+    seedBtn.hidden = !(empty && (canWrite || !HOSTED));
+    emptyNote.textContent = !empty ? ''
+      : HOSTED && serverFailed ? 'Kunne ikke hente den delte planen – last siden på nytt.'
+      : HOSTED && !serverReady ? 'Henter delt plan …'
+      : HOSTED && !canWrite ? 'Kun lesetilgang – be en med skrivetilgang legge inn epics.'
+      : 'Legg til en epic med ＋ Epic, eller last inn eksempelet fra ledermøtedecken.';
+  }
 
   function render(){
+    showEmpty();
+    exampleBadge.hidden = !state.example;
     const sx = chartScroll.scrollLeft;
     labels.innerHTML = '';
     chart.innerHTML = '';
-    barRefs = {}; labelDateRefs = {}; rowRefs = {};
+    barRefs = {}; rowRefs = {}; rangeRefs = {}; labelDateRefs = {};
+    updateTlSummary();
+    if(!state.lanes.length) return;
 
-    const corner = document.createElement('div');
-    corner.className = 'corner';
-    corner.textContent = 'Arbeidsstrøm / oppgave';
+    const corner = el('div', 'corner', 'Epic / feature');
     labels.appendChild(corner);
 
     // akse
-    const axis = document.createElement('div');
-    axis.className = 'axis';
-    for(let i=0;i<N_MONTHS;i++){
-      const {m,y} = monthInfo(i);
-      const el = document.createElement('div');
-      el.className = 'mth' + (m===0 ? ' jan' : '');
-      el.innerHTML = '<div class="mm">'+MND[m]+'</div><div class="yy">'+y+'</div>';
-      axis.appendChild(el);
+    const axis = el('div', 'axis');
+    for(let i = VIEW_FROM; i < N_MONTHS; i++){
+      const {m, y} = monthInfo(i);
+      const mth = el('div', 'mth' + (m === 0 ? ' jan' : ''));
+      mth.innerHTML = '<div class="mm">' + MND_S[m] + '</div><div class="yy">' + y + '</div>';
+      axis.appendChild(mth);
     }
     chart.appendChild(axis);
 
     // rutenett
-    const grid = document.createElement('div');
-    grid.className = 'grid';
-    for(let i=1;i<N_MONTHS;i++){
-      const v = document.createElement('div');
-      v.className = 'v' + (monthInfo(i).m===0 ? ' jan' : '');
-      v.style.left = (i*MONTH_W) + 'px';
+    const grid = el('div', 'grid');
+    for(let i = VIEW_FROM + 1; i < N_MONTHS; i++){
+      const v = el('div', 'v' + (monthInfo(i).m === 0 ? ' jan' : ''));
+      v.style.left = x(i) + 'px';
       grid.appendChild(v);
     }
     chart.appendChild(grid);
 
-    // T2-sone + i dag
-    const zone = document.createElement('div');
-    zone.className = 't2zone';
-    zone.style.left = (6*MONTH_W)+'px';
-    zone.style.width = (4*MONTH_W)+'px';
-    zone.innerHTML = '<span class="zl">T2-vindu (opsjon)</span>';
-    chart.appendChild(zone);
-
-    const today = document.createElement('div');
-    today.className = 'today';
-    today.style.left = (todayUnit()*MONTH_W) + 'px';
+    // i dag
+    const today = el('div', 'today');
+    today.style.left = x(todayUnit()) + 'px';
     const tn = new Date();
-    today.innerHTML = '<span class="tl">I DAG · ' + tn.getDate() + '. ' + MND[tn.getMonth()].toUpperCase() + '</span>';
+    today.innerHTML = '<span class="tl">I DAG · ' + tn.getDate() + '. ' + MND_UP[tn.getMonth()] + '</span>';
     chart.appendChild(today);
 
-    // lanes + rader
+    // epics (lanes) og features (rader)
     state.lanes.forEach(lane => {
-      const laneTasks = state.tasks.filter(t => t.lane === lane.key && (!presenting || t.ext));
-      if(presenting && !laneTasks.length) return;   // skjul interne spor i presentasjon
-      const ll = document.createElement('div');
-      ll.className = 'lane-label';
-      const nm = document.createElement('span');
-      nm.textContent = lane.name;
-      nm.title = 'Dobbeltklikk for å endre navn';
-      nm.style.cursor = 'text';
-      nm.addEventListener('dblclick', () => editInline(nm, lane.name, v => { lane.name = v; lane.v = (lane.v || 0) + 1; save(); render(); }));
-      const ctr = document.createElement('span');
-      const laneAllExt = laneTasks.length > 0 && laneTasks.every(t => t.ext);
-      const vis = document.createElement('button');
-      vis.className = 'lane-vis';
-      vis.textContent = laneAllExt ? '◉' : '○';
-      vis.title = laneAllExt
-        ? 'Hele strømmen er merket EKSTERN — klikk for å gjøre alt internt'
-        : 'Merk hele strømmen EKSTERN (vises i presentasjon)';
-      vis.addEventListener('click', () => {
-        const makeExt = !laneAllExt;
-        state.tasks.filter(t => t.lane === lane.key).forEach(t => {
-          if(!!t.ext !== makeExt){ t.ext = makeExt; touch(t, 'meta'); }
-        });
-        save(); render();
-      });
-      const add = document.createElement('button');
-      add.className = 'add-task';
-      add.textContent = '＋';
-      add.title = 'Legg til oppgave i ' + lane.name;
-      add.addEventListener('click', () => addTask(lane.key));
-      ctr.appendChild(vis); ctr.appendChild(add);
-      ll.appendChild(nm); ll.appendChild(ctr);
+      const st = epicStatus(state, lane.key);
+      const hasGoal = typeof lane.goalDate === 'number';
+
+      const ll = el('div', 'lane-label');
+      ll.dataset.key = lane.key;
+      const ln = el('span', 'ln', lane.name);
+      ln.title = 'Klikk for å redigere epicen';
+      ln.addEventListener('click', () => openEpicEditor(lane.key));
+      const lm = el('div', 'lm');
+      lm.innerHTML = '<span class="chip st-' + st.code + '">' + esc(STATUS_LABEL[st.code]) + '</span>' +
+        '<span class="goal">' + esc(goalText(lane)) + '</span>';
+      const add = el('button', 'add-feature', '＋');
+      add.title = 'Ny feature i denne epicen (utredning eller estimert velges i redigeringen)';
+      add.addEventListener('click', e => { e.stopPropagation(); addFeature(lane.key, 'discovery'); });
+      ll.append(ln, lm, add);
       labels.appendChild(ll);
 
-      const lb = document.createElement('div');
-      lb.className = 'lane-band';
-      lb.style.width = (N_MONTHS*MONTH_W)+'px';
+      const lb = el('div', 'lane-band');
+      lb.style.width = CHART_W + 'px';
+      if(hasGoal){
+        const gl = el('div', 'goal-line'); gl.style.left = x(lane.goalDate) + 'px'; lb.appendChild(gl);
+        const gt = el('span', 'goal-lbl', (lane.goalProvisional ? 'FORELØPIG MÅL ' : 'MÅLDATO ') + fmtDate(unitToDate(lane.goalDate)).toUpperCase());
+        gt.style.left = x(lane.goalDate) + 'px';
+        lb.appendChild(gt);
+      }
       chart.appendChild(lb);
 
-      laneTasks.forEach(t => {
-        // venstre kolonne
-        const tl = document.createElement('div');
-        tl.className = 'task-label';
+      laneTasks(lane.key).forEach(t => {
+        const tl = el('div', 'task-label');
         tl.dataset.id = t.id;
-        const dot = document.createElement('span');
-        dot.className = 'tl-dot ' + t.status;
-        dot.title = 'Statussignal: ' + STATUS_LABEL[t.status] +
-          (t.statusCause ? ' · ' + t.statusCause : '') + ' — klikk for å endre';
-        dot.addEventListener('click', e => { e.stopPropagation(); cycleStatus(t, e); });
-        tl.appendChild(dot);
-        const tt = document.createElement('span');
-        tt.className = 't';
-        tt.textContent = t.label;
+        const tt = el('span', 't', t.label);
         tt.title = t.label + ' (klikk for å redigere)';
-        tt.style.cursor = 'pointer';
-        const dd = document.createElement('span');
-        dd.className = 'd';
-        tl.appendChild(tt); tl.appendChild(dd);
-
-        const acts = document.createElement('div');
-        acts.className = 'row-actions';
-        acts.innerHTML =
-          '<button class="zoom" title="Zoom inn: delmål">⌕</button>' +
-          '<button class="link" title="Koble avhengighet: velg hvem som avhenger av denne">⇢</button>' +
-          '<button class="vis' + (t.ext ? ' on' : '') + '" title="' +
-            (t.ext ? 'EKSTERN — vises i presentasjon. Klikk for å gjøre intern' : 'Intern — skjules i presentasjon. Klikk for å merke ekstern') +
-          '">' + (t.ext ? '◉' : '○') + '</button>' +
-          '<button class="del" title="Slett oppgave">×</button>';
-        acts.querySelector('.zoom').addEventListener('click', () => openDetail(t.id));
-        acts.querySelector('.link').addEventListener('click', () => startLink(t.id));
-        acts.querySelector('.vis').addEventListener('click', () => {
-          t.ext = !t.ext;
-          touch(t, 'meta');
-          save(); render();
-        });
-        acts.querySelector('.del').addEventListener('click', () => removeTask(t.id));
-        tl.appendChild(acts);
+        const dd = el('span', 'd');
+        const acts = el('div', 'row-actions');
+        acts.innerHTML = '<button class="link" title="Koble avhengighet: velg hvem som venter på denne">⇢</button>' +
+          '<button class="del" title="Slett feature">×</button>';
+        acts.querySelector('.link').addEventListener('click', e => { e.stopPropagation(); startLink(t.id); });
+        acts.querySelector('.del').addEventListener('click', e => { e.stopPropagation(); removeTask(t.id); });
+        tl.append(tt, dd, acts);
         tl.addEventListener('click', e => {
-          if(e.target.closest('.row-actions') || e.target.closest('.tl-dot') || e.target.tagName === 'INPUT') return;
+          if(e.target.closest('.row-actions') || e.target.tagName === 'A') return;
           if(linkSource){ completeLink(t.id); return; }
           openEditor(t.id);
         });
         labels.appendChild(tl);
         labelDateRefs[t.id] = dd;
 
-        // rad + bar
-        const row = document.createElement('div');
-        row.className = 'row';
-        row.style.width = (N_MONTHS*MONTH_W)+'px';
-        // buffersegment før milepæl (føring 1.5)
-        if(t.milestone && typeof t.buffer === 'number' && t.buffer > 0 && typeof bufferStatuses === 'function'){
-          const bs = bufferStatuses(state).find(x => x.taskId === t.id);
-          if(bs){
-            const seg = document.createElement('div');
-            seg.className = 'buffer-seg' + (bs.overrunWeeks > 0 ? ' overrun' : '');
-            const w = t.buffer * 0.25 * MONTH_W;
-            seg.style.left = ((t.start - t.buffer * 0.25) * MONTH_W) + 'px';
-            seg.style.width = w + 'px';
-            seg.title = 'Buffer: ' + Math.round(bs.usedWeeks * 10) / 10 + ' av ' + bs.bufferWeeks + ' uker brukt' +
-              (bs.overrunWeeks > 0 ? ' · OVERSKREDET med ' + Math.round(bs.overrunWeeks * 10) / 10 + ' uker' : '');
-            seg.innerHTML = '<i style="width:' + Math.round(100 * Math.min(1, bs.usedWeeks / bs.bufferWeeks)) + '%"></i>';
-            row.appendChild(seg);
-          }
-        }
-        const bar = document.createElement('div');
-        bar.className = 'bar ' + t.lane + (t.t2 ? ' t2b' : '') + (t.milestone ? ' milestone' : '') + (hasSubs(t) ? ' locked' : '') +
-          (t.status !== 'gronn' ? ' st-' + t.status : '');
+        const row = el('div', 'row');
+        row.style.width = CHART_W + 'px';
+        if(hasGoal){ const gl = el('div', 'goal-line'); gl.style.left = x(lane.goalDate) + 'px'; row.appendChild(gl); }
+        const bar = el('div', 'bar ' + t.kind);
         bar.dataset.id = t.id;
-        bar.innerHTML = '<div class="h l"></div><span class="bl">' + esc(t.label) +
-          (hasSubs(t) ? '<span class="sub-ind">▸ '+t.subtasks.length+'</span>' : '') +
-          '</span>' +
-          (t.status !== 'gronn' ? '<span class="st-dot ' + t.status + '"></span>' : '') +
-          '<div class="h r"></div>';
-        bar.addEventListener('dblclick', () => openDetail(t.id));
+        bar.innerHTML = (t.kind === 'estimate' ? '<div class="seg likely"></div><div class="seg late"></div>' : '') +
+          '<div class="h l"></div><span class="bl">' + esc(t.label) + '</span>' +
+          (t.kind === 'estimate' ? '<div class="h m"></div>' : '') + '<div class="h r"></div>';
         row.appendChild(bar);
+        const rl = el('div', 'range-lbl');
+        row.appendChild(rl);
         chart.appendChild(row);
-        barRefs[t.id] = bar;
-        rowRefs[t.id] = row;
+        barRefs[t.id] = bar; rowRefs[t.id] = row; rangeRefs[t.id] = rl;
       });
     });
 
-    if(presenting && !state.tasks.some(t => t.ext)){
-      const em = document.createElement('div');
-      em.className = 'present-empty';
-      em.style.width = (N_MONTHS*MONTH_W) + 'px';
-      em.textContent = 'Ingen spor er merket eksternt enda. Avslutt presentasjonen (Esc) og merk oppgaver eller hele strømmer med ○-knappen.';
-      chart.appendChild(em);
-    }
-
-    // SVG for piler (sist = tegnes øverst)
-    depSvg = document.createElementNS('http://www.w3.org/2000/svg','svg');
-    depSvg.setAttribute('class','deps');
+    // piler (sist = tegnes øverst)
+    depSvg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    depSvg.setAttribute('class', 'deps');
     depSvg.innerHTML =
       '<defs>' +
       '<marker id="arrow" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="#8a95a1"/></marker>' +
@@ -1462,12 +685,8 @@ if (location.protocol === 'file:') {
     chart.appendChild(depSvg);
 
     positionAll();
-    updateTlSummary();
     if(linkSource) markLinkSource();
     chartScroll.scrollLeft = sx;
-    save();
-    if(typeof currentView !== 'undefined' && currentView === 'whatnow') renderWhatNow();
-    if(typeof currentView !== 'undefined' && currentView === 'dash') renderDash();
   }
 
   function positionAll(){
@@ -1477,26 +696,27 @@ if (location.protocol === 'file:') {
   function position(t){
     const bar = barRefs[t.id];
     if(!bar) return;
-    bar.style.left = (t.start*MONTH_W)+'px';
-    bar.style.width = Math.max(14,(t.end-t.start)*MONTH_W)+'px';
+    const left = x(t.start), width = Math.max(14, (t.end - t.start) * MONTH_W);
+    bar.style.left = left + 'px';
+    bar.style.width = width + 'px';
+    if(t.kind === 'estimate'){
+      const lw = Math.max(0, Math.min(width, (t.endLikely - t.start) * MONTH_W));
+      bar.querySelector('.seg.likely').style.width = lw + 'px';
+      bar.querySelector('.seg.late').style.width = Math.max(0, width - lw) + 'px';
+      bar.querySelector('.h.m').style.left = lw + 'px';
+    }
+    const rl = rangeRefs[t.id];
+    rl.style.left = (left + width) + 'px';
+    rl.textContent = t.kind === 'estimate' ? rangeLabel(t) : 'til ' + fmtDate(unitToDate(t.end));
     const chips = [];
-    if(t.ext) chips.push('<span class="chip ext">EKSTERN</span>');
-    if(t.source === 'skytracker') chips.push('<span class="chip">ST</span>');
-    if(hasSubs(t)) chips.push('<span class="chip">'+t.subtasks.length+' delmål</span>');
-    if(t.deps.length) chips.push('<span class="chip">⇠ '+t.deps.length+'</span>');
-    if(t.status !== 'gronn' && t.statusCause) chips.push('<span class="chip">'+esc(t.statusCause)+'</span>');
+    if(t.adoId) chips.push('<a class="chip ado" target="_blank" rel="noopener" href="' + ADO_URL(t.adoId) + '" title="Åpne i Azure DevOps">#' + t.adoId + '</a>');
+    if(t.deps.length) chips.push('<span class="chip" title="Venter på ' + t.deps.length + ' feature(s)">⇠ ' + t.deps.length + '</span>');
     if(t.editedBy){
       const when = t.editedAt ? new Date(t.editedAt).toLocaleString('nb-NO', {day:'numeric', month:'short', hour:'2-digit', minute:'2-digit'}) : '';
-      chips.push('<span class="chip who" title="Sist endret av '+esc(t.editedBy)+(when ? ' · '+esc(when) : '')+'">'+esc(initials(t.editedBy))+'</span>');
+      chips.push('<span class="chip who" title="Sist endret av ' + esc(t.editedBy) + (when ? ' · ' + esc(when) : '') + '">' + esc(initials(t.editedBy)) + '</span>');
     }
     labelDateRefs[t.id].innerHTML = esc(rangeText(t)) + chips.join('');
-    bar.title = t.label + ' · ' + rangeText(t) +
-      (t.status !== 'gronn' ? ' · ' + STATUS_LABEL[t.status] +
-        (t.statusCause ? ' (' + t.statusCause + ')' : '') +
-        (t.statusAt ? ' — meldt ' + new Date(t.statusAt).toLocaleDateString('nb-NO', {day:'numeric', month:'short'}) : '')
-        : '') +
-      (t.t2 ? ' · forutsetter T2' : '') +
-      (hasSubs(t) ? ' · dobbeltklikk for delmål (varighet styres av delmålene)' : '');
+    bar.title = t.label + ' · ' + rangeText(t);
   }
 
   function drawArrows(){
@@ -1508,17 +728,17 @@ if (location.protocol === 'file:') {
       b.deps.forEach(aId => {
         const a = getTask(aId);
         if(!a || !rowRefs[a.id] || !rowRefs[b.id]) return;
-        const x1 = a.end*MONTH_W, y1 = rowRefs[a.id].offsetTop + ROW_H/2;
-        const x2 = b.start*MONTH_W, y2 = rowRefs[b.id].offsetTop + ROW_H/2;
+        const x1 = x(a.end), y1 = rowRefs[a.id].offsetTop + ROW_H / 2;
+        const x2 = x(b.start), y2 = rowRefs[b.id].offsetTop + ROW_H / 2;
         const midX = Math.max(x1 + 12, x2 - 12);
-        const dPath = 'M'+x1+','+y1+' H'+midX+' V'+y2+' H'+(x2-1);
-        const g = document.createElementNS('http://www.w3.org/2000/svg','g');
-        const hit = document.createElementNS('http://www.w3.org/2000/svg','path');
-        hit.setAttribute('class','hit'); hit.setAttribute('d',dPath);
-        const vis = document.createElementNS('http://www.w3.org/2000/svg','path');
-        vis.setAttribute('class','vis'); vis.setAttribute('d',dPath);
-        const title = document.createElementNS('http://www.w3.org/2000/svg','title');
-        title.textContent = a.label + ' → ' + b.label + ' — klikk for å fjerne avhengigheten';
+        const dPath = 'M' + x1 + ',' + y1 + ' H' + midX + ' V' + y2 + ' H' + (x2 - 1);
+        const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+        const hit = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+        hit.setAttribute('class', 'hit'); hit.setAttribute('d', dPath);
+        const vis = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+        vis.setAttribute('class', 'vis'); vis.setAttribute('d', dPath);
+        const title = document.createElementNS('http://www.w3.org/2000/svg', 'title');
+        title.textContent = a.label + ' → ' + b.label + ' – klikk for å fjerne avhengigheten';
         g.appendChild(title); g.appendChild(hit); g.appendChild(vis);
         hit.addEventListener('click', async () => {
           if(await confirmDialog('Fjerne avhengighet', '«' + a.label + ' → ' + b.label + '» fjernes.', {danger:true, confirmText:'Fjern'})){
@@ -1532,63 +752,123 @@ if (location.protocol === 'file:') {
     });
   }
 
-  /* ================== inline-redigering ================== */
-  function editInline(el, current, onSave){
-    const input = document.createElement('input');
-    input.value = current;
-    el.replaceWith(input);
-    input.focus(); input.select();
-    let done = false;
-    const finish = ok => {
-      if(done) return; done = true;
-      const v = input.value.trim();
-      if(ok && v && v !== current) onSave(v); else render();
-    };
-    input.addEventListener('keydown', e => {
-      if(e.key === 'Enter') finish(true);
-      if(e.key === 'Escape') finish(false);
-    });
-    input.addEventListener('blur', () => finish(true));
+  function updateTlSummary(){
+    const n = { gronn:0, gul:0, rod:0, venter:0, other:0 };
+    state.lanes.forEach(l => { const c = epicStatus(state, l.key).code; if(n[c] !== undefined) n[c]++; else n.other++; });
+    tlSummary.innerHTML = state.lanes.length
+      ? '<span><i style="background:#2e7d4f"></i>' + n.gronn + '</span><span><i style="background:#c9932f"></i>' + n.gul + '</span>' +
+        '<span><i style="background:#b23a3a"></i>' + n.rod + '</span><span><i style="background:#dcd6cb"></i>' + (n.venter + n.other) + ' venter</span>'
+      : '';
   }
 
-  /* ================== rader: legg til / fjern ================== */
-  function addTask(laneKey){
-    const start = snapTo(Math.min(todayUnit(), N_MONTHS - 1), SNAP);
-    const t = {id:uid(), lane:laneKey, label:'Ny oppgave', start, end:start+1, deps:[], subtasks:[], fv:{}, status:'gronn'};
+  /* ================== drag ================== */
+  chart.addEventListener('pointerdown', e => {
+    const bar = e.target.closest('.bar');
+    if(!bar) return;
+    if(linkSource){ completeLink(bar.dataset.id); e.preventDefault(); return; }
+    const t = getTask(bar.dataset.id);
+    if(!t) return;
+    const h = e.target.classList.contains('h') ? e.target : null;
+    const mode = !h ? 'move' : h.classList.contains('l') ? 'l' : h.classList.contains('m') ? 'm' : 'r';
+    drag = {t, bar, mode, x0: e.clientX, start0: t.start, likely0: t.endLikely, end0: t.end, moved: false};
+    bar.classList.add('dragging');
+    bar.setPointerCapture(e.pointerId);
+    showTip(e, t);
+    e.preventDefault();
+  });
+  chart.addEventListener('pointermove', e => {
+    if(!drag) return;
+    const du = (e.clientX - drag.x0) / MONTH_W, t = drag.t;
+    if(drag.mode === 'move'){
+      let s = snapTo(drag.start0 + du, SNAP);
+      s = Math.max(VIEW_FROM, Math.min(N_MONTHS - (drag.end0 - drag.start0), s));
+      const d = s - t.start;
+      if(d){ shiftTask(t, d); touch(t, 'tid'); drag.moved = true; }
+    } else if(drag.mode === 'l'){
+      let s = snapTo(drag.start0 + du, SNAP);
+      const cap = t.kind === 'estimate' ? drag.likely0 - MIN_DUR : drag.end0 - MIN_DUR;
+      s = Math.max(VIEW_FROM, Math.min(cap, s));
+      if(s !== t.start){ t.start = s; touch(t, 'tid'); drag.moved = true; }
+    } else if(drag.mode === 'm'){
+      let m = snapTo(drag.likely0 + du, SNAP);
+      m = Math.max(drag.start0 + MIN_DUR, Math.min(drag.end0, m));
+      if(m !== t.endLikely){ t.endLikely = m; touch(t, 'tid'); drag.moved = true; }
+    } else {
+      let en = snapTo(drag.end0 + du, SNAP);
+      const floor = t.kind === 'estimate' ? drag.likely0 : drag.start0 + MIN_DUR;
+      en = Math.min(N_MONTHS, Math.max(floor, en));
+      if(en !== t.end){ t.end = en; touch(t, 'tid'); drag.moved = true; }
+    }
+    pushDeps();
+    positionAll();
+    showTip(e, t);
+  });
+  function endDrag(){
+    if(!drag) return;
+    drag.bar.classList.remove('dragging');
+    tip.style.display = 'none';
+    const moved = drag.moved;
+    drag = null;
+    if(moved){ save(); render(); }
+  }
+  chart.addEventListener('pointerup', endDrag);
+  chart.addEventListener('pointercancel', endDrag);
+  function showTip(e, t){
+    tip.style.display = 'block';
+    tip.innerHTML = '<b>' + esc(t.label) + '</b>&nbsp;&nbsp;' + esc(rangeText(t));
+    tip.style.left = Math.min(window.innerWidth - tip.offsetWidth - 12, e.clientX + 14) + 'px';
+    tip.style.top = (e.clientY - 40) + 'px';
+  }
+
+  /* ================== features: legg til / fjern ================== */
+  function addFeature(laneKey, kind){
+    const start = snapTo(Math.max(todayUnit(), VIEW_FROM), SNAP);
+    const t = kind === 'discovery'
+      ? {id: uid(), lane: laneKey, label: 'Ny utredning', kind: 'discovery', start, end: start + 2 * WEEK, deps: [], fv: {}}
+      : {id: uid(), lane: laneKey, label: 'Ny feature', kind: 'estimate', start, endLikely: start + 4 * WEEK, end: start + 6 * WEEK, deps: [], fv: {}};
     if(myName){ t.editedBy = myName; t.editedAt = new Date().toISOString(); }
-    // sett inn etter siste oppgave i samme lane (beholder gruppering)
     let idx = -1;
-    state.tasks.forEach((x,i) => { if(x.lane === laneKey) idx = i; });
-    if(idx === -1) state.tasks.push(t); else state.tasks.splice(idx+1, 0, t);
+    state.tasks.forEach((v, i) => { if(v.lane === laneKey) idx = i; });
+    if(idx === -1) state.tasks.push(t); else state.tasks.splice(idx + 1, 0, t);
     save(); render();
-    const tl = labels.querySelector('.task-label[data-id="'+t.id+'"] .t');
-    if(tl) editInline(tl, t.label, v => { t.label = v; save(); render(); });
+    openEditor(t.id);
   }
   async function removeTask(id){
     const t = getTask(id);
     if(!t) return;
-    if(!(await confirmDialog('Slette oppgave', 'Slette «' + t.label + '»? Avhengigheter til den fjernes også.', {danger:true, confirmText:'Slett'}))) return;
-    doRemoveTask(id);
+    if(!(await confirmDialog('Slette feature', 'Slette «' + t.label + '»? Avhengigheter til den fjernes også.', {danger:true, confirmText:'Slett'}))) return;
+    doRemoveTaskSilent(id);
+    save(); render();
   }
-  function doRemoveTask(id){
+  function doRemoveTaskSilent(id){
     const t = getTask(id);
     if(!t) return;
     state.deleted[id] = maxFvOf(t) + 1;   // tombstone: vinner over usett kopi hos andre
-    state.tasks = state.tasks.filter(x => x.id !== id);
-    state.tasks.forEach(x => {
-      if(x.deps.includes(id)){ x.deps = x.deps.filter(d => d !== id); touch(x, 'deps'); }
+    state.tasks = state.tasks.filter(v => v.id !== id);
+    state.tasks.forEach(v => {
+      if(v.deps.includes(id)){ v.deps = v.deps.filter(d => d !== id); touch(v, 'deps'); }
     });
     if(linkSource === id) cancelLink();
-    save(); render();
   }
 
   /* ================== avhengighet: koble-modus ================== */
-  const linkBanner = document.getElementById('linkBanner');
+  function dependsOn(aId, bId){       // avhenger a (transitivt) av b?
+    const seen = new Set();
+    const walk = id => {
+      if(id === bId) return true;
+      if(seen.has(id)) return false;
+      seen.add(id);
+      const t = getTask(id);
+      return t ? t.deps.some(walk) : false;
+    };
+    return walk(aId);
+  }
   function startLink(id){
+    const t = getTask(id);
+    if(!t) return;
     linkSource = id;
     document.body.classList.add('linking');
-    document.getElementById('linkText').innerHTML =
-      'Koble avhengighet: klikk oppgaven som skal <b>avhenge av</b> «' + esc(getTask(id).label) + '». Klikk en som alt er koblet for å fjerne.';
+    linkText.innerHTML = 'Koble avhengighet: klikk featuren som skal <b>vente på</b> «' + esc(t.label) + '». Klikk en som alt er koblet for å fjerne.';
     markLinkSource();
   }
   function markLinkSource(){
@@ -1599,17 +879,19 @@ if (location.protocol === 'file:') {
     const src = linkSource;
     if(!src || targetId === src){ cancelLink(); return; }
     const target = getTask(targetId);
+    if(!target){ cancelLink(); return; }
     if(target.deps.includes(src)){
       target.deps = target.deps.filter(d => d !== src);
       touch(target, 'deps');
     } else {
       if(dependsOn(src, targetId)){
-        alert('Kan ikke koble: det ville gitt en sirkulær avhengighet.');
-        cancelLink(); return;
+        cancelLink();
+        askDialog('Kan ikke koble', 'Det ville gitt en sirkulær avhengighet.', {confirmText:'OK'});
+        return;
       }
       target.deps.push(src);
       touch(target, 'deps');
-      resolveDeps();
+      pushDeps();
     }
     cancelLink();
     save(); render();
@@ -1619,428 +901,201 @@ if (location.protocol === 'file:') {
     document.body.classList.remove('linking');
     markLinkSource();
   }
-  document.getElementById('linkCancel').addEventListener('click', cancelLink);
-  document.addEventListener('keydown', e => {
-    if(e.key === 'Escape'){
-      if(dlgBack.classList.contains('open')) dlgClose(false);
-      else if(editorBack.classList.contains('open')) closeEditor();
-      else if(dataMenu.classList.contains('open')) dataMenu.classList.remove('open');
-      else if(importBack.classList.contains('open')) closeImportPreview();
-      else if(claudeBack.classList.contains('open')) claudeBack.classList.remove('open');
-      else if(linkSource) cancelLink();
-      else if(openTaskId) closeDetail();
-      else if(presenting) exitPresent();
-    }
-  });
+  $('linkCancel').addEventListener('click', cancelLink);
 
-  /* ================== drag (hovedvisning) ================== */
-  let drag = null;
-  chart.addEventListener('pointerdown', e => {
-    if(presenting) return;
-    const bar = e.target.closest('.bar');
-    if(!bar) return;
-    if(linkSource){ completeLink(bar.dataset.id); e.preventDefault(); return; }
-    const t = getTask(bar.dataset.id);
-    let mode = e.target.classList.contains('h')
-      ? (e.target.classList.contains('l') ? 'l' : 'r')
-      : 'move';
-    if(hasSubs(t)) mode = 'move';   // varighet styres av delmålene
-    drag = {t, bar, mode, x0:e.clientX, start0:t.start, end0:t.end};
-    bar.classList.add('dragging');
-    bar.setPointerCapture(e.pointerId);
-    showTip(e, t);
-    e.preventDefault();
-  });
-  chart.addEventListener('pointermove', e => {
-    if(!drag) return;
-    const du = (e.clientX - drag.x0) / MONTH_W;
-    const t = drag.t;
-    if(drag.mode === 'move'){
-      const dur = drag.end0 - drag.start0;
-      let s = snapTo(drag.start0 + du, SNAP);
-      s = Math.max(0, Math.min(N_MONTHS - dur, s));
-      const d = s - t.start;
-      if(d) shiftTask(t, d);
-    } else if(drag.mode === 'l'){
-      let s = snapTo(drag.start0 + du, SNAP);
-      s = Math.max(0, Math.min(drag.end0 - MIN_DUR, s));
-      if(s !== t.start){ t.start = s; touch(t, 'tid'); }
-    } else {
-      let en = snapTo(drag.end0 + du, SNAP);
-      en = Math.min(N_MONTHS, Math.max(drag.start0 + MIN_DUR, en));
-      if(en !== t.end){ t.end = en; touch(t, 'tid'); }
-    }
-    resolveDeps();
-    positionAll();
-    showTip(e, t);
-  });
-  function endDrag(){
-    if(!drag) return;
-    drag.bar.classList.remove('dragging');
-    tip.style.display = 'none';
-    drag = null;
-    save();
+  /* ================== dialoger ================== */
+  let dlgResolve = null;
+  function dlgClose(v){
+    if(!dlgResolve) return;
+    dlgBack.classList.remove('open');
+    const r = dlgResolve; dlgResolve = null; r(v);
   }
-  chart.addEventListener('pointerup', endDrag);
-  chart.addEventListener('pointercancel', endDrag);
-
-  function showTip(e, t){
-    tip.style.display = 'block';
-    tip.innerHTML = '<b>' + esc(t.label) + '</b>&nbsp;&nbsp;' + esc(rangeText(t));
-    tip.style.left = Math.min(window.innerWidth - tip.offsetWidth - 12, e.clientX + 14) + 'px';
-    tip.style.top = (e.clientY - 40) + 'px';
+  function askDialog(title, msg, opts){
+    opts = opts || {};
+    return new Promise(res => {
+      dlgResolve = res;
+      $('dlgTitle').textContent = title;
+      $('dlgMsg').textContent = msg;
+      const inp = $('dlgInput');
+      inp.hidden = !opts.input;
+      inp.value = '';
+      inp.placeholder = opts.placeholder || '';
+      const yes = $('dlgYes');
+      yes.textContent = opts.confirmText || 'OK';
+      yes.classList.toggle('danger', !!opts.danger);
+      $('dlgNo').hidden = !!opts.noCancel;
+      dlgBack.classList.add('open');
+      if(opts.input) setTimeout(() => inp.focus(), 0);
+    });
   }
+  const confirmDialog = (title, msg, opts) => askDialog(title, msg, opts).then(v => v === true);
+  $('dlgYes').addEventListener('click', () => { const inp = $('dlgInput'); dlgClose(inp.hidden ? true : inp.value); });
+  $('dlgNo').addEventListener('click', () => dlgClose(false));
+  dlgBack.addEventListener('click', e => { if(e.target === dlgBack) dlgClose(false); });
+  $('dlgInput').addEventListener('keydown', e => { if(e.key === 'Enter') dlgClose(e.target.value); });
 
-  /* ================== detaljvisning (zoom) ================== */
-  const modalBack = document.getElementById('modalBack');
-  const mLabels = document.getElementById('mLabels');
-  const mChart = document.getElementById('mChart');
-  let mView = null;   // {r0, r1, DMW}
-  let mBarRefs = {}, mDateRefs = {};
-
-  function openDetail(id){
-    if(presenting) return;
-    openTaskId = id;
+  /* ================== feature-editor ================== */
+  let editorTaskId = null;
+  let edSel = { kind: 'estimate' };
+  const ED_DEPS_NONE = '<span class="none">Ingen – denne kan starte når som helst.</span>';
+  function paintEdKind(){
+    document.querySelectorAll('#edKind button').forEach(b => b.classList.toggle('on', b.dataset.k === edSel.kind));
+    const disc = edSel.kind === 'discovery';
+    $('edEndField').hidden = !disc;
+    $('edLikelyField').hidden = disc;
+    $('edLateField').hidden = disc;
+  }
+  function openEditor(id){
     const t = getTask(id);
-    if(!hasSubs(t)){
-      // første delmål = hele oppgaven, så det er noe å dele opp
-      t.subtasks.push({id:uid(), label:'Delmål 1', start:t.start, end:t.end});
-      save();
-    }
-    modalBack.classList.add('open');
-    renderDetail();
-  }
-  function closeDetail(){
-    openTaskId = null;
-    modalBack.classList.remove('open');
-    render();   // oppdater delmål-chips og lås
-  }
-  document.getElementById('modalClose').addEventListener('click', closeDetail);
-  modalBack.addEventListener('click', e => { if(e.target === modalBack) closeDetail(); });
-
-  function detailRange(t){
-    const lo = Math.max(0, Math.floor((t.start - 0.25) * 4) / 4);
-    const hi = Math.min(N_MONTHS, Math.ceil((t.end + 0.5) * 4) / 4);
-    const span = Math.max(1, hi - lo);
-    const DMW = Math.max(160, Math.min(340, 820 / span));
-    return {r0:lo, r1:hi, DMW};
-  }
-
-  function renderDetail(){
-    const t = getTask(openTaskId);
-    if(!t){ closeDetail(); return; }
-    mView = detailRange(t);
-    const {r0, r1, DMW} = mView;
-    const W = (r1 - r0) * DMW;
-
-    document.getElementById('modalTitle').textContent = t.label;
-    document.getElementById('modalDates').textContent = rangeText(t);
-
-    mLabels.innerHTML = '';
-    mChart.innerHTML = '';
-    mBarRefs = {}; mDateRefs = {};
-    mChart.style.width = W + 'px';
-
-    const c = document.createElement('div');
-    c.className = 'mcorner';
-    c.textContent = 'Delmål';
-    mLabels.appendChild(c);
-
-    // akse: månedskolonner innen [r0, r1]
-    const axis = document.createElement('div');
-    axis.className = 'maxis';
-    const firstM = Math.floor(r0), lastM = Math.ceil(r1);
-    for(let i = firstM; i < lastM; i++){
-      const {m, y} = monthInfo(i);
-      const el = document.createElement('div');
-      el.className = 'mth';
-      const from = Math.max(i, r0), to = Math.min(i+1, r1);
-      el.style.width = ((to - from) * DMW) + 'px';
-      if(to - from > 0.2) el.innerHTML = '<div class="mm">'+MND[m]+'</div><div class="yy">'+y+'</div>';
-      axis.appendChild(el);
-    }
-    mChart.appendChild(axis);
-
-    // rutenett: uker (0.25) + månedsgrenser
-    const grid = document.createElement('div');
-    grid.className = 'mgrid';
-    for(let u = Math.ceil(r0/0.25)*0.25; u <= r1 + 1e-9; u += 0.25){
-      const v = document.createElement('div');
-      const isMonth = Math.abs(u - Math.round(u)) < 1e-9;
-      v.className = 'v ' + (isMonth ? 'm' : 'w');
-      v.style.left = ((u - r0) * DMW) + 'px';
-      grid.appendChild(v);
-    }
-    mChart.appendChild(grid);
-
-    t.subtasks.forEach(s => {
-      const ml = document.createElement('div');
-      ml.className = 'mtask';
-      const tt = document.createElement('span');
-      tt.className = 't';
-      tt.textContent = s.label;
-      tt.title = s.label + ' (dobbeltklikk for å redigere)';
-      tt.addEventListener('dblclick', () => editInlineDetail(tt, s));
-      const dd = document.createElement('span');
-      dd.className = 'd';
-      const del = document.createElement('button');
-      del.className = 'mdel';
-      del.textContent = '×';
-      del.title = 'Slett delmål';
-      del.addEventListener('click', () => {
-        t.subtasks = t.subtasks.filter(x => x.id !== s.id);
-        afterSubChange(t);
-        renderDetail();
-      });
-      ml.appendChild(tt); ml.appendChild(dd); ml.appendChild(del);
-      mLabels.appendChild(ml);
-      mDateRefs[s.id] = dd;
-
-      const row = document.createElement('div');
-      row.className = 'mrow';
-      row.style.width = W + 'px';
-      const bar = document.createElement('div');
-      bar.className = 'bar ' + t.lane;
-      bar.dataset.sid = s.id;
-      bar.innerHTML = '<div class="h l"></div><span class="bl">' + esc(s.label) + '</span><div class="h r"></div>';
-      row.appendChild(bar);
-      mChart.appendChild(row);
-      mBarRefs[s.id] = bar;
-      positionSub(t, s);
-    });
-  }
-
-  function editInlineDetail(el, s){
-    const t = getTask(openTaskId);
-    const input = document.createElement('input');
-    input.value = s.label;
-    el.replaceWith(input);
-    input.focus(); input.select();
-    let done = false;
-    const finish = ok => {
-      if(done) return; done = true;
-      const v = input.value.trim();
-      if(ok && v){ s.label = v; touch(t, 'subtasks'); }
-      save(); renderDetail();
-    };
-    input.addEventListener('keydown', e => {
-      if(e.key === 'Enter') finish(true);
-      if(e.key === 'Escape') finish(false);
-    });
-    input.addEventListener('blur', () => finish(true));
-  }
-
-  function positionSub(t, s){
-    const bar = mBarRefs[s.id];
-    if(!bar || !mView) return;
-    bar.style.left = ((s.start - mView.r0) * mView.DMW) + 'px';
-    bar.style.width = Math.max(12, (s.end - s.start) * mView.DMW) + 'px';
-    mDateRefs[s.id].textContent = rangeText(s);
-    bar.title = s.label + ' · ' + rangeText(s);
-  }
-
-  function afterSubChange(t){
-    touch(t, 'subtasks');
-    if(hasSubs(t)){
-      t.start = Math.min(...t.subtasks.map(s => s.start));
-      t.end = Math.max(...t.subtasks.map(s => s.end));
-    }
-    resolveDeps();          // kan skyve avhengige — og t selv via sine deps
-    positionAll();          // hovedvisningen bak modalen oppdateres live
-    document.getElementById('modalDates').textContent = rangeText(t);
-    save();
-  }
-
-  document.getElementById('addSubBtn').addEventListener('click', () => {
-    const t = getTask(openTaskId);
     if(!t) return;
-    const last = t.subtasks[t.subtasks.length - 1];
-    const start = last ? last.end : t.start;
-    t.subtasks.push({id:uid(), label:'Nytt delmål', start, end:Math.min(N_MONTHS, start + 0.5)});
-    afterSubChange(t);
-    renderDetail();
+    editorTaskId = id;
+    $('edTitle').textContent = t.kind === 'discovery' ? 'Rediger utredning' : 'Rediger feature';
+    $('edDates').textContent = rangeText(t);
+    $('edName').value = t.label;
+    edSel = { kind: t.kind };
+    paintEdKind();
+    $('edStart').value = toDateInput(t.start);
+    $('edEnd').value = toDateInput(t.end);
+    const r = rangeWeeks(t) || { likely: Math.round((t.end - t.start) / WEEK), late: Math.round((t.end - t.start) / WEEK) };
+    $('edLikely').value = r.likely;
+    $('edLate').value = r.late;
+    $('edAdo').value = t.adoId || '';
+    $('edDeps').innerHTML = t.deps.length ? t.deps.map(d => {
+      const p = getTask(d);
+      return '<span class="depchip" data-id="' + esc(d) + '">⇠ ' + esc(p ? p.label : d) + ' <button type="button" title="Fjern avhengigheten">×</button></span>';
+    }).join('') : ED_DEPS_NONE;
+    editorBack.classList.add('open');
+    setTimeout(() => $('edName').focus(), 0);
+  }
+  function closeEditor(){ editorTaskId = null; editorBack.classList.remove('open'); }
+  $('edKind').addEventListener('click', e => {
+    const b = e.target.closest('button[data-k]');
+    if(!b) return;
+    edSel.kind = b.dataset.k;
+    paintEdKind();
   });
-
-  // drag i detaljvisningen
-  let mDrag = null;
-  mChart.addEventListener('pointerdown', e => {
-    const bar = e.target.closest('.bar');
-    if(!bar) return;
-    const t = getTask(openTaskId);
-    const s = t.subtasks.find(x => x.id === bar.dataset.sid);
-    const mode = e.target.classList.contains('h')
-      ? (e.target.classList.contains('l') ? 'l' : 'r')
-      : 'move';
-    mDrag = {t, s, bar, mode, x0:e.clientX, start0:s.start, end0:s.end};
-    bar.classList.add('dragging');
-    bar.setPointerCapture(e.pointerId);
-    showTip(e, s);
-    e.preventDefault();
+  $('edDeps').addEventListener('click', e => {
+    if(e.target.tagName !== 'BUTTON') return;
+    e.target.closest('.depchip').remove();
+    if(!document.querySelector('#edDeps .depchip')) $('edDeps').innerHTML = ED_DEPS_NONE;
   });
-  mChart.addEventListener('pointermove', e => {
-    if(!mDrag) return;
-    const du = (e.clientX - mDrag.x0) / mView.DMW;
-    const s = mDrag.s;
-    if(mDrag.mode === 'move'){
-      const dur = mDrag.end0 - mDrag.start0;
-      let st = snapTo(mDrag.start0 + du, SNAP_D);
-      st = Math.max(0, Math.min(N_MONTHS - dur, st));
-      s.start = st; s.end = st + dur;
-    } else if(mDrag.mode === 'l'){
-      let st = snapTo(mDrag.start0 + du, SNAP_D);
-      st = Math.max(0, Math.min(mDrag.end0 - SNAP_D, st));
-      s.start = st;
+  $('edSave').addEventListener('click', () => {
+    const t = getTask(editorTaskId);
+    if(!t){ closeEditor(); return; }
+    const name = $('edName').value.trim();
+    if(name && name !== t.label){ t.label = name; touch(t, 'label'); }
+    const start = fromDateInput($('edStart').value);
+    if(start === null){ $('edStart').focus(); return; }
+    const kindChanged = edSel.kind !== t.kind;
+    if(kindChanged){ t.kind = edSel.kind; touch(t, 'meta'); }
+    if(edSel.kind === 'discovery'){
+      const end = fromDateInput($('edEnd').value);
+      if(end === null){ $('edEnd').focus(); return; }
+      const newEnd = Math.max(start + MIN_DUR, end);
+      if(start !== t.start || newEnd !== t.end || kindChanged){
+        t.start = start; t.end = newEnd; delete t.endLikely; touch(t, 'tid');
+      }
     } else {
-      let en = snapTo(mDrag.end0 + du, SNAP_D);
-      en = Math.min(N_MONTHS, Math.max(mDrag.start0 + SNAP_D, en));
-      s.end = en;
-    }
-    positionSub(mDrag.t, s);
-    afterSubChange(mDrag.t);
-    showTip(e, s);
-  });
-  function endMDrag(){
-    if(!mDrag) return;
-    mDrag.bar.classList.remove('dragging');
-    tip.style.display = 'none';
-    const t = mDrag.t;
-    mDrag = null;
-    save();
-    // hvis deps skjøv hele oppgaven, kan delmålene ha flyttet seg — tegn på nytt
-    renderDetail();
-  }
-  mChart.addEventListener('pointerup', endMDrag);
-  mChart.addEventListener('pointercancel', endMDrag);
-
-  /* ================== SkyTracker-synk ================== */
-  const syncBtn = document.getElementById('syncStBtn');
-  async function applySkytracker(){
-    if(HOSTED){
-      syncBtn.disabled = true;
-      try{
-        const r = await fetch('api/timeline-export', {cache:'no-store'});
-        if(!r.ok) throw new Error('HTTP ' + r.status);
-        window.SKYTRACKER_DATA = await r.json();
-      }catch(err){
-        alert('Klarte ikke å hente fra SkyTracker (' + err.message + ').\n' +
-              'Sjekk at du fortsatt er innlogget, og prøv igjen.');
-        syncBtn.disabled = false;
-        return;
+      const lw = Math.max(1, parseInt($('edLikely').value, 10) || 1);
+      const hw = Math.max(lw, parseInt($('edLate').value, 10) || lw);
+      const el_ = start + lw * WEEK, en = start + hw * WEEK;
+      if(start !== t.start || el_ !== t.endLikely || en !== t.end || kindChanged){
+        t.start = start; t.endLikely = el_; t.end = en; touch(t, 'tid');
       }
-      syncBtn.disabled = false;
     }
-    const d = window.SKYTRACKER_DATA;
-    if(!d || !Array.isArray(d.tasks)){
-      alert('Fant ingen skytracker-data.js ved siden av denne filen.\n\n' +
-            'Hent siste data først: dobbeltklikk «sync-skytracker.command» i samme mappe\n' +
-            '(eller kjør: cd ~/Skytale/SkyTracker && npx tsx scripts/export-timeline.ts),\n' +
-            'og last siden på nytt.');
-      return;
-    }
-    if(!state.lanes.some(l => l.key === d.lane.key)) state.lanes.push(clone(d.lane));
-    // statussignaler er et planleggingslag — bevar dem over resynk
-    const oldStatus = {};
-    state.tasks.filter(t => t.source === 'skytracker').forEach(t => {
-      oldStatus[t.id] = { status:t.status, statusCause:t.statusCause, statusAt:t.statusAt, fv:t.fv };
-    });
-    state.tasks = state.tasks.filter(t => t.source !== 'skytracker');
-    d.tasks.forEach(t => {
-      const nt = clone(t);
-      const prev = oldStatus[nt.id];
-      if(prev){
-        nt.status = prev.status; nt.statusCause = prev.statusCause; nt.statusAt = prev.statusAt;
-      }
-      // synkede data skal vinne over eldre kopier hos andre: bump datafeltene
-      nt.fv = Object.assign({}, (prev && prev.fv) || {});
-      ['tid','label','subtasks','meta'].forEach(f => { nt.fv[f] = (nt.fv[f] || 0) + 1; });
-      if(myName){ nt.editedBy = myName; nt.editedAt = new Date().toISOString(); }
-      state.tasks.push(nt);
-    });
-    state.skytrackerSyncedAt = d.syncedAt;
-    normalize(state);
-    resolveDeps();
+    const ado = parseInt($('edAdo').value, 10);
+    const newAdo = isFinite(ado) && ado > 0 ? ado : undefined;
+    if(t.adoId !== newAdo){ if(newAdo) t.adoId = newAdo; else delete t.adoId; touch(t, 'meta'); }
+    const keep = [...document.querySelectorAll('#edDeps .depchip')].map(c => c.dataset.id);
+    if(keep.length !== t.deps.length){ t.deps = t.deps.filter(d => keep.includes(d)); touch(t, 'deps'); }
+    normalizePlan(state);
+    pushDeps();
     save(); render();
-    updateSyncBtn();
-  }
-  function updateSyncBtn(){
-    const d = window.SKYTRACKER_DATA;
-    const cur = state.skytrackerSyncedAt;
-    let label = 'Synk SkyTracker';
-    if(cur){
-      const dt = new Date(cur);
-      label += ' · ' + dt.toLocaleDateString('nb-NO', {day:'numeric', month:'short'}) +
-               ' ' + dt.toLocaleTimeString('nb-NO', {hour:'2-digit', minute:'2-digit'});
-    }
-    syncBtn.textContent = label;
-    // rød prikk = nyere data ligger klar enn det som er tatt inn
-    syncBtn.classList.toggle('has-new', !!(d && d.syncedAt && d.syncedAt !== cur));
-    const dataBtnEl = document.getElementById('dataBtn');
-    if(dataBtnEl) dataBtnEl.classList.toggle('has-new', !!(d && d.syncedAt && d.syncedAt !== cur));
-    syncBtn.title = d
-      ? 'Hent inn SkyTracker-tavlen «' + (d.boardName || '') + '» (eksportert ' + new Date(d.syncedAt).toLocaleString('nb-NO') + ')'
-      : 'Kjør sync-skytracker.command først for å hente siste data';
-  }
-  syncBtn.addEventListener('click', applySkytracker);
-  updateSyncBtn();
-  window.__stDataLoaded = updateSyncBtn;   // kalles når lokal skytracker-data.js er lastet
-
-  // Hostet i SkyTracker: guiden serveres på /timeline/guide, den lokale
-  // redaksjonelle filen finnes ikke — juster lenkene deretter.
-  if(HOSTED){
-    document.querySelectorAll('a[href="claude-guide.html"]').forEach(a => { a.href = 'timeline/guide'; });
-    document.querySelectorAll('a[href="index.html"]').forEach(a => {
-      const holder = a.closest('span') || a;
-      holder.style.display = 'none';
-    });
-  }
-
-  /* ================== kolonnebredde (Arbeidsstrøm/oppgave) ================== */
-  const LABELW_KEY = 'skytale-telenor-gantt-labelw';
-  const LABELW_DEFAULT = cssNum('--label-w');
-  const colResizer = document.getElementById('colResizer');
-  const currentLabelW = () => parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--label-w'));
-  const setLabelW = w => document.documentElement.style.setProperty('--label-w', w + 'px');
-  {
-    const saved = parseInt(localStorage.getItem(LABELW_KEY), 10);
-    if(saved >= 160 && saved <= 600) setLabelW(saved);
-  }
-  let colDrag = null;
-  colResizer.addEventListener('pointerdown', e => {
-    colDrag = { x0: e.clientX, w0: currentLabelW() };
-    colResizer.classList.add('active');
-    colResizer.setPointerCapture(e.pointerId);
-    e.preventDefault();
+    closeEditor();
   });
-  colResizer.addEventListener('pointermove', e => {
-    if(!colDrag) return;
-    setLabelW(Math.max(160, Math.min(600, colDrag.w0 + e.clientX - colDrag.x0)));
-  });
-  function endColDrag(){
-    if(!colDrag) return;
-    colDrag = null;
-    colResizer.classList.remove('active');
-    localStorage.setItem(LABELW_KEY, String(Math.round(currentLabelW())));
-  }
-  colResizer.addEventListener('pointerup', endColDrag);
-  colResizer.addEventListener('pointercancel', endColDrag);
-  colResizer.addEventListener('dblclick', () => {
-    setLabelW(LABELW_DEFAULT);
-    localStorage.removeItem(LABELW_KEY);
+  $('edCancel').addEventListener('click', closeEditor);
+  $('edClose').addEventListener('click', closeEditor);
+  editorBack.addEventListener('click', e => { if(e.target === editorBack) closeEditor(); });
+  $('edLink').addEventListener('click', () => { const id = editorTaskId; closeEditor(); startLink(id); });
+  $('edDelete').addEventListener('click', async () => {
+    const t = getTask(editorTaskId);
+    if(!t) return;
+    if(!(await confirmDialog('Slette feature', 'Slette «' + t.label + '»? Avhengigheter til den fjernes også.', {danger:true, confirmText:'Slett'}))) return;
+    const id = editorTaskId;
+    closeEditor();
+    doRemoveTaskSilent(id);
+    save(); render();
   });
 
-  /* ================== delt lagring (hostet: autosave for alle) ================== */
-  let serverVersion = null, canWrite = false, serverReady = false, saveTimer = null, applyingRemote = false;
-  let myName = null;   // fra GET /api/timeline-plan — brukes til «sist endret av»-stempling
-  function setSaveNote(msg){
-    if(HOSTED) document.getElementById('dirtyNote').textContent = msg ? '☁ ' + msg : '';
+  /* ================== epics: legg til / rediger / slett ================== */
+  let epicKey = null;
+  function addEpic(){
+    const key = 'e' + Date.now().toString(36) + Math.random().toString(36).slice(2, 4);
+    state.lanes.push({ key, name: 'Ny epic', owner: OWNER_DEFAULT, v: 1 });
+    state.example = false;   // eksplisitt false: en slettet nøkkel overlever flettingen på serveren
+    save(); render();
+    openEpicEditor(key);
   }
+  function openEpicEditor(key){
+    const l = getLane(key);
+    if(!l) return;
+    epicKey = key;
+    $('epTitle').textContent = l.name;
+    $('epSub').textContent = 'Eies av ' + (l.owner || OWNER_DEFAULT) + ' · ' + STATUS_LABEL[epicStatus(state, key).code];
+    $('epName').value = l.name;
+    $('epGoal').value = typeof l.goalDate === 'number' ? toDateInput(l.goalDate) : '';
+    $('epProvisional').checked = !!l.goalProvisional;
+    $('epAdo').value = l.adoId || '';
+    epicBack.classList.add('open');
+    setTimeout(() => $('epName').focus(), 0);
+  }
+  function closeEpicEditor(){ epicKey = null; epicBack.classList.remove('open'); }
+  $('epSave').addEventListener('click', () => {
+    const l = getLane(epicKey);
+    if(!l){ closeEpicEditor(); return; }
+    let changed = false;
+    const name = $('epName').value.trim();
+    if(name && name !== l.name){ l.name = name; changed = true; }
+    const goalRaw = $('epGoal').value;
+    const goal = goalRaw ? fromDateInput(goalRaw) : null;
+    if(goal === null){ if(typeof l.goalDate === 'number'){ delete l.goalDate; changed = true; } }
+    else if(goal !== l.goalDate){ l.goalDate = goal; changed = true; }
+    const prov = $('epProvisional').checked;
+    if(prov !== !!l.goalProvisional){ if(prov) l.goalProvisional = true; else delete l.goalProvisional; changed = true; }
+    const ado = parseInt($('epAdo').value, 10);
+    const newAdo = isFinite(ado) && ado > 0 ? ado : undefined;
+    if(l.adoId !== newAdo){ if(newAdo) l.adoId = newAdo; else delete l.adoId; changed = true; }
+    if(changed){ bumpLane(l); save(); }
+    render();
+    closeEpicEditor();
+  });
+  $('epCancel').addEventListener('click', closeEpicEditor);
+  $('epClose').addEventListener('click', closeEpicEditor);
+  epicBack.addEventListener('click', e => { if(e.target === epicBack) closeEpicEditor(); });
+  $('epDelete').addEventListener('click', async () => {
+    const l = getLane(epicKey);
+    if(!l) return;
+    const n = laneTasks(epicKey).length;
+    if(!(await confirmDialog('Slette epic', 'Slette «' + l.name + '»' + (n ? ' og ' + n + ' feature(s) under den' : '') + '?', {danger:true, confirmText:'Slett'}))) return;
+    const key = epicKey;
+    closeEpicEditor();
+    laneTasks(key).map(t => t.id).forEach(doRemoveTaskSilent);
+    state.deletedLanes[key] = (l.v || 0) + 1;
+    state.lanes = state.lanes.filter(v => v.key !== key);
+    state.example = false;   // eksplisitt false: en slettet nøkkel overlever flettingen på serveren
+    save(); render();
+  });
+  $('addEpicBtn').addEventListener('click', addEpic);
+
+  /* ================== delt lagring (hostet) ================== */
+  function setSaveNote(msg){ if(HOSTED) dirtyNote.textContent = msg ? '☁ ' + msg : ''; }
   function applyRemote(data, version){
     applyingRemote = true;
     serverVersion = version;
-    state = normalize(data);
-    resolveDeps();
+    state = normalizePlan(data);
+    pushDeps();
+    pendingTouch.clear();     // dytt fra fletting er ikke en egen redigering
     render();
-    updateSyncBtn();
     applyingRemote = false;
   }
   async function initServerPlan(){
@@ -2053,21 +1108,21 @@ if (location.protocol === 'file:') {
       canWrite = j.role === 'writer';
       myName = j.user || null;
       serverReady = true;
-      document.getElementById('roBanner').hidden = canWrite;
+      roBanner.hidden = canWrite;
       if(j.plan){
         applyRemote(j.plan.data, j.plan.version);
-        setSaveNote('delt plan lastet' + (canWrite ? '' : ' — kun lesetilgang, endringer forblir lokale'));
-      } else if(canWrite){
-        await pushPlan();   // aller første lagring: planen du ser blir den delte
+        setSaveNote('delt plan lastet' + (canWrite ? '' : ' – kun lesetilgang'));
       } else {
-        setSaveNote('ingen delt plan enda — kun lesetilgang');
+        state = emptyPlan();
+        render();
+        setSaveNote(canWrite ? 'ingen delt plan ennå' : 'ingen delt plan ennå – kun lesetilgang');
       }
     }catch(err){
-      setSaveNote('frakoblet — lagrer kun lokalt');
+      serverFailed = true;
+      setSaveNote('frakoblet – kunne ikke hente planen');
+      render();
     }
   }
-  let pendingSave = false;   // endret etter at en push startet?
-  let pushing = false;       // PUT underveis — polling holder seg unna
   async function pushPlan(){
     pendingSave = false;
     pushing = true;
@@ -2078,29 +1133,31 @@ if (location.protocol === 'file:') {
       });
       if(r.status === 403){
         canWrite = false;
-        document.getElementById('roBanner').hidden = false;
-        setSaveNote('kun lesetilgang — endringer forblir lokale');
+        roBanner.hidden = false;
+        setSaveNote('kun lesetilgang – endringer forblir lokale');
         return;
       }
-      if(r.status === 409){   // ren skrivekø-kollisjon — prøv igjen straks
-        setSaveNote('travelt — prøver igjen');
-        scheduleServerSave();
-        return;
-      }
+      if(r.status === 409){ setSaveNote('travelt – prøver igjen'); scheduleServerSave(); return; }
       if(!r.ok) throw new Error('HTTP ' + r.status);
       const j = await r.json();
-      serverVersion = j.version;
       const tid = new Date().toLocaleTimeString('nb-NO', {hour:'2-digit', minute:'2-digit'});
+      if(drag || colDrag){
+        // brukeren drar: ikke bytt ut tilstanden under hånden. serverVersion holdes gammel,
+        // så pollTick henter den flettede planen når draget er ferdig (eller neste lagring gjør det).
+        setSaveNote('lagret for alle ' + tid);
+        return;
+      }
+      serverVersion = j.version;
       // serveren fletter felt-for-felt og returnerer resultatet; ta det inn
       // med mindre brukeren alt har rukket å endre mer (neste push rydder da opp)
       if(!pendingSave && JSON.stringify(j.data) !== JSON.stringify(state)){
         applyRemote(j.data, j.version);
-        setSaveNote('lagret ' + tid + ' — flettet med endringer fra andre');
+        setSaveNote('lagret ' + tid + ' – flettet med endringer fra andre');
       } else {
         setSaveNote('lagret for alle ' + tid);
       }
     }catch(err){
-      setSaveNote('lagring feilet — prøver igjen ved neste endring');
+      setSaveNote('lagring feilet – prøver igjen ved neste endring');
     }finally{
       pushing = false;
     }
@@ -2112,721 +1169,102 @@ if (location.protocol === 'file:') {
     clearTimeout(saveTimer);
     saveTimer = setTimeout(pushPlan, 900);
   }
-
-  /* ---------- polling: andres lagringer dukker opp av seg selv ---------- */
-  const POLL_MS = 10000;
+  const anyModalOpen = () => editorBack.classList.contains('open') || epicBack.classList.contains('open') || dlgBack.classList.contains('open');
   async function pollTick(){
     if(!HOSTED || !serverReady) return;
-    // ikke midt i brukerens egen redigering eller lagring
-    if(drag || mDrag || colDrag || linkSource || openTaskId) return;
+    if(drag || colDrag || linkSource || anyModalOpen()) return;   // ikke midt i brukerens egen redigering
     if(pendingSave || pushing) return;
-    if(importBack.classList.contains('open') || claudeBack.classList.contains('open')) return;
     try{
       const r = await fetch('api/timeline-plan', {cache:'no-store'});
       if(!r.ok) return;
       const j = await r.json();
-      // sjekk på nytt — brukeren kan ha begynt å dra mens vi ventet på svar
-      if(drag || mDrag || pendingSave || pushing) return;
+      if(drag || pendingSave || pushing || anyModalOpen()) return;
       if(j.plan && j.plan.version !== serverVersion){
         applyRemote(j.plan.data, j.plan.version);
-        const tid = j.plan.updatedAt
-          ? new Date(j.plan.updatedAt).toLocaleTimeString('nb-NO', {hour:'2-digit', minute:'2-digit'}) : '';
+        const tid = j.plan.updatedAt ? new Date(j.plan.updatedAt).toLocaleTimeString('nb-NO', {hour:'2-digit', minute:'2-digit'}) : '';
         setSaveNote('oppdatert av ' + (j.plan.updatedBy || 'noen andre') + (tid ? ' ' + tid : ''));
       }
-    }catch(e){ /* frakoblet — prøver igjen neste runde */ }
-  }
-  if(HOSTED) setInterval(pollTick, POLL_MS);
-
-  /* ================== presentasjonsmodus (investorvisning) ================== */
-  const mainTitle = document.getElementById('mainTitle');
-  const metaRight = document.getElementById('metaRight');
-  const NORMAL_TITLE = mainTitle.innerHTML;
-  const NORMAL_META = metaRight.textContent;
-  function enterPresent(){
-    if(presenting) return;
-    presenting = true;
-    cancelLink();
-    closeCauseMenu();
-    closeImportPreview();
-    closeEditor();
-    dlgClose(false);
-    claudeBack.classList.remove('open');
-    dataMenu.classList.remove('open');
-    if(currentView === 'whatnow' || currentView === 'log') switchView('plan');
-    if(openTaskId) closeDetail();
-    document.body.classList.add('presenting');
-    mainTitle.innerHTML = 'Veikart — <span class="accent">Skytale.</span>';
-    metaRight.textContent = 'Veikart og milepæler · ' +
-      new Date().toLocaleDateString('nb-NO', {day:'numeric', month:'long', year:'numeric'});
-    render();
-  }
-  function exitPresent(){
-    if(!presenting) return;
-    presenting = false;
-    document.body.classList.remove('presenting');
-    mainTitle.innerHTML = NORMAL_TITLE;
-    metaRight.textContent = NORMAL_META;
-    render();
-  }
-  document.getElementById('presentBtn').addEventListener('click', enterPresent);
-  document.getElementById('presentExit').addEventListener('click', exitPresent);
-
-  /* ================== hjelpepanel ================== */
-  const HELP_SEEN = 'skytale-telenor-gantt-help-seen';
-  const helpPanel = document.getElementById('helpPanel');
-  document.getElementById('helpBtn').addEventListener('click', () => {
-    helpPanel.classList.toggle('open');
-    localStorage.setItem(HELP_SEEN, '1');
-  });
-  document.getElementById('helpClose').addEventListener('click', () => {
-    helpPanel.classList.remove('open');
-    localStorage.setItem(HELP_SEEN, '1');
-  });
-  if(!localStorage.getItem(HELP_SEEN)) helpPanel.classList.add('open');
-  document.getElementById('helpMore').addEventListener('click', () => {
-    helpPanel.classList.toggle('expanded');
-    document.getElementById('helpMore').textContent =
-      helpPanel.classList.contains('expanded') ? 'Vis færre emner' : 'Vis alle emner';
-  });
-
-  /* ================== seksjonsnavigasjon ================== */
-  const VIEWS = ['plan', 'whatnow', 'dash', 'log'];
-  let currentView = 'plan';
-  function switchView(name){
-    currentView = name;
-    VIEWS.forEach(v => {
-      document.getElementById('view-' + v).hidden = v !== name;
-      const b = document.querySelector('.tabs button[data-view="' + v + '"]');
-      if(b) b.classList.toggle('active', v === name);
-    });
-    if(name === 'whatnow') renderWhatNow();
-    if(name === 'dash') renderDash();
-    if(name === 'log') renderLog();
-  }
-  document.getElementById('tabs').addEventListener('click', e => {
-    const b = e.target.closest('button[data-view]');
-    if(b) switchView(b.dataset.view);
-  });
-  const STATUS_COL = {gronn:'#2e7d43', gul:'#d9a416', rod:'#c3441c'};
-  const laneName = key => { const l = state.lanes.find(x => x.key === key); return l ? l.name : key; };
-  function renderWhatNow(){
-    const el = document.getElementById('view-whatnow');
-    const now = todayUnit();
-    const horizon = now + 0.5;   // 14 dager ≈ 0.5 måned-enheter
-    const eps = 1e-9;
-    const closure = typeof depClosure === 'function' ? depClosure : () => [];
-
-    // pågående og kommende oppgaver de neste to ukene, i startrekkefølge
-    const soon = state.tasks
-      .filter(t => !t.milestone && t.start < horizon && t.end > now + eps)
-      .sort((a,b) => a.start - b.start || a.end - b.end);
-    const waitTxt = t => {
-      const blockers = t.deps.map(getTask).filter(p => p && p.end > now + eps && p.end >= t.start - eps);
-      return blockers.length ? 'venter på: ' + blockers.map(p => p.label).join(' · ') : '';
-    };
-    let html = '<h2 class="wn-h">Neste 14 dager</h2>';
-    html += soon.length
-      ? '<div class="wn-card">' + soon.map(t => {
-          const started = t.start <= now;
-          const w = waitTxt(t);
-          return '<div class="wn-row">' +
-            '<span class="wn-dot" style="background:' + (STATUS_COL[t.status] || STATUS_COL.gronn) + '"></span>' +
-            '<span class="wn-name">' + esc(t.label) + '</span>' +
-            '<span class="wn-lane">' + esc(laneName(t.lane)) + '</span>' +
-            '<span class="wn-when">' + (started ? 'pågår · ferdig ' + esc(fmt(unitToDate(t.end))) : 'starter ' + esc(fmt(unitToDate(t.start)))) + '</span>' +
-            (w ? '<span class="wn-wait">⇠ ' + esc(w) + '</span>' : '') +
-            '</div>';
-        }).join('') + '</div>'
-      : '<div class="view-empty">Ingen oppgaver pågår eller starter de neste to ukene.</div>';
-
-    // milepæler i datorekkefølge med fremdrift fra avhengighetskjeden
-    const milestones = state.tasks.filter(t => t.milestone).sort((a,b) => a.start - b.start);
-    html += '<h2 class="wn-h">Milepæler</h2>';
-    if(!milestones.length){
-      html += '<div class="view-empty">Ingen milepæler i planen enda — merk en oppgave som milepæl i redigeringspanelet.</div>';
-    }
-    milestones.forEach(m => {
-      const target = unitToDate(m.start);
-      const dayDiff = Math.round((target - new Date()) / 86400000);
-      const when = dayDiff > 0 ? 'nås ' + fmt(target) + ' · om ' + dayDiff + ' dager'
-                 : dayDiff < 0 ? 'måldato ' + fmt(target) + ' · passert' : 'nås i dag';
-      const chain = closure(state, m.id).filter(t => !t.milestone);
-      const done = chain.filter(t => t.end <= now + eps);
-      const rest = chain.filter(t => t.end > now + eps).sort((a,b) => a.end - b.end);
-      const pct = chain.length ? Math.round(100 * done.length / chain.length) : null;
-      html += '<div class="ms-card">' +
-        '<div class="ms-head"><h3>' + esc(m.label) + '</h3><span class="ms-when">' + esc(when) + '</span></div>' +
-        (m.dod ? '<div class="ms-dod"><b>Ferdig betyr:</b> ' + esc(m.dod) + '</div>' : '') +
-        ((m.links || []).length ? '<div class="ms-links">' + m.links.map(l =>
-          '<a href="' + esc(l.url) + '" target="_blank" rel="noopener">' + esc(l.label || l.url) + ' ↗</a>').join('') + '</div>' : '') +
-        (typeof milestoneCost === 'function' && milestoneCost(state, m.id) > 0
-          ? '<div class="ms-meta">Kost til milepælen: ~' + milestoneCost(state, m.id).toLocaleString('nb-NO') + ' kr (estimat)' +
-            (typeof m.revenue === 'number' && m.revenue > 0 ? ' · forventet inntjening: ~' + m.revenue.toLocaleString('nb-NO') + ' kr (estimat)' : '') + '</div>'
-          : '') +
-        (typeof m.buffer === 'number' && m.buffer > 0 && typeof bufferStatuses === 'function'
-          ? (() => {
-              const bs = bufferStatuses(state).find(x => x.taskId === m.id);
-              return bs ? '<div class="ms-meta">Buffer: ' + Math.round(bs.usedWeeks * 10) / 10 + ' av ' + bs.bufferWeeks + ' uker brukt' +
-                (bs.overrunWeeks > 0 ? ' · <span style="color:var(--accent)">overskredet med ' + Math.round(bs.overrunWeeks * 10) / 10 + ' uker</span>' : '') + '</div>' : '';
-            })() : '') +
-        (pct !== null
-          ? '<div class="ms-progress"><i style="width:' + pct + '%"></i></div>' +
-            '<div class="ms-meta">' + done.length + ' av ' + chain.length + ' koblede oppgaver planlagt ferdige (' + pct + ' %)</div>' +
-            (rest.length ? '<div class="ms-rest"><b>Gjenstår:</b> ' +
-              rest.slice(0, 6).map(t => esc(t.label) + ' (' + esc(fmt(unitToDate(t.end))) + ')').join(' · ') +
-              (rest.length > 6 ? ' · +' + (rest.length - 6) + ' til' : '') + '</div>' : '')
-          : '<div class="ms-rest">Ingen oppgaver er koblet til milepælen — koble avhengigheter (⇢) for å få fremdriftsbildet.</div>') +
-        '</div>';
-    });
-    el.innerHTML = html;
-  }
-  /* Telleregler (samme i alle fliser — dokumentert nederst i visningen):
-     fullført = ikke-milepæl med planlagt slutt før i dag · i arbeid = pågår i dag ·
-     pipeline = starter etter i dag · milepælsfremdrift = andel av avhengighetskjeden
-     med planlagt slutt før i dag. Kroner er alltid estimater. */
-  function renderDash(){
-    const el = document.getElementById('view-dash');
-    const now = todayUnit();
-    const eps = 1e-9;
-    const pool = state.tasks.filter(t => !presenting || t.ext);
-    const work = pool.filter(t => !t.milestone);
-    const done = work.filter(t => t.end <= now + eps);
-    const doing = work.filter(t => t.start <= now && t.end > now + eps);
-    const pipe = work.filter(t => t.start > now);
-    const mss = pool.filter(t => t.milestone).sort((a,b) => a.start - b.start);
-    const closure = typeof depClosure === 'function' ? depClosure : () => [];
-    const nok = n => n >= 1e6 ? ((Math.round(n/1e5)/10).toLocaleString('nb-NO') + ' MNOK')
-                              : (Math.round(n/1000).toLocaleString('nb-NO') + ' kNOK');
-    const dateToUnit = d => (d.getFullYear() - BASE_Y) * 12 + (d.getMonth() - BASE_M) +
-      (d.getDate() - 1) / new Date(d.getFullYear(), d.getMonth()+1, 0).getDate();
-
-    // stat-fliser
-    const eco = typeof planEconomy === 'function' ? planEconomy({tasks: pool}) : {cost:0, revenue:0};
-    let html = '<div class="dash-stats">' +
-      '<div class="stat"><div class="n">' + done.length + '</div><div class="l">Fullført</div><div class="s">planlagt slutt passert</div></div>' +
-      '<div class="stat"><div class="n">' + doing.length + '</div><div class="l">I arbeid</div><div class="s">pågår i dag</div></div>' +
-      '<div class="stat"><div class="n">' + pipe.length + '</div><div class="l">I pipeline</div><div class="s">starter senere</div></div>' +
-      (eco.revenue > 0 ? '<div class="stat"><div class="n">' + nok(eco.revenue) + '</div><div class="l">Forventet inntjening</div><div class="s">estimat, hele planen</div></div>' : '') +
-      (!presenting && eco.cost > 0 ? '<div class="stat"><div class="n">' + nok(eco.cost) + '</div><div class="l">Estimert kost</div><div class="s">internt styringstall</div></div>' : '') +
-      '</div>';
-
-    // horisonten — hele planen som én linje
-    const W = 1000, H = 86, x = u => 20 + (u / N_MONTHS) * (W - 40);
-    let hz = '<svg class="hz-svg" viewBox="0 0 ' + W + ' ' + H + '" preserveAspectRatio="none">' +
-      '<line x1="20" y1="46" x2="' + (W-20) + '" y2="46" stroke="var(--line)" stroke-width="2"/>';
-    for(let i=0;i<=N_MONTHS;i+=1){
-      if(monthInfo(i).m === 0) hz += '<line x1="' + x(i) + '" y1="38" x2="' + x(i) + '" y2="54" stroke="var(--ink-faint)" stroke-width="1"/>' +
-        '<text x="' + x(i) + '" y="76" text-anchor="middle" font-size="10" fill="var(--ink-faint)" font-family="Spline Sans Mono">' + monthInfo(i).y + '</text>';
-    }
-    hz += '<line x1="' + x(now) + '" y1="24" x2="' + x(now) + '" y2="62" stroke="var(--accent)" stroke-width="2"/>' +
-      '<text x="' + x(now) + '" y="16" text-anchor="middle" font-size="9.5" fill="var(--accent)" font-family="Spline Sans Mono">I DAG</text>';
-    mss.forEach(m => {
-      const col = presenting ? 'var(--ink)' : (STATUS_COL[m.status] || STATUS_COL.gronn);
-      hz += '<circle cx="' + x(m.start) + '" cy="46" r="7" fill="' + col + '" stroke="var(--card)" stroke-width="2"><title>' +
-        esc(m.label) + ' · ' + esc(fmt(unitToDate(m.start))) + '</title></circle>';
-    });
-    hz += '</svg>';
-    const upcoming = mss.filter(m => m.start >= now - eps).slice(0, 5);
-    html += '<div class="dash-grid"><div class="dash-card horizon"><h3>Horisonten</h3>' +
-      '<div class="dc-sub">' + N_MONTHS + ' måneder · milepæler' + (presenting ? '' : ' farget etter statussignal') + '</div>' +
-      hz +
-      (upcoming.length ? '<div class="hz-list">' + upcoming.map(m =>
-        '<span><b>' + esc(m.label) + '</b> · ' + esc(fmt(unitToDate(m.start))) + '</span>').join('') + '</div>' : '') +
-      '</div>';
-
-    // neste milepæl
-    const next = mss.find(m => m.start >= now - eps);
-    if(next){
-      const chain = closure(state, next.id).filter(t => !t.milestone && (!presenting || t.ext));
-      const chDone = chain.filter(t => t.end <= now + eps);
-      const pct = chain.length ? Math.round(100 * chDone.length / chain.length) : null;
-      const dd = Math.max(0, Math.round((unitToDate(next.start) - new Date()) / 86400000));
-      html += '<div class="dash-card"><h3>Neste milepæl</h3>' +
-        '<div class="dc-sub">' + esc(next.label) + ' · ' + esc(fmt(unitToDate(next.start))) + '</div>' +
-        '<div class="dc-body">' +
-        '<div class="stat" style="border:none;padding:0 0 8px"><div class="n">' + dd + '</div><div class="l">dager igjen</div></div>' +
-        (next.dod ? '<div style="font-size:12.5px;color:var(--ink-soft);margin-bottom:8px"><b style="color:var(--ink)">Ferdig betyr:</b> ' + esc(next.dod) + '</div>' : '') +
-        (pct !== null ? '<div class="ms-progress" style="margin:0 0 6px"><i style="width:' + pct + '%"></i></div>' +
-          '<div class="buf-num">' + chDone.length + ' av ' + chain.length + ' koblede oppgaver planlagt ferdige (' + pct + ' %)</div>' : '') +
-        '</div></div>';
-    }
-
-    // buffer-helse
-    const bufs = typeof bufferStatuses === 'function' ? bufferStatuses({tasks: pool}) : [];
-    html += '<div class="dash-card"><h3>Buffer-helse</h3><div class="dc-sub">føring 1.5 — reserven før hver milepæl</div><div class="dc-body">' +
-      (bufs.length ? bufs.map(b =>
-        '<div class="buf-row"><span class="buf-name">' + esc(b.label) + '</span>' +
-        '<span class="buf-bar' + (b.overrunWeeks > 0 ? ' overrun' : '') + '"><i style="width:' + Math.round(100 * Math.min(1, b.usedWeeks / b.bufferWeeks)) + '%"></i></span>' +
-        '<span class="buf-num">' + (Math.round(b.usedWeeks*10)/10) + ' av ' + b.bufferWeeks + ' uker' +
-        (b.overrunWeeks > 0 ? ' · +' + (Math.round(b.overrunWeeks*10)/10) + ' over' : '') + '</span>' +
-        '<span class="buf-num" id="buftrend-' + esc(b.taskId) + '"></span></div>').join('')
-      : '<div class="buf-num">Ingen milepæler har buffer satt enda — legg inn uker i redigeringspanelet.</div>') +
-      '</div></div>';
-
-    if(!presenting){
-      // aktivitetspuls: planlagt fullførte per uke, siste 12 uker
-      const buckets = [];
-      for(let j = 11; j >= 0; j--){
-        const from = new Date(); from.setDate(from.getDate() - 7 * (j + 1));
-        const to = new Date(); to.setDate(to.getDate() - 7 * j);
-        const a = dateToUnit(from), b = dateToUnit(to);
-        buckets.push(work.filter(t => t.end > a && t.end <= b).length);
-      }
-      const maxB = Math.max(1, ...buckets);
-      const bw = 300 / 12;
-      html += '<div class="dash-card"><h3>Aktivitetspuls</h3><div class="dc-sub">oppgaver planlagt fullført per uke · siste 12 uker</div><div class="dc-body">' +
-        '<svg class="spark" viewBox="0 0 300 56" preserveAspectRatio="none">' +
-        buckets.map((v,i) => {
-          const bh = Math.max(2, (v/maxB) * 48);
-          return '<rect x="' + (i*bw+2) + '" y="' + (52-bh) + '" width="' + (bw-4) + '" height="' + bh + '" rx="2" fill="var(--sea)"><title>' + v + ' fullført</title></rect>';
-        }).join('') + '</svg></div></div>';
-
-      // statussignal-bildet
-      const n = {gronn:0, gul:0, rod:0};
-      pool.forEach(t => { if(n[t.status] !== undefined) n[t.status]++; });
-      const rode = pool.filter(t => t.status === 'rod');
-      html += '<div class="dash-card"><h3>Statussignal-bildet</h3><div class="dc-sub">per oppgave · røde krever beslutning</div><div class="dc-body">' +
-        '<div class="tl-summary" style="font-size:13px;margin-bottom:8px">' +
-        '<span><i style="background:#2e7d43"></i>' + n.gronn + ' grønn</span>' +
-        '<span><i style="background:#d9a416"></i>' + n.gul + ' gul</span>' +
-        '<span><i style="background:#c3441c"></i>' + n.rod + ' rød</span></div>' +
-        (rode.length ? rode.map(t => '<div class="red-row"><span class="wn-dot" style="background:#c3441c"></span>' +
-          '<b>' + esc(t.label) + '</b><span class="imp-det">' + esc(t.statusCause || 'uten årsak') + '</span></div>').join('') : '') +
-        '</div></div>';
-
-      // økonomi per milepæl
-      const ecoRows = mss.filter(m => typeof milestoneCost === 'function' &&
-        (milestoneCost(state, m.id) > 0 || (m.revenue || 0) > 0));
-      if(ecoRows.length){
-        html += '<div class="dash-card"><h3>Kost / nytte per milepæl</h3><div class="dc-sub">estimater — kost = egen + avhengighetskjeden</div><div class="dc-body">' +
-          ecoRows.map(m => '<div class="eco-row"><span>' + esc(m.label) + '</span><b>' +
-            nok(milestoneCost(state, m.id)) + ((m.revenue || 0) > 0 ? ' → ' + nok(m.revenue) : '') + '</b></div>').join('') +
-          '</div></div>';
-      }
-    } else if(mss.some(m => (m.revenue || 0) > 0)){
-      // investorvariant: inntjening som aggregater per milepæl, aldri kost
-      html += '<div class="dash-card"><h3>Forventet inntjening per milepæl</h3><div class="dc-sub">estimater</div><div class="dc-body">' +
-        mss.filter(m => (m.revenue || 0) > 0).map(m =>
-          '<div class="eco-row"><span>' + esc(m.label) + '</span><b>' + nok(m.revenue) + '</b></div>').join('') +
-        '</div></div>';
-    }
-
-    html += '</div><div class="dash-note">Telleregler: fullført = planlagt slutt før i dag · i arbeid = pågår i dag · pipeline = starter senere · ' +
-      'milepælsfremdrift = andel av avhengighetskjeden med planlagt slutt før i dag · alle kroner er estimater' +
-      (presenting ? ' · investorvisning: kun eksternt merket innhold' : '') + '</div>';
-    el.innerHTML = html;
-
-    // buffertrend fra ukesnapshots (kun delt modus)
-    if(HOSTED && bufs.length){
-      fetch('api/timeline-buffer-history', {cache:'no-store'}).then(r => r.ok ? r.json() : {snapshots:[]}).then(j => {
-        const by = {};
-        (j.snapshots || []).forEach(s => { (by[s.milestoneId] = by[s.milestoneId] || []).push(s); });
-        bufs.forEach(b => {
-          const rows = by[b.taskId];
-          const holder = document.getElementById('buftrend-' + b.taskId);
-          if(!rows || rows.length < 2 || !holder) return;
-          const last = rows[rows.length-1].usedWeeks, prev = rows[rows.length-2].usedWeeks;
-          holder.textContent = last > prev ? '↗ øker' : last < prev ? '↘ avtar' : '→ stabil';
-          holder.style.color = last > prev ? 'var(--accent)' : 'var(--ink-faint)';
-        });
-      }).catch(() => {});
-    }
-  }
-  async function renderLog(){
-    const el = document.getElementById('view-log');
-    if(!HOSTED){
-      el.innerHTML = '<div class="view-empty">Endringsloggen føres i den delte utgaven — åpne tidslinjen via SkyTracker.</div>';
-      return;
-    }
-    el.innerHTML = '<div class="view-empty">Henter endringslogg …</div>';
-    let rows = [];
-    try{
-      const r = await fetch('api/timeline-changes?limit=120', {cache:'no-store'});
-      if(!r.ok) throw new Error('HTTP ' + r.status);
-      rows = (await r.json()).changes || [];
-    }catch(err){
-      el.innerHTML = '<div class="view-empty">Klarte ikke å hente endringsloggen (' + esc(err.message) + ').</div>';
-      return;
-    }
-    if(!rows.length){
-      el.innerHTML = '<div class="view-empty">Ingen endringer logget enda — loggen fylles etter hvert som planen redigeres.</div>';
-      return;
-    }
-    const KIND_TXT = {ny:'la til', endret:'endret', slettet:'slettet'};
-    const byDay = new Map();
-    rows.forEach(c => {
-      const key = new Date(c.at).toLocaleDateString('nb-NO', {weekday:'long', day:'numeric', month:'long'});
-      if(!byDay.has(key)) byDay.set(key, []);
-      byDay.get(key).push(c);
-    });
-    let html = '<div class="log-list">';
-    byDay.forEach((list, day) => {
-      html += '<h3 class="log-day">' + esc(day) + '</h3>';
-      list.forEach(c => {
-        const t = new Date(c.at).toLocaleTimeString('nb-NO', {hour:'2-digit', minute:'2-digit'});
-        const groups = (c.groups || '').split(',').filter(Boolean);
-        const det = c.kind === 'endret' && c.before && c.after
-          ? changeDetail({groups, before: c.before, after: c.after}) : '';
-        html += '<div class="log-row">' +
-          '<span class="log-when">' + t + '</span>' +
-          '<span class="imp-kind ' + esc(c.kind) + '">' + (KIND_TXT[c.kind] || esc(c.kind)) + '</span>' +
-          '<span class="log-body"><b>' + esc(c.editor || 'ukjent') + '</b> — «' + esc(c.taskLabel) + '»' +
-          (det ? '<span class="imp-det"> · ' + det + '</span>' : '') + '</span></div>';
-      });
-    });
-    el.innerHTML = html + '</div>';
+    }catch(e){ /* frakoblet – prøver igjen neste runde */ }
   }
 
-  /* ================== Data-meny ================== */
-  const dataMenu = document.getElementById('dataMenu');
-  const dataBtn = document.getElementById('dataBtn');
-  dataBtn.addEventListener('click', e => { e.stopPropagation(); dataMenu.classList.toggle('open'); });
-  dataMenu.addEventListener('click', () => dataMenu.classList.remove('open'));
-  document.addEventListener('pointerdown', e => {
-    if(dataMenu.classList.contains('open') && !e.target.closest('.menu-wrap')) dataMenu.classList.remove('open');
-  });
-
-  /* ================== dialoger (erstatter confirm/prompt) ================== */
-  const dlgBack = document.getElementById('dlgBack');
-  let dlgResolve = null;
-  function dlgClose(v){
-    if(!dlgResolve) return;
-    dlgBack.classList.remove('open');
-    const r = dlgResolve; dlgResolve = null; r(v);
-  }
-  function askDialog(title, msg, opts){
-    opts = opts || {};
-    return new Promise(res => {
-      dlgResolve = res;
-      document.getElementById('dlgTitle').textContent = title;
-      document.getElementById('dlgMsg').textContent = msg;
-      const inp = document.getElementById('dlgInput');
-      inp.hidden = !opts.input;
-      inp.value = '';
-      inp.placeholder = opts.placeholder || '';
-      const yes = document.getElementById('dlgYes');
-      yes.textContent = opts.confirmText || 'OK';
-      yes.classList.toggle('danger', !!opts.danger);
-      dlgBack.classList.add('open');
-      if(opts.input) setTimeout(() => inp.focus(), 0);
-    });
-  }
-  const confirmDialog = (title, msg, opts) => askDialog(title, msg, opts).then(v => v === true);
-  document.getElementById('dlgYes').addEventListener('click', () => {
-    const inp = document.getElementById('dlgInput');
-    dlgClose(inp.hidden ? true : inp.value);
-  });
-  document.getElementById('dlgNo').addEventListener('click', () => dlgClose(false));
-  dlgBack.addEventListener('click', e => { if(e.target === dlgBack) dlgClose(false); });
-  document.getElementById('dlgInput').addEventListener('keydown', e => {
-    if(e.key === 'Enter') dlgClose(e.target.value);
-  });
-
-  /* ================== oppgave-editor ================== */
-  const editorBack = document.getElementById('editorBack');
-  let editorTaskId = null;
-  let edSel = {status:'gronn', cause:''};
-  const ED_DEPS_NONE = '<span class="none">Ingen — denne kan starte når som helst.</span>';
-  function paintEdStatus(){
-    document.querySelectorAll('#edStatus button').forEach(b =>
-      b.classList.toggle('on', b.dataset.s === edSel.status));
-    const cause = document.getElementById('edCause');
-    cause.hidden = edSel.status === 'gronn';
-    if(!cause.hidden){
-      cause.innerHTML = '<option value="">Uten årsak foreløpig</option>' +
-        CAUSES.map(c => '<option' + (edSel.cause === c ? ' selected' : '') + '>' + c + '</option>').join('');
-    }
-  }
-  function openEditor(id){
-    const t = getTask(id);
-    if(!t || presenting) return;
-    editorTaskId = id;
-    document.getElementById('edTitle').textContent = t.milestone ? 'Rediger milepæl' : 'Rediger oppgave';
-    document.getElementById('edDates').textContent = rangeText(t);
-    const st = t.source === 'skytracker';
-    document.getElementById('edStNote').hidden = !st;
-    const name = document.getElementById('edName');
-    name.value = t.label;
-    name.disabled = st;
-    edSel = {status: t.status || 'gronn', cause: t.statusCause || ''};
-    paintEdStatus();
-    document.getElementById('edExt').checked = !!t.ext;
-    document.getElementById('edMilestone').checked = !!t.milestone;
-    document.getElementById('edDodField').hidden = !t.milestone;
-    document.getElementById('edBufferField').hidden = !t.milestone;
-    document.getElementById('edDod').value = t.dod || '';
-    document.getElementById('edBuffer').value = typeof t.buffer === 'number' ? t.buffer : '';
-    document.getElementById('edCost').value = typeof t.cost === 'number' ? t.cost : '';
-    document.getElementById('edRevenue').value = typeof t.revenue === 'number' ? t.revenue : '';
-    document.getElementById('edLinks').innerHTML = (t.links || []).map(l =>
-      '<div class="linkrow"><input class="l-label" placeholder="Navn" value="' + esc(l.label || '') + '">' +
-      '<input class="l-url" placeholder="https://…" value="' + esc(l.url || '') + '">' +
-      '<button type="button" title="Fjern lenken">×</button></div>').join('');
-    document.getElementById('edDeps').innerHTML = t.deps.length ? t.deps.map(d => {
-      const p = getTask(d);
-      return '<span class="depchip" data-id="' + esc(d) + '">⇠ ' + esc(p ? p.label : d) +
-        ' <button title="Fjern avhengigheten">×</button></span>';
-    }).join('') : ED_DEPS_NONE;
-    document.getElementById('edSubs').textContent = hasSubs(t) ? 'Delmål (' + t.subtasks.length + ') …' : 'Del opp i delmål …';
-    editorBack.classList.add('open');
-  }
-  function closeEditor(){ editorTaskId = null; editorBack.classList.remove('open'); }
-  document.getElementById('edStatus').addEventListener('click', e => {
-    const b = e.target.closest('button[data-s]');
-    if(!b) return;
-    edSel.status = b.dataset.s;
-    if(edSel.status === 'gronn') edSel.cause = '';
-    paintEdStatus();
-  });
-  document.getElementById('edCause').addEventListener('change', e => { edSel.cause = e.target.value; });
-  document.getElementById('edMilestone').addEventListener('change', e => {
-    document.getElementById('edDodField').hidden = !e.target.checked;
-    document.getElementById('edBufferField').hidden = !e.target.checked;
-  });
-  document.getElementById('edAddLink').addEventListener('click', () => {
-    const row = document.createElement('div');
-    row.className = 'linkrow';
-    row.innerHTML = '<input class="l-label" placeholder="Navn">' +
-      '<input class="l-url" placeholder="https://…">' +
-      '<button type="button" title="Fjern lenken">×</button>';
-    document.getElementById('edLinks').appendChild(row);
-    row.querySelector('.l-label').focus();
-  });
-  document.getElementById('edLinks').addEventListener('click', e => {
-    if(e.target.tagName === 'BUTTON') e.target.closest('.linkrow').remove();
-  });
-  document.getElementById('edDeps').addEventListener('click', e => {
-    if(e.target.tagName !== 'BUTTON') return;
-    e.target.closest('.depchip').remove();
-    if(!document.querySelector('#edDeps .depchip'))
-      document.getElementById('edDeps').innerHTML = ED_DEPS_NONE;
-  });
-  document.getElementById('edSave').addEventListener('click', () => {
-    const t = getTask(editorTaskId);
-    if(!t){ closeEditor(); return; }
-    const name = document.getElementById('edName').value.trim();
-    if(name && name !== t.label && t.source !== 'skytracker'){ t.label = name; touch(t, 'label'); }
-    if(edSel.status !== (t.status || 'gronn') || (edSel.cause || undefined) !== t.statusCause){
-      t.status = edSel.status;
-      if(edSel.status !== 'gronn' && edSel.cause) t.statusCause = edSel.cause; else delete t.statusCause;
-      t.statusAt = new Date().toISOString();
-      touch(t, 'status');
-    }
-    const ext = document.getElementById('edExt').checked;
-    if(!!t.ext !== ext){ t.ext = ext; touch(t, 'meta'); }
-    const ms = document.getElementById('edMilestone').checked;
-    if(!!t.milestone !== ms){
-      if(ms) t.milestone = true; else delete t.milestone;
-      touch(t, 'meta');
-    }
-    const dod = document.getElementById('edDod').value.trim();
-    if((t.dod || '') !== dod){
-      if(dod) t.dod = dod; else delete t.dod;
-      touch(t, 'meta');
-    }
-    const buf = parseFloat(document.getElementById('edBuffer').value);
-    const newBuf = isFinite(buf) && buf > 0 ? buf : undefined;
-    if(t.buffer !== newBuf){
-      if(newBuf !== undefined) t.buffer = newBuf; else delete t.buffer;
-      touch(t, 'buffer');
-    }
-    const numField = id => {
-      const v = parseFloat(document.getElementById(id).value);
-      return isFinite(v) && v >= 0 && document.getElementById(id).value !== '' ? v : undefined;
-    };
-    const cost = numField('edCost'), revenue = numField('edRevenue');
-    if(t.cost !== cost || t.revenue !== revenue){
-      if(cost !== undefined) t.cost = cost; else delete t.cost;
-      if(revenue !== undefined) t.revenue = revenue; else delete t.revenue;
-      touch(t, 'okonomi');
-    }
-    const links = [...document.querySelectorAll('#edLinks .linkrow')].map(row => ({
-      label: row.querySelector('.l-label').value.trim(),
-      url: row.querySelector('.l-url').value.trim()
-    })).filter(l => l.url);
-    if(JSON.stringify(links) !== JSON.stringify(t.links || [])){
-      if(links.length) t.links = links; else delete t.links;
-      touch(t, 'meta');
-    }
-    const keep = [...document.querySelectorAll('#edDeps .depchip')].map(el => el.dataset.id);
-    if(keep.length !== t.deps.length){ t.deps = t.deps.filter(d => keep.includes(d)); touch(t, 'deps'); }
-    resolveDeps();
+  /* ================== eksempel, eksport, hjelp, kolonnebredde ================== */
+  seedBtn.addEventListener('click', async () => {
+    if(!(await confirmDialog('Last inn eksempel', 'Legger inn de sju eksempel-epicene fra ledermøtedecken.' + (HOSTED ? ' Det blir den delte planen for alle.' : ''), {confirmText:'Last inn'}))) return;
+    state = exampleSeed(state);   // bumper forbi gamle tombstones, ellers sletter flettingen eksempelet igjen
     save(); render();
-    closeEditor();
-  });
-  document.getElementById('edCancel').addEventListener('click', closeEditor);
-  document.getElementById('edClose').addEventListener('click', closeEditor);
-  editorBack.addEventListener('click', e => { if(e.target === editorBack) closeEditor(); });
-  document.getElementById('edSubs').addEventListener('click', () => {
-    const id = editorTaskId; closeEditor(); openDetail(id);
-  });
-  document.getElementById('edLink').addEventListener('click', () => {
-    const id = editorTaskId; closeEditor(); startLink(id);
-  });
-  document.getElementById('edDelete').addEventListener('click', async () => {
-    const t = getTask(editorTaskId);
-    if(!t) return;
-    if(!(await confirmDialog('Slette oppgave', 'Slette «' + t.label + '»? Avhengigheter til den fjernes også.', {danger:true, confirmText:'Slett'}))) return;
-    const id = editorTaskId;
-    closeEditor();
-    doRemoveTask(id);
-  });
-
-  /* ================== verktøylinje ================== */
-  document.getElementById('resetBtn').addEventListener('click', async () => {
-    if(HOSTED){
-      const svar = await askDialog('Nullstill den delte planen',
-        'Dette setter planen tilbake til plandatoene fra dokumentet — for ALLE som bruker verktøyet. ' +
-        'Egne rader, delmål, statussignaler og avhengigheter fjernes.\n\nSkriv NULLSTILL for å bekrefte:',
-        {input:true, danger:true, confirmText:'Nullstill', placeholder:'NULLSTILL'});
-      if(svar !== 'NULLSTILL') return;
-    } else {
-      if(!(await confirmDialog('Nullstill til plan',
-        'Alt settes tilbake til plandatoene fra dokumentet. Egne rader, delmål og avhengigheter fjernes.',
-        {danger:true, confirmText:'Nullstill'}))) return;
-    }
-    // finn høyeste feltversjon i dagens plan, så nullstillingen vinner flettingen
-    const M = Math.max(0, ...state.tasks.map(maxFvOf)) + 1;
-    const oldIds = state.tasks.map(t => t.id);
-    state = normalize(clone(SEED));
-    state.tasks.forEach(t => { FV_FIELDS.forEach(f => { t.fv[f] = M; }); });
-    const seedIds = new Set(state.tasks.map(t => t.id));
-    oldIds.filter(id => !seedIds.has(id)).forEach(id => { state.deleted[id] = M; });
-    localStorage.removeItem(STORE_V2);
-    cancelLink();
-    render();
-    updateSyncBtn();
   });
   function downloadFile(name, text, mime){
     const blob = new Blob([text], {type: mime});
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
     a.download = name;
+    document.body.appendChild(a);
     a.click();
-    URL.revokeObjectURL(a.href);
+    setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 0);
   }
-  const exportPlan = () => downloadFile('skytale-telenor-plan.json', JSON.stringify(state, null, 2), 'application/json');
-  document.getElementById('exportBtn').addEventListener('click', exportPlan);
-  document.getElementById('importBtn').addEventListener('click', () => {
-    document.getElementById('importFile').click();
+  $('exportBtn').addEventListener('click', () => {
+    const d = new Date();
+    const ymd = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+    downloadFile('skytale-veikart-' + ymd + '.json', JSON.stringify(state, null, 2), 'application/json');
   });
+  $('helpBtn').addEventListener('click', () => helpPanel.classList.toggle('open'));
+  $('helpClose').addEventListener('click', () => helpPanel.classList.remove('open'));
 
-  /* ---------- smart import med forhåndsvisning ---------- */
-  const importBack = document.getElementById('importBack');
-  let pendingImport = null;
-  const GROUP_TXT = {tid:'tidsrom', label:'navn', status:'statussignal', deps:'avhengigheter', subtasks:'delmål', meta:'egenskaper'};
-  const statusTxt = t => ({gronn:'GRØNN', gul:'GUL', rod:'RØD'}[t.status] || t.status || 'GRØNN') +
-    (t.statusCause ? ' (' + t.statusCause + ')' : '');
-  function changeDetail(c){
-    return (c.groups || []).map(g => {
-      if(g === 'tid') return esc(rangeText(c.before)) + ' → ' + esc(rangeText(c.after));
-      if(g === 'label') return '«' + esc(c.before.label) + '» → «' + esc(c.after.label) + '»';
-      if(g === 'status') return esc(statusTxt(c.before)) + ' → ' + esc(statusTxt(c.after));
-      if(g === 'deps') return 'avhengigheter: ' + (c.before.deps || []).length + ' → ' + (c.after.deps || []).length;
-      if(g === 'subtasks') return 'delmål: ' + (c.before.subtasks || []).length + ' → ' + (c.after.subtasks || []).length;
-      return GROUP_TXT[g];
-    }).join(' · ');
+  const colResizer = $('colResizer');
+  const LABELW_DEFAULT = cssNum('--label-w');
+  function setLabelW(px){ document.documentElement.style.setProperty('--label-w', Math.max(180, Math.min(560, px)) + 'px'); }
+  try{ const w = parseFloat(localStorage.getItem(LABELW_KEY)); if(isFinite(w)) setLabelW(w); }catch(e){}
+  colResizer.addEventListener('pointerdown', e => {
+    colDrag = { x0: e.clientX, w0: cssNum('--label-w') };
+    colResizer.classList.add('active');
+    colResizer.setPointerCapture(e.pointerId);
+    e.preventDefault();
+  });
+  colResizer.addEventListener('pointermove', e => {
+    if(!colDrag) return;
+    setLabelW(colDrag.w0 + (e.clientX - colDrag.x0));
+  });
+  function endColDrag(){
+    if(!colDrag) return;
+    colDrag = null;
+    colResizer.classList.remove('active');
+    try{ localStorage.setItem(LABELW_KEY, String(cssNum('--label-w'))); }catch(e){}
+    drawArrows();
   }
-  function openImportPreview(res){
-    pendingImport = res.plan;
-    const KINDS = ['ny','endret','slettet','bevart'];
-    const KIND_TXT = {ny:'nye', endret:'endret', slettet:'slettes', bevart:'bevart (ST)'};
-    const n = {ny:0, endret:0, slettet:0, bevart:0};
-    res.changes.forEach(c => { n[c.kind]++; });
-    const real = res.changes.filter(c => c.kind !== 'bevart').length;
-    document.getElementById('impSub').textContent = real
-      ? real + (real === 1 ? ' endring' : ' endringer') + ' i filen'
-      : 'Filen er identisk med planen slik den står';
-    document.getElementById('impSum').innerHTML = KINDS
-      .filter(k => n[k]).map(k => '<span><b>' + n[k] + '</b>' + KIND_TXT[k] + '</span>').join('');
-    document.getElementById('impList').innerHTML = res.changes.map(c =>
-      '<li><span class="imp-kind ' + c.kind + '">' + KIND_TXT[c.kind] + '</span>' +
-      '<span class="imp-name">' + esc(c.label || c.id) + '</span>' +
-      '<span class="imp-det">' + (c.kind === 'endret' ? changeDetail(c) :
-        c.kind === 'bevart' ? 'SkyTracker-speilrad — beholdes selv om den mangler i filen' : '') + '</span></li>'
-    ).join('') || '<li><span class="imp-det">Ingen endringer å vise.</span></li>';
-    document.getElementById('impNote').textContent = !real ? '' : HOSTED
-      ? (canWrite ? 'Bruk endringene = lagres for alle.' : 'Kun lesetilgang — endringene forblir lokale hos deg.')
-      : 'Endringene lagres i din nettleser.';
-    document.getElementById('impApply').disabled = !real;
-    importBack.classList.add('open');
-  }
-  function closeImportPreview(){
-    pendingImport = null;
-    importBack.classList.remove('open');
-  }
-  document.getElementById('impApply').addEventListener('click', () => {
-    if(pendingImport){
-      state = normalize(pendingImport);
-      resolveDeps();
-      save(); render();
-      updateSyncBtn();
-    }
-    closeImportPreview();
-  });
-  document.getElementById('impCancel').addEventListener('click', closeImportPreview);
-  document.getElementById('impCloseX').addEventListener('click', closeImportPreview);
-  importBack.addEventListener('click', e => { if(e.target === importBack) closeImportPreview(); });
+  colResizer.addEventListener('pointerup', endColDrag);
+  colResizer.addEventListener('pointercancel', endColDrag);
+  colResizer.addEventListener('dblclick', () => { setLabelW(LABELW_DEFAULT); try{ localStorage.removeItem(LABELW_KEY); }catch(e){} drawArrows(); });
 
-  document.getElementById('importFile').addEventListener('change', e => {
-    const f = e.target.files[0];
-    if(!f) return;
-    const r = new FileReader();
-    r.onload = () => {
-      try{
-        const s = JSON.parse(r.result);
-        if(!s || !Array.isArray(s.lanes) || !Array.isArray(s.tasks)) throw new Error('feil format');
-        if(typeof computeImportDiff !== 'function') throw new Error('import-modulen er ikke lastet — last siden på nytt og prøv igjen');
-        openImportPreview(computeImportDiff(state, s, {editor: myName || undefined, now: new Date().toISOString()}));
-      }catch(err){
-        alert('Kunne ikke lese filen: ' + err.message);
-      }
-      e.target.value = '';
-    };
-    r.readAsText(f);
+  document.addEventListener('keydown', e => {
+    if(e.key !== 'Escape') return;
+    if(dlgBack.classList.contains('open')) dlgClose(false);
+    else if(editorBack.classList.contains('open')) closeEditor();
+    else if(epicBack.classList.contains('open')) closeEpicEditor();
+    else if(linkSource) cancelLink();
+    else if(helpPanel.classList.contains('open')) helpPanel.classList.remove('open');
   });
+  window.addEventListener('resize', drawArrows);
 
-  /* ---------- Claude-pakken ---------- */
-  const claudeBack = document.getElementById('claudeBack');
-  document.getElementById('claudeBtn').addEventListener('click', () => {
-    document.getElementById('claudeSteps').innerHTML = HOSTED ? (
-      '<p>Planen vedlikeholdes i en <b>lokal Claude-økt</b> på din maskin. Du trenger ikke kunne ' +
-      'JSON — instruksjonsfilen forklarer alt til Claude, og importen viser alltid en ' +
-      'forhåndsvisning før noe lagres.</p><ol>' +
-      '<li><b>Last ned Claude-pakken</b> — planen (<code>skytale-telenor-plan.json</code>) og ' +
-      'instruksjonene (<code>claude-instruksjoner.md</code>) havner i nedlastingsmappen din.</li>' +
-      '<li>Åpne terminalen i mappen med filene og start <code>claude</code>.</li>' +
-      '<li>Be om endringene: «les claude-instruksjoner.md, og oppdater planen: …» — pek gjerne ' +
-      'på referater eller dokumenter.</li>' +
-      '<li>Trykk <b>Importer</b> her, velg filen, se over forhåndsvisningen og bekreft.</li></ol>'
-    ) : (
-      '<p>Åpnet lokalt fra fil: instruksjonene ligger allerede i denne mappen som ' +
-      '<code>CLAUDE.md</code> og leses automatisk når en Claude-økt startes her.</p><ol>' +
-      '<li><b>Last ned Claude-pakken</b> (planen som JSON) og legg filen i denne mappen.</li>' +
-      '<li>Start <code>claude</code> i mappen.</li>' +
-      '<li>Be om endringene du vil ha — pek på dokumentasjonen.</li>' +
-      '<li>Trykk <b>Importer</b>, velg filen, se over forhåndsvisningen og bekreft.</li></ol>'
-    );
-    claudeBack.classList.add('open');
-  });
-  document.getElementById('claudePkgBtn').addEventListener('click', async () => {
-    exportPlan();
-    if(HOSTED){
-      try{
-        const r = await fetch('timeline/claude-instruksjoner.md', {cache:'no-store'});
-        if(!r.ok) throw new Error('HTTP ' + r.status);
-        downloadFile('claude-instruksjoner.md', await r.text(), 'text/markdown');
-      }catch(err){
-        alert('Planen ble lastet ned, men ikke instruksjonsfilen (' + err.message + '). Prøv igjen.');
-      }
-    }
-  });
-  document.getElementById('claudeClose').addEventListener('click', () => claudeBack.classList.remove('open'));
-  claudeBack.addEventListener('click', e => { if(e.target === claudeBack) claudeBack.classList.remove('open'); });
-
+  /* ================== start ================== */
+  pushDeps();
   render();
   initServerPlan();
-  if(new URLSearchParams(location.search).get('present') === '1') enterPresent();
+  if(HOSTED) setInterval(pollTick, POLL_MS);
+};
+</script>
+<!-- Delt logikk (epic-tools.js): samme fil kjøres her, i den hostede utgaven (/timeline/epic-tools.js) og i
+     vitest. Lastes etter at __bootTimeline er definert; siden starter når modulen er på plass. -->
+<script>
+(function(){
+  var s = document.createElement('script');
+  s.src = location.protocol === 'file:' ? 'epic-tools.js' : 'timeline/epic-tools.js';
+  s.onload = function(){ window.__bootTimeline(); };
+  s.onerror = function(){
+    document.getElementById('emptyState').hidden = false;
+    document.getElementById('gantt').hidden = true;
+    document.getElementById('emptyNote').textContent = 'Kunne ikke laste epic-tools.js.';
+  };
+  document.head.appendChild(s);
 })();
 </script>
 </body>
