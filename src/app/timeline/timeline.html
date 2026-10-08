@@ -339,6 +339,28 @@
   .dragging-row{opacity:.5}
   .ed-field select{width:100%;font:inherit;font-size:14px;padding:6px 12px;border:1px solid var(--line);border-radius:4px;background:var(--input-bg);color:var(--text)}
 
+  /* ---------- historikk ---------- */
+  .drawer{position:fixed;top:0;right:0;bottom:0;width:min(520px,100%);background:var(--surface);border-left:1px solid var(--line);box-shadow:var(--shadow);z-index:55;display:flex;flex-direction:column}
+  .drawer[hidden]{display:none}
+  .drawer-head{display:flex;align-items:center;gap:10px;padding:14px 16px;border-bottom:1px solid var(--line-soft)}
+  .drawer-head h2{font-size:16px;font-weight:600;flex:1;color:var(--text)}
+  .drawer-head select{font:inherit;font-size:12px;padding:4px 8px;border:1px solid var(--line);border-radius:4px;background:var(--input-bg);color:var(--text);max-width:220px}
+  .drawer-body{overflow:auto;padding:4px 16px 16px;flex:1}
+  .hist-cs{margin-top:14px;padding-top:10px;border-top:1px solid var(--line-soft);display:flex;gap:8px;align-items:center;flex-wrap:wrap;font-size:12px;color:var(--text-3)}
+  .hist-cs:first-child{border-top:none;margin-top:4px}
+  .hist-cs .when{font-weight:600;color:var(--text)}
+  .hist-cs .reason{background:var(--ok-bg);color:var(--ok-fg);white-space:normal}
+  .hist-cs .reason.missing{background:var(--warn-bg);color:var(--warn-fg)}
+  .hist-ev{display:grid;gap:2px;padding:5px 0 5px 10px;border-left:2px solid var(--line-soft);margin-top:6px;font-size:13px}
+  .hist-ev .where{font-size:11px;color:var(--text-3)}
+  .hist-ev .sum{color:var(--text)}
+  .hist-ev .chip.cause{background:var(--warn-bg);color:var(--warn-fg);margin-left:6px}
+  .hist-empty{padding:24px 0;color:var(--text-4);font-size:13px;text-align:center}
+  .drawer-foot{padding:10px 16px;border-top:1px solid var(--line-soft);display:flex;justify-content:center}
+  #histBtn{position:relative}
+  .count{position:absolute;top:-7px;right:-7px;min-width:18px;height:18px;padding:0 5px;border-radius:9px;background:var(--warn);color:#fff;font-size:10px;font-weight:700;line-height:18px;text-align:center}
+  .count[hidden]{display:none}
+
   footer{
     margin-top:24px;display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap;
     font-size:11px;color:var(--text-4);border-top:1px solid var(--line-soft);padding-top:12px;
@@ -362,6 +384,7 @@
     <span class="whoami" id="whoami"></span>
     <span class="ro-tag" id="roTag" hidden>Lesetilgang</span>
     <button id="exportBtn">Eksporter (JSON)</button>
+    <button id="histBtn" title="Hva har flyttet seg, og hvorfor">Historikk<span class="count" id="histBadge" hidden></span></button>
     <button id="helpBtn">Hjelp</button>
     <button class="primary" id="addEpicBtn">＋ Epic</button>
   </div>
@@ -437,6 +460,16 @@
 
 <div class="drag-tip" id="dragTip"></div>
 
+<aside class="drawer" id="histDrawer" hidden>
+  <div class="drawer-head">
+    <h2>Historikk</h2>
+    <select id="histLane" title="Vis én epic"><option value="">Alle epics</option></select>
+    <button class="x" id="histClose" title="Lukk">✕</button>
+  </div>
+  <div class="drawer-body" id="histList"></div>
+  <div class="drawer-foot"><button id="histMore">Last flere</button></div>
+</aside>
+
 <!-- feature-editor -->
 <div class="modal-back" id="editorBack">
   <div class="modal" style="width:min(580px,100%)">
@@ -466,7 +499,7 @@
       </div>
     </div>
     <div class="modal-foot">
-      <button class="danger-ghost" id="edDelete">Slett feature …</button>
+      <span class="btns"><button class="danger-ghost" id="edDelete">Slett feature …</button><button class="text" id="edHistory">Historikk</button></span>
       <span class="btns"><button class="text" id="edCancel">Avbryt</button><button class="primary" id="edSave">Lagre</button></span>
     </div>
   </div>
@@ -491,7 +524,7 @@
       </div>
     </div>
     <div class="modal-foot">
-      <button class="danger-ghost" id="epDelete">Slett epic …</button>
+      <span class="btns"><button class="danger-ghost" id="epDelete">Slett epic …</button><button class="text" id="epHistory">Historikk</button></span>
       <span class="btns"><button class="text" id="epCancel">Avbryt</button><button class="primary" id="epSave">Lagre</button></span>
     </div>
   </div>
@@ -1151,7 +1184,6 @@ window.__bootTimeline = function(){
     else { pendingNote.reasonCode = code; pendingNote.reason = text || null; pendingNote.lines = []; }
     if(pendingSave) scheduleServerSave();   // en lagring som ventet på dialogen (også en sen begrunnelse) går nå
   }
-  async function submitLateReason(changesetId, code, text){ /* fylles i historikk-oppgaven */ }
   $('reasonCodes').addEventListener('click', e => {
     const b = e.target.closest('button[data-code]');
     if(!b) return;
@@ -1193,6 +1225,87 @@ window.__bootTimeline = function(){
       lines.push(t.label + ': flyttet fra «' + (getLane(b.lane) || {name: b.lane}).name + '» til «' + (getLane(t.lane) || {name: t.lane}).name + '»');
     return lines;
   }
+
+  /* ================== historikk ================== */
+  const histDrawer = $('histDrawer'), histList = $('histList'), histLane = $('histLane'), histBadge = $('histBadge');
+  let hist = { lane: '', target: '', before: null, done: false, lastCs: null };
+  $('histBtn').hidden = !HOSTED; $('edHistory').hidden = !HOSTED; $('epHistory').hidden = !HOSTED;
+  const fmtWhen = iso => new Date(iso).toLocaleString('nb-NO', {day:'numeric', month:'short', hour:'2-digit', minute:'2-digit'});
+  function setBadge(n){ histBadge.hidden = !n; histBadge.textContent = n ? String(n) : ''; }
+  async function refreshHistoryBadge(){
+    if(!HOSTED) return;
+    try{
+      const r = await fetch('api/timeline-changes?limit=1', {cache:'no-store'});
+      if(r.ok) setBadge((await r.json()).missing14d);
+    }catch(e){}
+  }
+  function openHistory(opts){
+    opts = opts || {};
+    hist = { lane: opts.lane || '', target: opts.target || '', before: null, done: false, lastCs: null };
+    histLane.innerHTML = '<option value="">Alle epics</option>' + state.lanes.map(l =>
+      '<option value="' + esc(l.key) + '"' + (l.key === hist.lane ? ' selected' : '') + '>' + esc(l.name) + '</option>').join('');
+    histLane.disabled = !!hist.target;
+    histList.innerHTML = '';
+    histDrawer.hidden = false;
+    loadHistory();
+  }
+  async function loadHistory(){
+    if(hist.done) return;
+    const q = new URLSearchParams({ limit: '60' });
+    if(hist.lane) q.set('lane', hist.lane);
+    if(hist.target) q.set('target', hist.target);
+    if(hist.before) q.set('before', hist.before);
+    try{
+      const r = await fetch('api/timeline-changes?' + q, {cache:'no-store'});
+      if(!r.ok) throw new Error('HTTP ' + r.status);
+      const j = await r.json();
+      setBadge(j.missing14d);
+      if(!j.events.length && !histList.children.length) histList.innerHTML = '<div class="hist-empty">Ingen endringer ennå.</div>';
+      j.events.forEach(appendEvent);
+      if(j.events.length < 60) hist.done = true; else hist.before = j.events[j.events.length - 1].at;
+      $('histMore').hidden = hist.done;
+    }catch(e){ histList.innerHTML = '<div class="hist-empty">Kunne ikke hente historikken.</div>'; }
+  }
+  function appendEvent(e){
+    const cs = e.changeset || {};
+    if(cs.id !== hist.lastCs){
+      hist.lastCs = cs.id;
+      const head = el('div', 'hist-cs');
+      const reason = cs.reasonCode && cs.reasonCode !== 'ingen'
+        ? '<span class="chip reason">' + esc(REASON_LABEL[cs.reasonCode] || cs.reasonCode) + (cs.reason ? ' – ' + esc(cs.reason) : '') + '</span>'
+        : cs.reasonCode === 'ingen'
+          ? '<span class="chip reason missing">Begrunnelse mangler</span>' + (canWrite ? '<button class="text add-reason" data-cs="' + esc(cs.id) + '" data-when="' + esc(fmtWhen(cs.at || e.at)) + '">Legg til</button>' : '')
+          : '';
+      head.innerHTML = '<span class="when">' + esc(fmtWhen(cs.at || e.at)) + '</span><span>' + esc(cs.editor || 'system') + '</span>' + reason;
+      histList.appendChild(head);
+    }
+    const lane = e.laneKey ? getLane(e.laneKey) : null;
+    const where = e.targetType === 'feature' ? (lane ? lane.name + ' › ' : '') + e.targetLabel : e.targetLabel;
+    const cause = e.cause === 'avhengighet'
+      ? '<span class="chip cause">avhengighet' + (e.causeRef ? ': ' + esc((getTask(e.causeRef) || {label: e.causeRef}).label) : '') + '</span>' : '';
+    const row = el('div', 'hist-ev');
+    row.innerHTML = '<span class="where">' + esc(where) + '</span><span class="sum">' + esc(e.summary) + cause + '</span>';
+    histList.appendChild(row);
+  }
+  async function submitLateReason(changesetId, code, text){
+    try{
+      const r = await fetch('api/timeline-changes', { method:'PATCH', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ changesetId, reasonCode: code, reason: text || '' }) });
+      if(!r.ok) throw new Error('HTTP ' + r.status);
+    }catch(e){ askDialog('Kunne ikke lagre begrunnelsen', 'Prøv igjen om litt.', {confirmText:'OK', noCancel:true}); }
+    openHistory({ lane: hist.lane, target: hist.target });   // last listen på nytt: chippen og tellingen oppdateres
+  }
+  histList.addEventListener('click', e => {
+    const b = e.target.closest('button.add-reason');
+    if(!b) return;
+    askReason(['Begrunnelse for endringen ' + b.dataset.when], { changesetId: b.dataset.cs });
+  });
+  histLane.addEventListener('change', () => openHistory({ lane: histLane.value }));
+  $('histMore').addEventListener('click', loadHistory);
+  $('histClose').addEventListener('click', () => { histDrawer.hidden = true; });
+  $('histBtn').addEventListener('click', () => histDrawer.hidden ? openHistory() : (histDrawer.hidden = true));
+  $('epHistory').addEventListener('click', () => { const k = epicKey; closeEpicEditor(); openHistory({ lane: k }); });
+  $('edHistory').addEventListener('click', () => { const id = editorTaskId; closeEditor(); openHistory({ target: id }); });
 
   /* ================== feature-editor ================== */
   let editorTaskId = null;
@@ -1403,6 +1516,7 @@ window.__bootTimeline = function(){
       roBanner.hidden = canWrite;
       roTag.hidden = canWrite;
       whoami.textContent = myName || '';
+      refreshHistoryBadge();
       if(j.plan){
         applyRemote(j.plan.data, j.plan.version);
         setSaveNote('delt plan lastet' + (canWrite ? '' : ' – kun lesetilgang'));
@@ -1437,6 +1551,7 @@ window.__bootTimeline = function(){
       if(r.status === 409){ restoreNote(note); setSaveNote('travelt – prøver igjen'); scheduleServerSave(); return; }
       if(!r.ok) throw new Error('HTTP ' + r.status);
       const j = await r.json();
+      refreshHistoryBadge();
       const tid = new Date().toLocaleTimeString('nb-NO', {hour:'2-digit', minute:'2-digit'});
       if(drag || colDrag){
         // brukeren drar: ikke bytt ut tilstanden under hånden. serverVersion holdes gammel,
@@ -1541,6 +1656,7 @@ window.__bootTimeline = function(){
     else if(dlgBack.classList.contains('open')) dlgClose(false);
     else if(editorBack.classList.contains('open')) closeEditor();
     else if(epicBack.classList.contains('open')) closeEpicEditor();
+    else if(!histDrawer.hidden) histDrawer.hidden = true;
     else if(linkSource) cancelLink();
     else if(helpPanel.classList.contains('open')) helpPanel.classList.remove('open');
   });
