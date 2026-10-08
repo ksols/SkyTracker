@@ -79,9 +79,10 @@ describe("diffPlans: features", () => {
     const b = one([lane("x")], [disc({ start: 2, end: 3 })]);
     expect(diffPlans(b, one([lane("x")], [disc({ start: 2, end: 3.5 })]))[0].summary).toMatch(/^Utredning slutt: \d+\. [a-zæøå]+ → \d+\. [a-zæøå]+ \(2 uker senere\)$/);
     const estimated = diffPlans(b, one([lane("x")], [est({ id: "d", label: "Disc", start: 2, endLikely: 3, end: 3.5 })]));
-    expect(estimated).toEqual([expect.objectContaining({ code: "feature.estimert", summary: "Utredet: estimat 4–6 uker" })]);
+    expect(estimated.map((e) => e.code)).toEqual(["feature.estimert", "feature.tilstand"]);   // in an epic, an estimate is aktiv
+    expect(estimated[0].summary).toBe("Utredet: estimat 4–6 uker");
     const back = diffPlans(one([lane("x")], [est({})]), one([lane("x")], [disc({ id: "e", label: "Est", start: 4, end: 5 })]));
-    expect(codes(back)).toEqual(["feature.utredning"]);
+    expect(codes(back)).toEqual(["feature.utredning", "feature.tilstand"]);
     const fresh = diffPlans(one([lane("x")]), one([lane("x")], [disc({ id: "n", label: "Ny" }), est({ id: "m", label: "M" })]));
     expect(fresh.map((e) => e.summary)).toEqual([expect.stringMatching(/^Ny utredning \(til /), "Ny feature (4–8 uker)"]);
     const gone = diffPlans(one([lane("x")], [est({}), disc({})]), one([lane("x")]));
@@ -142,5 +143,38 @@ describe("needsReason", () => {
   it("labels exist for every reason code", () => {
     expect(REASON_LABEL.prioritering).toBe("Prioritert om i produktforum");
     expect(REASON_LABEL.ingen).toBe("Uten begrunnelse");
+  });
+});
+
+describe("diffPlans: lifecycle", () => {
+  const shelf = (over: Partial<PlanTask>) => est({ lane: "_backlog", ...over });
+  it("feature states, owner, buffer and raw changes get events with the process's words", () => {
+    const b = one([lane("x")], [disc({ id: "w", lane: "_backlog", state: "ny" })]);
+    const started = one([lane("x")], [disc({ id: "w", lane: "_backlog", assignee: "THM", start: 2, end: 3 })]);
+    expect(diffPlans(b, started).map((e) => [e.code, e.summary])).toEqual([
+      ["feature.tilstand", expect.stringMatching(/^Utredning startet \(til \d+\. [a-zæøå]+\)$/)], ["feature.eier", "Eier: THM"],
+    ]);
+    const ready = one([lane("x")], [shelf({ id: "w", label: "Disc", assignee: "THM", start: 2, endLikely: 3, end: 3.5, raw: { likely: 4, late: 6 } })]);
+    expect(diffPlans(started, ready).map((e) => e.code)).toEqual(["feature.estimert", "feature.tilstand", "feature.raw"]);
+    expect(diffPlans(started, ready).map((e) => e.summary)).toEqual(["Utredet: estimat 4–6 uker", "Klar for veikart", "Utredningen sa 4–6 uker"]);
+    const placed = one([lane("x")], [est({ id: "w", label: "Disc", assignee: "THM", start: 2, endLikely: 3.25, end: 3.75, raw: { likely: 4, late: 6 }, bufferWeeks: 1, committedRange: { likely: 5, late: 7, start: 2 }, activatedAt: "2026-11-05" })]);
+    expect(diffPlans(ready, placed).map((e) => e.summary)).toEqual([
+      "Flyttet fra «Klar for veikart» til «Epic X»", "Spenn: 4–6 → 5–7 uker (utvidet 1 uke)", "Aktiv: lagt i epicen med lovet spenn 5–7 uker", "Buffer: 0 → 1 uke",
+    ]);
+    const back = one([lane("x")], [shelf({ id: "w", label: "Disc", assignee: "THM", start: 2, endLikely: 3.25, end: 3.75, raw: { likely: 4, late: 6 }, bufferWeeks: 1 })]);
+    expect(diffPlans(placed, back).map((e) => e.summary)).toEqual(["Flyttet fra «Epic X» til «Klar for veikart»", "Tilbake på hylla: klar for veikart"]);
+    const delivered = one([lane("x")], [est({ id: "w", label: "Disc", assignee: "THM", start: 2, endLikely: 3.25, end: 3.75, raw: { likely: 4, late: 6 }, bufferWeeks: 1, state: "levert", deliveredAt: "2026-12-03" })]);
+    expect(diffPlans(placed, delivered).map((e) => e.summary)).toEqual(["Levert 3. des"]);
+  });
+
+  it("epic states: chosen, closed with an outcome, back to proposal; closing asks for a reason", () => {
+    const prop = one([lane("x", { state: "forslag" })]), act = one([lane("x", { state: "aktiv" })]);
+    const closed = one([lane("x", { state: "avsluttet", outcome: "nådd", closedReason: "3 kunder i drift" })]);
+    expect(diffPlans(prop, act)[0]).toMatchObject({ code: "epic.tilstand", summary: "Valgt i produktforum" });
+    expect(diffPlans(act, closed)[0].summary).toBe("Avsluttet: nådd – 3 kunder i drift");
+    expect(diffPlans(act, one([lane("x", { state: "avsluttet", outcome: "endret" })]))[0].summary).toBe("Avsluttet: endret");
+    expect(diffPlans(act, prop)[0].summary).toBe("Tilbake til forslag");
+    expect(needsReason(diffPlans(act, closed)[0])).toBe(true);
+    expect(needsReason(diffPlans(prop, act)[0])).toBe(true);
   });
 });

@@ -217,7 +217,7 @@ describe("lifecycle: shelf, states, sizes, buffer, preview", () => {
   });
 
   it("an aktiv feature moved to the shelf becomes klar and loses its commitment", () => {
-    const p = normalizePlan({ lanes: [{ key: "x", name: "X" }], tasks: [est({ id: "a", lane: "_backlog", state: "aktiv", committedRange: { likely: 4, late: 6 }, activatedAt: "2026-11-05" })] });
+    const p = normalizePlan({ lanes: [{ key: "x", name: "X" }], tasks: [est({ id: "a", lane: "_backlog", state: "aktiv", committedRange: { likely: 4, late: 6, start: 4 }, activatedAt: "2026-11-05" })] });
     expect(p.tasks[0]).toMatchObject({ state: "klar" });
     expect(p.tasks[0]).not.toHaveProperty("committedRange");
     expect(p.tasks[0]).not.toHaveProperty("activatedAt");
@@ -226,7 +226,7 @@ describe("lifecycle: shelf, states, sizes, buffer, preview", () => {
   it("deps across the shelf still push, epicStatus ignores the shelf, epic fields are cleaned", () => {
     const p = normalizePlan({
       lanes: [{ key: "x", name: "X", state: "avsluttet", outcome: "nådd", closedReason: " ", assignee: "" }, { key: "y", name: "Y", state: "bogus" }],
-      tasks: [est({ id: "a", lane: "_backlog", start: 4, endLikely: 5, end: 6 }), est({ id: "b", lane: "x", start: 4, endLikely: 5, end: 7, deps: ["a"], assignee: "  ", bufferWeeks: -2, raw: { likely: "x" } })],
+      tasks: [est({ id: "a", lane: "_backlog", start: 4, endLikely: 5, end: 6 }), est({ id: "b", lane: "x", start: 4, endLikely: 5, end: 7, deps: ["a"], assignee: "  ", bufferWeeks: -2, raw: { likely: "x" } as unknown as PlanTask["raw"] })],
     });
     expect(resolveDeps(p)).toEqual([{ id: "b", by: "a" }]);
     expect(epicStatus(p, "_backlog").code).toBe("tom");

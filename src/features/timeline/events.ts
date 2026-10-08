@@ -3,13 +3,14 @@
 // summary rendered once. The PUT handler logs these on every save; later the
 // compare mode (R1b) reuses the same function for "since the baseline".
 import type { Plan, PlanLane, PlanTask } from "./merge";
-import { WEEK, unitToDate, fmtDate, rangeWeeks } from "./epic-tools.js";
+import { WEEK, BACKLOG, unitToDate, fmtDate, rangeWeeks } from "./epic-tools.js";
 
 export const EVENT_CODES = [
   "epic.ny", "epic.slettet", "epic.navn", "epic.maltall", "epic.eier", "epic.maldato", "epic.ekstern", "epic.prioritet", "epic.ado",
   "feature.ny", "feature.slettet", "feature.navn", "feature.flyttet", "feature.spenn", "feature.utredning-slutt",
   "feature.estimert", "feature.utredning", "feature.epic", "feature.prioritet", "feature.avhengighet", "feature.ado",
-  "plan.seed", "plan.begrunnelse",
+  "feature.tilstand", "feature.eier", "feature.buffer", "feature.raw", "epic.tilstand",
+  "plan.seed", "plan.begrunnelse", "plan.baseline",
 ] as const;
 export type EventCode = (typeof EVENT_CODES)[number];
 export type Cause = "bruker" | "avhengighet" | "ado" | "system";
@@ -87,6 +88,23 @@ function goalSummary(b: PlanLane, a: PlanLane): string {
 }
 const textChange = (what: string, b: string | undefined, a: string | undefined) =>
   !b && a ? what + " satt: " + a : b && !a ? what + " fjernet (var " + b + ")" : what + ": " + q(b ?? "") + " → " + q(a ?? "");
+const wk = (c: number) => c + " uke" + (c === 1 ? "" : "r");
+const rawOf = (t: PlanTask) => (t.raw ? { likely: t.raw.likely, late: t.raw.late } : null);
+function epicStateSummary(b: PlanLane, a: PlanLane): string {
+  const s = a.state ?? "aktiv";
+  if (s === "avsluttet") return "Avsluttet: " + (a.outcome ?? "uten utfall") + (a.closedReason ? " – " + a.closedReason : "");
+  if (s === "aktiv") return (b.state ?? "aktiv") === "avsluttet" ? "Gjenåpnet" : "Valgt i produktforum";
+  return "Tilbake til forslag";
+}
+function stateSummary(b: PlanTask, t: PlanTask): string {
+  switch (t.state) {
+    case "utredes": return "Utredning startet (til " + date(t.end) + ")";
+    case "klar": return (b.state === "aktiv" || b.state === "levert") ? "Tilbake på hylla: klar for veikart" : "Klar for veikart";
+    case "aktiv": return "Aktiv: lagt i epicen" + (t.committedRange ? " med lovet spenn " + span(t.committedRange) + " uker" : "");
+    case "levert": return "Levert" + (t.deliveredAt ? " " + fmtDate(new Date(t.deliveredAt)) : "");
+    default: return "Registrert";
+  }
+}
 
 export function diffPlans(before: Plan, after: Plan, opts: DiffOptions = {}): PlanEvent[] {
   if (opts.source === "seed") {
@@ -96,7 +114,7 @@ export function diffPlans(before: Plan, after: Plan, opts: DiffOptions = {}): Pl
   const ev: PlanEvent[] = [];
   const bl = new Map(before.lanes.map((l) => [l.key, l]));
   const al = new Map(after.lanes.map((l) => [l.key, l]));
-  const laneName = (key: string) => al.get(key)?.name ?? bl.get(key)?.name ?? key;
+  const laneName = (key: string) => (key === BACKLOG ? "Klar for veikart" : al.get(key)?.name ?? bl.get(key)?.name ?? key);
   const bt = new Map(before.tasks.map((t) => [t.id, t]));
   const at = new Map(after.tasks.map((t) => [t.id, t]));
   const label = (id: string) => at.get(id)?.label ?? bt.get(id)?.label ?? id;
@@ -115,6 +133,8 @@ export function diffPlans(before: Plan, after: Plan, opts: DiffOptions = {}): Pl
       ev.push({ ...base, code: "epic.maldato", before: { date: b.goalDate ?? null, provisional: !!b.goalProvisional }, after: { date: l.goalDate ?? null, provisional: !!l.goalProvisional }, summary: goalSummary(b, l) });
     if (!!b.externalDate !== !!l.externalDate) ev.push({ ...base, code: "epic.ekstern", before: !!b.externalDate, after: !!l.externalDate, summary: l.externalDate ? "Merket som ekstern dato" : "Ekstern dato fjernet" });
     if ((b.adoId ?? null) !== (l.adoId ?? null)) ev.push({ ...base, code: "epic.ado", before: b.adoId ?? null, after: l.adoId ?? null, summary: l.adoId ? "ADO-id: #" + l.adoId : "ADO-id fjernet" });
+    if ((b.state ?? "aktiv") !== (l.state ?? "aktiv") || (b.outcome ?? null) !== (l.outcome ?? null) || (b.closedReason ?? null) !== (l.closedReason ?? null))
+      ev.push({ ...base, code: "epic.tilstand", before: { state: b.state ?? "aktiv", outcome: b.outcome ?? null }, after: { state: l.state ?? "aktiv", outcome: l.outcome ?? null }, summary: epicStateSummary(b, l) });
     if (movedLanes.has(l.key)) {
       const from = bKeys.indexOf(l.key) + 1, to = aKeys.indexOf(l.key) + 1;
       const next = aKeys[to];
@@ -175,6 +195,11 @@ export function diffPlans(before: Plan, after: Plan, opts: DiffOptions = {}): Pl
       ev.push({ ...base, code: "feature.utredning-slutt", before: { end: b.end }, after: { end: t.end },
         summary: `Utredning slutt: ${date(b.end)} → ${date(t.end)}` + (dw > 0 ? ` (${n(dw, "uke", "uker")} senere)` : dw < 0 ? ` (${n(-dw, "uke", "uker")} tidligere)` : "") });
     }
+    const bs = b.state ?? "aktiv", as = t.state ?? "aktiv";
+    if (bs !== as) ev.push({ ...base, code: "feature.tilstand", before: bs, after: as, summary: stateSummary(b, t) });
+    if ((b.assignee ?? "") !== (t.assignee ?? "")) ev.push({ ...base, code: "feature.eier", before: b.assignee ?? null, after: t.assignee ?? null, summary: t.assignee ? "Eier: " + t.assignee : "Eier fjernet" });
+    if ((b.bufferWeeks ?? 0) !== (t.bufferWeeks ?? 0)) ev.push({ ...base, code: "feature.buffer", before: b.bufferWeeks ?? 0, after: t.bufferWeeks ?? 0, summary: "Buffer: " + (b.bufferWeeks ? wk(b.bufferWeeks) : "0") + " → " + (t.bufferWeeks ? wk(t.bufferWeeks) : "0") });
+    if (JSON.stringify(rawOf(b)) !== JSON.stringify(rawOf(t)) && t.raw) ev.push({ ...base, code: "feature.raw", before: rawOf(b), after: rawOf(t), summary: "Utredningen sa " + span(t.raw) + " uker" });
     const bd = b.deps ?? [], ad = t.deps ?? [];
     for (const id of ad) if (!bd.includes(id)) ev.push({ ...base, code: "feature.avhengighet", after: id, summary: `Blokkeres nå av ${q(label(id))}` });
     for (const id of bd) if (!ad.includes(id)) ev.push({ ...base, code: "feature.avhengighet", before: id, summary: `Avhengighet til ${q(label(id))} fjernet` });
@@ -191,6 +216,7 @@ export function needsReason(e: PlanEvent): boolean {
   switch (e.code) {
     case "epic.maldato": return (e.before as { date: number | null }).date !== null;
     case "epic.prioritet":
+    case "epic.tilstand":
     case "feature.epic": return true;
     case "feature.spenn": { const b = e.before as { likely: number; late: number }, a = e.after as { likely: number; late: number }; return a.late > b.late || a.likely > b.likely; }
     case "feature.flyttet": return (e.after as { start: number }).start - (e.before as { start: number }).start >= WEEK - 1e-9;
