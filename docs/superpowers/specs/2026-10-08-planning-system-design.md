@@ -37,6 +37,19 @@ What that means for this document:
 - The three questions the history must always answer: a goal changed (who, when, from what to what, why); an estimate
   was dragged out (which feature, how many weeks, by a person or by which dependency); a priority was shifted (which
   epic or feature, from which place to which, in which forum, with which reason).
+
+08.10.2026 evening, on the HLD (artifact «Tidslinjen som planleggingssystem»):
+
+> Ok. Vi trenger ikke ADO PAT vi kan bruke ENTRA id login som allerede ligger på timeline verktøyet. Samme entraid kan
+> opprette endre ting i ADO. sjekk Skytale.QA repo for å se hvordan den har gjort det f.eks
+
+> Denne er godkjent jeg andbefaler at dette bygges nå. Kjør hele prosjektet så tester jeg det lokalt når alle modulene
+> er ferdig.
+
+So: the HLD is approved, the build runs in the same session, and ADO is reached with the signed-in person's Entra
+identity (see «ADO access» at the end of §3), never with a PAT. GO tests the result locally when every stage is done,
+so the hand-over includes the local test steps (a local Postgres with the migrations applied, the dev server, the
+Entra sign-in that already works on localhost).
 Sources: the deck «Et veikart vi kan holde» (s9 journey, s11 estimate, s20 funnel, s21 hold/bust, s22 tools,
 s25 dependencies, s26 investors, s27 cadence, s29 action plan), PROS-PLAN-01 rev A, PROS-DISC-01 rev B,
 PROS-SPRINT-01 rev A, `ClaudeReports/planning/roadmap-2.0/handover-v2-ownership.md` (ownership table), the gap
@@ -129,6 +142,41 @@ TimelineSnapshot  { id, at, kind: "dag" | "baseline" | "sprint", label?, planVer
 
 `TimelineChange` (the table from August) stays as is, unused, like `BufferSnapshot`; it is dropped in a later
 clean-up. `/api/timeline-changes` is rewritten to serve events.
+
+### ADO access: the signed-in person's Entra identity, no PAT (GO, 08.10)
+
+Skytale.QA already does this from the browser (`QA/app/src/auth.ts`: MSAL, scope
+`499b84ac-1321-427f-aa17-267ca6975798/user_impersonation`, bearer token on every `dev.azure.com` call, writes
+attributed to the signed-in person; `QA/scripts/lib/ado.ts` uses an `az account get-access-token` token for scripts).
+SkyTracker does the same through the sign-in it already has (Auth.js, Microsoft Entra ID, JWT sessions):
+
+1. **Sign-in scope.** The provider requests `openid profile email offline_access
+   499b84ac-1321-427f-aa17-267ca6975798/user_impersonation` instead of the default `openid profile email User.Read`
+   (Entra issues an access token for one resource; the OIDC scopes ride along). The id token, the group claim and the
+   writer/reader role are unchanged. The provider's optional Graph photo fetch fails harmlessly (no avatar; the app shows
+   none).
+2. **Where the tokens live.** On every sign-in the `jwt` callback (Node runtime, in `auth.ts`) upserts
+   `access_token`, `refresh_token` and `expires_at` on the user's `Account` row (the Auth.js adapter table already has the
+   columns; Auth.js itself only writes them on the first link). The tokens never enter the session cookie and are never
+   sent to the browser.
+3. **Using them.** `src/features/ado/token.ts` exports `adoAuthFor(session)`: reads the Account row, refreshes against
+   `https://login.microsoftonline.com/<tenant>/oauth2/v2.0/token` (`grant_type=refresh_token`, the client id and secret
+   the app already has, the ADO scope) when fewer than two minutes remain, writes the new pair back, returns
+   `Bearer <token>`. Every ADO call in `/api/ado-push`, `/api/ado-refresh` and the Skytale.Specs reader runs as the
+   signed-in person, so ADO's own permissions apply and the work-item history names the person who pressed the button.
+4. **No token yet** (the person signed in before the scope existed, consent missing, refresh token expired): the route
+   answers 401 `{ error: "ado-login" }` and the page shows «Logg inn på nytt for å koble til ADO» with the sign-in
+   link. Nothing is pushed half-way.
+5. **Local development and the dry run.** `ADO_DEV_TOKEN` (an `az account get-access-token --resource 499b84ac-…`
+   token, server-side only, never deployed) overrides step 3, as `VITE_ADO_TOKEN` does in Skytale.QA. `?dry=1` on the push
+   routes returns the patches without sending and needs no token at all.
+6. **Tenant setup, once.** The app registration «SkyTracker» (appId `73db25b8-7299-46e3-afd5-95872c1e489a`) gets the
+   delegated permission Azure DevOps › `user_impersonation` (`ee69721e-6c3a-468f-a9ec-302d16a4c599`), added in stage 4
+   with `az ad app permission add`. Each person consents at their next sign-in (the QA app runs on per-user consent
+   today), or an admin consents for everyone once:
+   `az ad app permission grant --id 73db25b8-7299-46e3-afd5-95872c1e489a --api 499b84ac-1321-427f-aa17-267ca6975798 --scope user_impersonation`.
+7. **Later automation** (a cron refresh with nobody signed in) needs a service principal added to the ADO organisation
+   and a client-credentials token for the same resource. Still no PAT. Not built now.
 
 ## 4. The history: «Historikk»
 
@@ -335,7 +383,7 @@ SkyTracker-owned fields, write read-back fields: child stories, points, iteratio
 `deliveredAt`); conflicts shown at the top of the page; the sprint ruler (iteration paths and dates read from ADO,
 cached in the plan as `sprints[]`), «Sprint 71 · dag 4» on the today line, current sprint goal next to the legend,
 automatic baseline at sprint start; `client.ts` generalised to a work-item-type argument (hard-wired to «User
-Story» today); `SKYTRACKER_ADO_PAT` in Vercel; the Skytale.Specs reader for «Hent estimat fra utredningen» (file
+Story» today); every ADO call as the signed-in person via the Entra token (§3 «ADO access»), no PAT; the Skytale.Specs reader for «Hent estimat fra utredningen» (file
 format = GO's decision 3 below). Estimate fields in ADO only after GO's decision 4; until then the push writes
 everything else. Events `ado.push`, `ado.konflikt`, `ado.lest`.
 Verification: vitest on the patch builders and the conflict detection with recorded ADO responses; a dry-run mode
@@ -385,6 +433,10 @@ fixtures; a sample report from the first real quarter.
 6. Capacity in R5: the assignee rule or the board bridge? [assignee rule; decide after R4 with real data]
 7. The same-week notice channel: Slack channel or mail? [Slack, the MCP exists; mail later if ledelsen wants it]
 8. Wording: «Tidslinjen» everywhere (page title, board link, deck, PROS-PLAN-01). [yes, in R1a]
+9. ADO access: the signed-in person's Entra identity through the existing sign-in, as Skytale.QA does; no PAT.
+   [decided by GO 08.10; mechanism in §3 «ADO access»]
+
+All nine were decided on 08.10.2026, with the recommendations accepted.
 
 Documents on GO's side that still contradict the ownership flip (deck s14 notes and s26 «Kilde: epicene i ADO»,
 PROS-PLAN-01 «Tidslinjen: epics fra ADO» and step 5, PROS-DISC-01 «ADO Feature: arbeidsflyt og tilstand» and
@@ -411,6 +463,7 @@ step 4) are listed in the gap analysis §3; they are not changed by this plan.
 | Reasons are skipped and the history becomes «what» without «why» | The dialog is one click for the common codes; missing reasons are counted and listed in the forum summary; GO tightens the policy in one constant |
 | Autosave batches two unrelated edits into one changeset with one reason | The dialog lists the events it covers; a late `PATCH` can split nothing, so the rule is: one edit, pause, next edit. Acceptable for a planning tool, revisit if it bites |
 | The ADO process change (estimate fields) waits on an admin | The push works without the fields; the estimate stays visible in the Feature description as text until then |
+| The first push meets an Entra consent prompt («Need admin approval») or a stale token | The permission is on the app registration; the person consents at sign-in, or an admin grants it once with one command; the page says «Logg inn på nytt» instead of failing half-way; the dry run needs no token |
 | Progress from ADO needs stories with points, which need the discovery process to run | R4 starts with the manual field on day 10, so the traffic light works from the first sprint |
 | Plan JSON grows (snapshots per day) | ≤ 1 daily snapshot of a few tens of KB; named baselines on demand; a yearly clean-up of daily snapshots older than 12 months if ever needed |
 | Two editors in the forum at once | The field merge is unchanged; the history records `cause: flette` where a field came from the other client, so nothing silent happens |
