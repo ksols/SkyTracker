@@ -3,6 +3,7 @@ import {
   WEEK, N_MONTHS, dateToUnit, unitToDate, normalizePlan, epicStatus, resolveDeps,
   rangeLabel, goalText, exampleSeed, STATUS_LABEL,
   isoWeek, weekSpan, windowLabel, epicWindowText, discoveryOverdue,
+  shelfTasks, epicCounts, sizeClass, bufferLabel, rawLabel, previewPlacement,
 } from "./epic-tools.js";
 import type { Plan, PlanTask } from "./merge";
 
@@ -196,5 +197,70 @@ describe("week windows and overdue", () => {
     expect(discoveryOverdue(disc({ start: 2, end: 3 }), 3.5)).toBe(true);
     expect(discoveryOverdue(disc({ start: 2, end: 3 }), 2.5)).toBe(false);
     expect(discoveryOverdue(est({ end: 3 }), 3.5)).toBe(false);
+  });
+});
+
+describe("lifecycle: shelf, states, sizes, buffer, preview", () => {
+  it("keeps tasks on the shelf and derives states for a legacy plan (no state anywhere)", () => {
+    const p = normalizePlan({
+      lanes: [{ key: "x", name: "X" }],
+      tasks: [disc({ id: "d1" }), est({ id: "e1" }), est({ id: "s1", lane: "_backlog" }), disc({ id: "s2", lane: "_backlog" })],
+    });
+    expect(p.tasks.map((t) => [t.id, t.lane, t.state])).toEqual([["d1", "x", "utredes"], ["e1", "x", "aktiv"], ["s1", "_backlog", "klar"], ["s2", "_backlog", "utredes"]]);
+    expect(p.lanes[0].state).toBe("aktiv");
+    expect(shelfTasks(p).map((t) => t.id)).toEqual(["s1", "s2"]);
+  });
+
+  it("ny stays ny only on the shelf; levert is kept; a registered wish in an epic lane moves to the shelf", () => {
+    const p = normalizePlan({ lanes: [{ key: "x", name: "X" }], tasks: [disc({ id: "a", state: "ny" }), disc({ id: "b", lane: "_backlog", state: "ny" }), est({ id: "c", state: "levert" })] });
+    expect(p.tasks.map((t) => [t.id, t.lane, t.state])).toEqual([["c", "x", "levert"], ["a", "_backlog", "ny"], ["b", "_backlog", "ny"]]);
+  });
+
+  it("an aktiv feature moved to the shelf becomes klar and loses its commitment", () => {
+    const p = normalizePlan({ lanes: [{ key: "x", name: "X" }], tasks: [est({ id: "a", lane: "_backlog", state: "aktiv", committedRange: { likely: 4, late: 6 }, activatedAt: "2026-11-05" })] });
+    expect(p.tasks[0]).toMatchObject({ state: "klar" });
+    expect(p.tasks[0]).not.toHaveProperty("committedRange");
+    expect(p.tasks[0]).not.toHaveProperty("activatedAt");
+  });
+
+  it("deps across the shelf still push, epicStatus ignores the shelf, epic fields are cleaned", () => {
+    const p = normalizePlan({
+      lanes: [{ key: "x", name: "X", state: "avsluttet", outcome: "nådd", closedReason: " ", assignee: "" }, { key: "y", name: "Y", state: "bogus" }],
+      tasks: [est({ id: "a", lane: "_backlog", start: 4, endLikely: 5, end: 6 }), est({ id: "b", lane: "x", start: 4, endLikely: 5, end: 7, deps: ["a"], assignee: "  ", bufferWeeks: -2, raw: { likely: "x" } })],
+    });
+    expect(resolveDeps(p)).toEqual([{ id: "b", by: "a" }]);
+    expect(epicStatus(p, "_backlog").code).toBe("tom");
+    expect(p.lanes[0]).toMatchObject({ state: "avsluttet", outcome: "nådd" });
+    expect(p.lanes[0]).not.toHaveProperty("closedReason");
+    expect(p.lanes[1].state).toBe("aktiv");
+    const b = p.tasks.find((t) => t.id === "b")!;
+    expect(b).not.toHaveProperty("assignee");
+    expect(b).not.toHaveProperty("raw");
+    expect(b.bufferWeeks).toBeUndefined();
+    expect(epicCounts(p)).toEqual({ forslag: 0, aktiv: 1, avsluttet: 1 });
+  });
+
+  it("sizeClass from the discovery's duration; buffer and raw labels", () => {
+    expect(sizeClass(disc({ start: 2, end: 2.25 }))).toBe("S");
+    expect(sizeClass(disc({ start: 2, end: 2.5 }))).toBe("M");
+    expect(sizeClass(disc({ start: 2, end: 3 }))).toBe("L");
+    expect(sizeClass(disc({ start: 2, end: 3.25 }))).toBe("XL");
+    expect(sizeClass(est({}))).toBe("");
+    expect(bufferLabel(est({ start: 4, endLikely: 5, end: 5.5 }))).toBe("4–6 uker");
+    expect(bufferLabel(est({ start: 4, endLikely: 5.25, end: 5.75, bufferWeeks: 1 }))).toBe("4–6 uker + 1 uke buffer");
+    expect(bufferLabel(est({ start: 4, endLikely: 5.5, end: 6, bufferWeeks: 2 }))).toBe("4–6 uker + 2 uker buffer");
+    expect(rawLabel(est({ start: 4, endLikely: 5.25, end: 5.75, bufferWeeks: 1, raw: { likely: 4, late: 6 } }))).toBe("");
+    expect(rawLabel(est({ start: 4, endLikely: 5.5, end: 6, raw: { likely: 4, late: 6 } }))).toBe("utredning sa 4–6");
+  });
+
+  it("previewPlacement: the colour the epic gets where the feature lands, nothing else moves", () => {
+    const p = normalizePlan({
+      lanes: [{ key: "x", name: "X", goalDate: 6 }],
+      tasks: [est({ id: "a", lane: "x", start: 4, endLikely: 5, end: 5.75 }), est({ id: "s", lane: "_backlog", start: 4.5, endLikely: 6.5, end: 7 })],
+    });
+    const pv = previewPlacement(p, "s", "x");
+    expect(pv).toEqual({ before: "gronn", after: "rod", window: expect.stringMatching(/^Leveres uke \d+–\d+$/) });
+    expect(p.tasks.find((t) => t.id === "s")!.lane).toBe("_backlog");   // the plan itself is untouched
+    expect(previewPlacement(p, "nope", "x")).toBeNull();
   });
 });

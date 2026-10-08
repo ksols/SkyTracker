@@ -30,6 +30,12 @@ function fmtDate(d) {
 const SCHEMA = "epics-v1";
 const KINDS = ["discovery", "estimate"];
 const OWNER_DEFAULT = "PM + CTO";
+const BACKLOG = "_backlog";   // the shelf «Klar for veikart»: tasks without an epic
+const FEATURE_STATES = ["ny", "utredes", "klar", "aktiv", "levert"];
+const EPIC_STATES = ["forslag", "aktiv", "avsluttet"];
+const STATE_LABEL = { ny: "Registrert", utredes: "Utredes", klar: "Klar for veikart", aktiv: "Aktiv", levert: "Levert" };
+const EPIC_STATE_LABEL = { forslag: "Forslag", aktiv: "Aktiv", avsluttet: "Avsluttet" };
+const OUTCOMES = ["nådd", "ikke nådd", "endret"];
 const num = (v, fallback) => (typeof v === "number" && isFinite(v) ? v : fallback);
 
 function normalizePlan(plan) {
@@ -46,13 +52,17 @@ function normalizePlan(plan) {
     if (num(l.adoId, null) === null) delete l.adoId;
     if (typeof l.metric !== "string" || !l.metric.trim()) delete l.metric;
     if (!l.externalDate) delete l.externalDate;
+    if (!EPIC_STATES.includes(l.state)) l.state = "aktiv";
+    if (typeof l.closedReason !== "string" || !l.closedReason.trim()) delete l.closedReason;
+    if (!OUTCOMES.includes(l.outcome)) delete l.outcome;
+    if (typeof l.closedAt !== "string" || !l.closedAt) delete l.closedAt;
   });
   // priority = the order on the timeline (1 = top). Data, not array order, so it survives the merge.
   let nextPri = Math.max(0, ...p.lanes.map((l) => num(l.priority, 0)));
   p.lanes.forEach((l) => { if (num(l.priority, null) === null) l.priority = ++nextPri; });
   p.lanes.sort((a, b) => a.priority - b.priority); // stable: equal priorities keep their order
   const laneKeys = new Set(p.lanes.map((l) => l.key));
-  p.tasks = p.tasks.filter((t) => t && typeof t.id === "string" && laneKeys.has(t.lane));
+  p.tasks = p.tasks.filter((t) => t && typeof t.id === "string" && (laneKeys.has(t.lane) || t.lane === BACKLOG));
   p.tasks.forEach((t) => {
     t.deps = Array.isArray(t.deps) ? t.deps : [];
     t.fv = t.fv && typeof t.fv === "object" ? t.fv : {};
@@ -66,6 +76,14 @@ function normalizePlan(plan) {
       delete t.endLikely;
     }
     if (num(t.adoId, null) === null) delete t.adoId;
+    if (typeof t.assignee !== "string" || !t.assignee.trim()) delete t.assignee; else t.assignee = t.assignee.trim();
+    if (num(t.bufferWeeks, null) === null || t.bufferWeeks <= 0) delete t.bufferWeeks; else t.bufferWeeks = Math.round(t.bufferWeeks);
+    if (!t.raw || typeof t.raw !== "object" || num(t.raw.likely, null) === null || num(t.raw.late, null) === null) delete t.raw;
+    // state: ny and levert are explicit; everything else follows from kind and lane
+    if (t.state === "ny") { if (t.lane !== BACKLOG) t.lane = BACKLOG; }
+    else if (t.state !== "levert") t.state = t.kind === "discovery" ? "utredes" : t.lane === BACKLOG ? "klar" : "aktiv";
+    if (t.state !== "aktiv" && t.state !== "levert") { delete t.committedRange; delete t.activatedAt; }
+    if (t.state !== "levert") delete t.deliveredAt;
   });
   const ids = new Set(p.tasks.map((t) => t.id));
   p.tasks.forEach((t) => {
@@ -76,6 +94,7 @@ function normalizePlan(plan) {
   p.tasks.forEach((t) => { if (num(t.order, null) !== null) nextOrd[t.lane] = Math.max(nextOrd[t.lane] || 0, t.order); });
   p.tasks.forEach((t) => { if (num(t.order, null) === null) t.order = nextOrd[t.lane] = (nextOrd[t.lane] || 0) + 1; });
   const laneIdx = new Map(p.lanes.map((l, i) => [l.key, i]));
+  laneIdx.set(BACKLOG, p.lanes.length);   // the shelf sorts last
   p.tasks.sort((a, b) => laneIdx.get(a.lane) - laneIdx.get(b.lane) || a.order - b.order);
   return p;
 }
@@ -101,6 +120,12 @@ function epicStatus(plan, laneKey) {
   const goal = lane.goalDate;
   const code = late <= goal + 1e-9 ? "gronn" : likely > goal + 1e-9 ? "rod" : "gul";
   return { code, likely, late };
+}
+function shelfTasks(plan) { return plan.tasks.filter((t) => t.lane === BACKLOG); }
+function epicCounts(plan) {
+  const c = { forslag: 0, aktiv: 0, avsluttet: 0 };
+  plan.lanes.forEach((l) => { c[l.state || "aktiv"]++; });
+  return c;
 }
 
 /* ---------- dependencies: finish-to-start on the blocker's late end ---------- */
@@ -151,6 +176,39 @@ function rangeLabel(t) {
 function goalText(lane) {
   if (typeof lane.goalDate !== "number") return "Måldato settes etter utredning";
   return (lane.goalProvisional ? "Foreløpig mål " : "Måldato ") + fmtDate(unitToDate(lane.goalDate));
+}
+
+/* ---------- lifecycle labels ---------- */
+function sizeClass(t) {
+  if (t.kind !== "discovery") return "";
+  const w = (t.end - t.start) / WEEK;
+  return w <= 1 + 1e-9 ? "S" : w <= 2 + 1e-9 ? "M" : w <= 4 + 1e-9 ? "L" : "XL";
+}
+function bufferLabel(t) {
+  const r = rangeWeeks(t);
+  if (!r) return "";
+  const b = t.bufferWeeks || 0;
+  const likely = r.likely - b, late = r.late - b;
+  const base = (likely === late ? late : likely + "–" + late) + " uker";
+  return b ? base + " + " + b + " uke" + (b === 1 ? "" : "r") + " buffer" : base;
+}
+function rawLabel(t) {
+  const r = rangeWeeks(t);
+  if (!r || !t.raw) return "";
+  const b = t.bufferWeeks || 0;
+  if (r.likely - b === t.raw.likely && r.late - b === t.raw.late) return "";
+  return "utredning sa " + (t.raw.likely === t.raw.late ? t.raw.late : t.raw.likely + "–" + t.raw.late);
+}
+/* ---------- the price before a decision: the epic's colour if this feature lands there ---------- */
+function previewPlacement(plan, taskId, laneKey) {
+  if (!plan.tasks.some((t) => t.id === taskId) || !plan.lanes.some((l) => l.key === laneKey)) return null;
+  const before = epicStatus(plan, laneKey).code;
+  const copy = normalizePlan(JSON.parse(JSON.stringify(plan)));
+  const t = copy.tasks.find((v) => v.id === taskId);
+  t.lane = laneKey;
+  delete t.order;
+  normalizePlan(copy);
+  return { before, after: epicStatus(copy, laneKey).code, window: epicWindowText(copy, laneKey) };
 }
 
 /* ---------- delivery window in ISO weeks, overdue discoveries ---------- */
@@ -238,8 +296,10 @@ function exampleSeed(prev) {
 if (typeof module !== "undefined") {
   module.exports = {
     BASE_Y, BASE_M, N_MONTHS, WEEK, SCHEMA, OWNER_DEFAULT, STATUS_LABEL,
+    BACKLOG, FEATURE_STATES, EPIC_STATES, STATE_LABEL, EPIC_STATE_LABEL, OUTCOMES,
     dateToUnit, unitToDate, fmtDate, normalizePlan, epicStatus, shiftTask, resolveDeps,
     rangeWeeks, rangeLabel, goalText, exampleSeed,
     isoWeek, weekSpan, windowLabel, epicWindowText, discoveryOverdue,
+    shelfTasks, epicCounts, sizeClass, bufferLabel, rawLabel, previewPlacement,
   };
 }
