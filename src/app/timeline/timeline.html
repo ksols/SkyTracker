@@ -319,6 +319,15 @@
   .dlg-body{padding:0 20px 16px;font-size:14px;color:var(--text-2);max-width:60ch;white-space:pre-line}
   .dlg-body input{margin-top:12px}
 
+  /* ---------- begrunnelse ---------- */
+  #reasonBack{z-index:70}
+  .reason-list{margin:0 20px 12px;padding:10px 12px;border:1px solid var(--line-soft);border-radius:6px;background:var(--bg);font-size:13px;color:var(--text);display:grid;gap:4px}
+  .reason-codes{display:flex;gap:6px;flex-wrap:wrap;padding:0 20px 12px}
+  .reason-codes button.on{background:var(--accent);border-color:var(--accent);color:#fff}
+  .reason-text{display:block;padding:0 20px 16px}
+  .reason-text textarea{width:100%;font:inherit;font-size:14px;padding:6px 12px;border:1px solid var(--line);border-radius:4px;background:var(--input-bg);color:var(--text);min-height:64px;resize:vertical}
+  .reason-text textarea:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)}
+
   footer{
     margin-top:24px;display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap;
     font-size:11px;color:var(--text-4);border-top:1px solid var(--line-soft);padding-top:12px;
@@ -475,6 +484,24 @@
   </div>
 </div>
 
+<!-- begrunnelse: hvorfor flyttet noe seg -->
+<div class="modal-back" id="reasonBack">
+  <div class="modal" style="width:min(560px,100%)">
+    <div class="modal-head">
+      <div><h2>Hvorfor?</h2><div class="md">Begrunnelsen lagres i historikken sammen med endringen.</div></div>
+    </div>
+    <div class="modal-body">
+      <div class="reason-list" id="reasonList"></div>
+      <div class="reason-codes" id="reasonCodes"></div>
+      <label class="reason-text"><textarea id="reasonText" placeholder="Kort, slik ledelsen skal lese det"></textarea></label>
+    </div>
+    <div class="modal-foot">
+      <button class="text" id="reasonSkip">Lagre uten begrunnelse</button>
+      <span class="btns"><button class="primary" id="reasonSave">Lagre</button></span>
+    </div>
+  </div>
+</div>
+
 <!-- bekreftelses-/inndata-dialog -->
 <div class="modal-back" id="dlgBack">
   <div class="modal" style="width:min(480px,100%)">
@@ -505,6 +532,14 @@ window.__bootTimeline = function(){
   const MND_UP = ['JAN','FEB','MAR','APR','MAI','JUN','JUL','AUG','SEP','OKT','NOV','DES'];
   const MND_S = ['jan','feb','mar','apr','mai','jun','jul','aug','sep','okt','nov','des'];
   const FV_FIELDS = ['tid','label','deps','meta'];
+  const REASON_CODES = [
+    ['utredning', 'Utredningen viste mer/mindre arbeid'], ['avhengighet', 'En avhengighet flyttet seg'],
+    ['kapasitet', 'Kapasitet: annet gikk foran'], ['prioritering', 'Prioritert om i produktforum'],
+    ['ekstern', 'Ekstern dato endret'], ['omfang', 'Omfanget endret'], ['rydding', 'Retting / rydding'], ['annet', 'Annet'],
+  ];
+  const REASON_LABEL = Object.fromEntries(REASON_CODES);
+  /* Hvilke endringer som spør etter begrunnelse. Speiler needsReason() i events.ts; GO justerer her. */
+  const ASK_REASON_FOR = { goalChanged: true, startLaterWeeks: 1, rangeWidened: true, discoveryEndLater: true, movedToOtherEpic: true, epicReordered: true, estimateDeleted: true };
 
   function cssNum(v){ return parseFloat(getComputedStyle(document.documentElement).getPropertyValue(v)); }
   const x = u => (u - VIEW_FROM) * MONTH_W;                       // enhet → px i diagrammet
@@ -554,6 +589,13 @@ window.__bootTimeline = function(){
   let linkSource = null;          // id under kobling
   let myName = null, canWrite = false, serverReady = false, serverFailed = false, serverVersion = null, applyingRemote = false;
   let drag = null, colDrag = null, saveTimer = null, pendingSave = false, pushing = false;
+  function newNote(){ return { causes: {}, reason: null, reasonCode: null, source: null, lines: [] }; }
+  let pendingNote = newNote();   // følger neste lagring: begrunnelse, årsaker (dytt fra avhengighet), kilde (eksempel)
+  function restoreNote(note){      // lagringen feilet: begrunnelsen og årsakene skal bli med i neste forsøk
+    Object.assign(pendingNote.causes, note.causes);
+    if(!pendingNote.reasonCode && note.reasonCode){ pendingNote.reasonCode = note.reasonCode; pendingNote.reason = note.reason; }
+    if(!pendingNote.source) pendingNote.source = note.source;
+  }
 
   function emptyPlan(){ return normalizePlan({ lanes: [], tasks: [], deleted: {} }); }
   function loadState(){
@@ -590,8 +632,13 @@ window.__bootTimeline = function(){
     if(HOSTED){ scheduleServerSave(); }
     else { try{ localStorage.setItem(STORE, JSON.stringify(state)); }catch(e){} }
   }
-  function pushDeps(){
-    resolveDeps(state).forEach(id => { const t = getTask(id); if(t) touch(t, 'tid'); });
+  function pushDeps(recordCauses){
+    resolveDeps(state).forEach(({id, by}) => {
+      const t = getTask(id);
+      if(!t) return;
+      touch(t, 'tid');
+      if(recordCauses !== false && by) pendingNote.causes[id] = 'dep:' + by;   // historikken: «flyttet av avhengighet …»
+    });
   }
 
   /* ================== hovedvisning ================== */
@@ -848,9 +895,13 @@ window.__bootTimeline = function(){
     if(!drag) return;
     drag.bar.classList.remove('dragging');
     tip.style.display = 'none';
-    const moved = drag.moved;
+    const d = drag;
     drag = null;
-    if(moved){ save(); render(); }
+    if(d.moved){
+      const lines = dragReasonLines(d);
+      if(lines.length) askReason(lines);   // dialogen holder lagringen til den er lukket
+      save(); render();
+    }
   }
   chart.addEventListener('pointerup', endDrag);
   chart.addEventListener('pointercancel', endDrag);
@@ -878,6 +929,7 @@ window.__bootTimeline = function(){
     const t = getTask(id);
     if(!t) return;
     if(!(await confirmDialog('Slette feature', 'Slette «' + t.label + '»? Avhengigheter til den fjernes også.', {danger:true, confirmText:'Slett'}))) return;
+    if(t.kind === 'estimate' && ASK_REASON_FOR.estimateDeleted) askReason([t.label + ': slettet']);
     doRemoveTaskSilent(id);
     save(); render();
   }
@@ -975,6 +1027,75 @@ window.__bootTimeline = function(){
   dlgBack.addEventListener('click', e => { if(e.target === dlgBack) dlgClose(false); });
   $('dlgInput').addEventListener('keydown', e => { if(e.key === 'Enter') dlgClose(e.target.value); });
 
+  /* ================== begrunnelse ================== */
+  const reasonBack = $('reasonBack');
+  let reasonOpen = false, reasonLate = null;   // reasonLate = { changesetId }: begrunnelse som legges til i etterkant (historikken)
+  function askReason(lines, late){
+    if(!HOSTED || !canWrite) return;           // lokal fil eller lesetilgang: ingen delt historikk å begrunne
+    reasonLate = late || null;
+    if(!reasonLate) pendingNote.lines = pendingNote.lines.concat(lines);
+    reasonOpen = true;
+    const shown = reasonLate ? lines : pendingNote.lines;
+    $('reasonList').innerHTML = shown.map(l => '<span>' + esc(l) + '</span>').join('');
+    const cur = reasonLate ? null : pendingNote.reasonCode;
+    $('reasonCodes').innerHTML = REASON_CODES.map(([c, lbl]) =>
+      '<button type="button" data-code="' + c + '"' + (cur === c ? ' class="on"' : '') + '>' + esc(lbl) + '</button>').join('');
+    $('reasonText').value = reasonLate ? '' : (pendingNote.reason || '');
+    $('reasonSkip').hidden = !!reasonLate;
+    reasonBack.classList.add('open');
+    setTimeout(() => $('reasonText').focus(), 0);
+  }
+  function closeReason(code, text){
+    reasonOpen = false;
+    reasonBack.classList.remove('open');
+    const late = reasonLate; reasonLate = null;
+    if(late){ if(code !== 'ingen') submitLateReason(late.changesetId, code, text); }
+    else { pendingNote.reasonCode = code; pendingNote.reason = text || null; pendingNote.lines = []; }
+    if(pendingSave) scheduleServerSave();   // en lagring som ventet på dialogen (også en sen begrunnelse) går nå
+  }
+  async function submitLateReason(changesetId, code, text){ /* fylles i historikk-oppgaven */ }
+  $('reasonCodes').addEventListener('click', e => {
+    const b = e.target.closest('button[data-code]');
+    if(!b) return;
+    [...$('reasonCodes').querySelectorAll('button')].forEach(x => x.classList.toggle('on', x === b));
+  });
+  $('reasonSave').addEventListener('click', () => {
+    const on = $('reasonCodes').querySelector('button.on');
+    const text = $('reasonText').value.trim();
+    if(!on && !text){ $('reasonText').focus(); return; }
+    closeReason(on ? on.dataset.code : 'annet', text);
+  });
+  $('reasonSkip').addEventListener('click', () => closeReason('ingen', null));
+  const spanText = r => r.likely === r.late ? String(r.late) : r.likely + '–' + r.late;
+  const weeksWord = n => n + ' uke' + (n === 1 ? '' : 'r');
+  function dragReasonLines(d){
+    const t = d.t, lines = [];
+    const laterW = Math.round((t.start - d.start0) / WEEK);
+    if(ASK_REASON_FOR.startLaterWeeks && laterW >= ASK_REASON_FOR.startLaterWeeks)
+      lines.push(t.label + ': flyttet ' + weeksWord(laterW) + ' senere (start ' + fmtDate(unitToDate(d.start0)) + ' → ' + fmtDate(unitToDate(t.start)) + ')');
+    if(t.kind === 'estimate' && ASK_REASON_FOR.rangeWidened){
+      const b = { likely: Math.round((d.likely0 - d.start0) / WEEK), late: Math.round((d.end0 - d.start0) / WEEK) }, a = rangeWeeks(t);
+      if(a.late > b.late || a.likely > b.likely) lines.push(t.label + ': spenn ' + spanText(b) + ' → ' + spanText(a) + ' uker');
+    }
+    if(t.kind === 'discovery' && ASK_REASON_FOR.discoveryEndLater && t.end > d.end0 + 1e-9)
+      lines.push(t.label + ': utredning slutt ' + fmtDate(unitToDate(d.end0)) + ' → ' + fmtDate(unitToDate(t.end)));
+    return lines;
+  }
+  function editReasonLines(b, t){
+    const lines = [];
+    const laterW = Math.round((t.start - b.start) / WEEK);
+    if(ASK_REASON_FOR.startLaterWeeks && laterW >= ASK_REASON_FOR.startLaterWeeks) lines.push(t.label + ': flyttet ' + weeksWord(laterW) + ' senere');
+    if(b.kind === 'estimate' && t.kind === 'estimate' && ASK_REASON_FOR.rangeWidened){
+      const rb = rangeWeeks(b), ra = rangeWeeks(t);
+      if(ra.late > rb.late || ra.likely > rb.likely) lines.push(t.label + ': spenn ' + spanText(rb) + ' → ' + spanText(ra) + ' uker');
+    }
+    if(b.kind === 'discovery' && t.kind === 'discovery' && ASK_REASON_FOR.discoveryEndLater && t.end > b.end + 1e-9)
+      lines.push(t.label + ': utredning slutt ' + fmtDate(unitToDate(b.end)) + ' → ' + fmtDate(unitToDate(t.end)));
+    if(b.lane !== t.lane && ASK_REASON_FOR.movedToOtherEpic)
+      lines.push(t.label + ': flyttet fra «' + (getLane(b.lane) || {name: b.lane}).name + '» til «' + (getLane(t.lane) || {name: t.lane}).name + '»');
+    return lines;
+  }
+
   /* ================== feature-editor ================== */
   let editorTaskId = null;
   let edSel = { kind: 'estimate' };
@@ -1023,25 +1144,35 @@ window.__bootTimeline = function(){
   $('edSave').addEventListener('click', () => {
     const t = getTask(editorTaskId);
     if(!t){ closeEditor(); return; }
+    const before = { label: t.label, lane: t.lane, kind: t.kind, start: t.start, end: t.end, endLikely: t.endLikely };
     const name = $('edName').value.trim();
     if(name && name !== t.label){ t.label = name; touch(t, 'label'); }
     const start = fromDateInput($('edStart').value);
     if(start === null){ $('edStart').focus(); return; }
     const kindChanged = edSel.kind !== t.kind;
     if(kindChanged){ t.kind = edSel.kind; touch(t, 'meta'); }
+    // stille lagring: en dratt (ukefestet) linje går ikke uendret gjennom datofeltet, så datoer
+    // sammenlignes på dagsnivå og spenn i uker – ellers logges «Flyttet 0 uker» ved hver lagring
     if(edSel.kind === 'discovery'){
       const end = fromDateInput($('edEnd').value);
       if(end === null){ $('edEnd').focus(); return; }
       const newEnd = Math.max(start + MIN_DUR, end);
-      if(start !== t.start || newEnd !== t.end || kindChanged){
-        t.start = start; t.end = newEnd; delete t.endLikely; touch(t, 'tid');
+      const startChanged = toDateInput(start) !== toDateInput(t.start), endChanged = toDateInput(newEnd) !== toDateInput(t.end);
+      if(startChanged || endChanged || kindChanged){
+        if(startChanged || kindChanged) t.start = start;
+        if(endChanged || kindChanged) t.end = Math.max(t.start + MIN_DUR, newEnd);
+        delete t.endLikely; touch(t, 'tid');
       }
     } else {
       const lw = Math.max(1, parseInt($('edLikely').value, 10) || 1);
       const hw = Math.max(lw, parseInt($('edLate').value, 10) || lw);
-      const el_ = start + lw * WEEK, en = start + hw * WEEK;
-      if(start !== t.start || el_ !== t.endLikely || en !== t.end || kindChanged){
-        t.start = start; t.endLikely = el_; t.end = en; touch(t, 'tid');
+      const r = rangeWeeks(t);
+      const startChanged = toDateInput(start) !== toDateInput(t.start);
+      const weeksChanged = !r || lw !== r.likely || hw !== r.late;
+      if(startChanged || weeksChanged || kindChanged){
+        if(startChanged || kindChanged) t.start = start;
+        t.endLikely = t.start + lw * WEEK; t.end = t.start + hw * WEEK;
+        touch(t, 'tid');
       }
     }
     const ado = parseInt($('edAdo').value, 10);
@@ -1051,6 +1182,8 @@ window.__bootTimeline = function(){
     if(keep.length !== t.deps.length){ t.deps = t.deps.filter(d => keep.includes(d)); touch(t, 'deps'); }
     normalizePlan(state);
     pushDeps();
+    const lines = editReasonLines(before, t);
+    if(lines.length) askReason(lines);
     save(); render();
     closeEditor();
   });
@@ -1063,6 +1196,7 @@ window.__bootTimeline = function(){
     if(!t) return;
     if(!(await confirmDialog('Slette feature', 'Slette «' + t.label + '»? Avhengigheter til den fjernes også.', {danger:true, confirmText:'Slett'}))) return;
     const id = editorTaskId;
+    if(t.kind === 'estimate' && ASK_REASON_FOR.estimateDeleted) askReason([t.label + ': slettet']);
     closeEditor();
     doRemoveTaskSilent(id);
     save(); render();
@@ -1095,6 +1229,8 @@ window.__bootTimeline = function(){
     const l = getLane(epicKey);
     if(!l){ closeEpicEditor(); return; }
     let changed = false;
+    const lines = [];
+    const before = { goalDate: l.goalDate, goalProvisional: !!l.goalProvisional };
     const name = $('epName').value.trim();
     if(name && name !== l.name){ l.name = name; changed = true; }
     const goalRaw = $('epGoal').value;
@@ -1106,7 +1242,12 @@ window.__bootTimeline = function(){
     const ado = parseInt($('epAdo').value, 10);
     const newAdo = isFinite(ado) && ado > 0 ? ado : undefined;
     if(l.adoId !== newAdo){ if(newAdo) l.adoId = newAdo; else delete l.adoId; changed = true; }
-    if(changed){ bumpLane(l); save(); }
+    if(ASK_REASON_FOR.goalChanged && typeof before.goalDate === 'number'){
+      if(typeof l.goalDate !== 'number') lines.push(l.name + ': måldato fjernet (var ' + fmtDate(unitToDate(before.goalDate)) + ')');
+      else if(Math.abs(l.goalDate - before.goalDate) > 1e-9) lines.push(l.name + ': måldato ' + fmtDate(unitToDate(before.goalDate)) + ' → ' + fmtDate(unitToDate(l.goalDate)));
+      else if(before.goalProvisional && !l.goalProvisional) lines.push(l.name + ': foreløpig mål → endelig måldato');
+    }
+    if(changed){ bumpLane(l); if(lines.length) askReason(lines); save(); }
     render();
     closeEpicEditor();
   });
@@ -1134,7 +1275,7 @@ window.__bootTimeline = function(){
     applyingRemote = true;
     serverVersion = version;
     state = normalizePlan(data);
-    pushDeps();
+    pushDeps(false);          // dytt fra andres lagring er ikke denne klientens redigering
     pendingTouch.clear();     // dytt fra fletting er ikke en egen redigering
     render();
     applyingRemote = false;
@@ -1169,10 +1310,12 @@ window.__bootTimeline = function(){
   async function pushPlan(){
     pendingSave = false;
     pushing = true;
+    const note = pendingNote;        // det som følger akkurat denne lagringen
+    pendingNote = newNote();
     try{
       const r = await fetch('api/timeline-plan', {
         method:'PUT', headers:{'Content-Type':'application/json'},
-        body: JSON.stringify({ data: state })
+        body: JSON.stringify({ data: state, note: { reason: note.reason, reasonCode: note.reasonCode, causes: note.causes, source: note.source } })
       });
       if(r.status === 403){
         canWrite = false;
@@ -1181,7 +1324,7 @@ window.__bootTimeline = function(){
         setSaveNote('kun lesetilgang – endringer forblir lokale');
         return;
       }
-      if(r.status === 409){ setSaveNote('travelt – prøver igjen'); scheduleServerSave(); return; }
+      if(r.status === 409){ restoreNote(note); setSaveNote('travelt – prøver igjen'); scheduleServerSave(); return; }
       if(!r.ok) throw new Error('HTTP ' + r.status);
       const j = await r.json();
       const tid = new Date().toLocaleTimeString('nb-NO', {hour:'2-digit', minute:'2-digit'});
@@ -1201,6 +1344,7 @@ window.__bootTimeline = function(){
         setSaveNote('lagret for alle ' + tid);
       }
     }catch(err){
+      restoreNote(note);
       setSaveNote('lagring feilet – prøver igjen ved neste endring');
     }finally{
       pushing = false;
@@ -1209,11 +1353,12 @@ window.__bootTimeline = function(){
   function scheduleServerSave(){
     if(!serverReady || !canWrite || applyingRemote) return;
     pendingSave = true;
+    if(reasonOpen){ setSaveNote('venter på begrunnelse…'); return; }   // closeReason() kaller hit igjen
     setSaveNote('lagrer…');
     clearTimeout(saveTimer);
     saveTimer = setTimeout(pushPlan, 900);
   }
-  const anyModalOpen = () => editorBack.classList.contains('open') || epicBack.classList.contains('open') || dlgBack.classList.contains('open');
+  const anyModalOpen = () => editorBack.classList.contains('open') || epicBack.classList.contains('open') || dlgBack.classList.contains('open') || reasonBack.classList.contains('open');
   async function pollTick(){
     if(!HOSTED || !serverReady) return;
     if(drag || colDrag || linkSource || anyModalOpen()) return;   // ikke midt i brukerens egen redigering
@@ -1235,6 +1380,7 @@ window.__bootTimeline = function(){
   seedBtn.addEventListener('click', async () => {
     if(!(await confirmDialog('Last inn eksempel', 'Legger inn de sju eksempel-epicene fra ledermøtedecken.' + (HOSTED ? ' Det blir den delte planen for alle.' : ''), {confirmText:'Last inn'}))) return;
     state = exampleSeed(state);   // bumper forbi gamle tombstones, ellers sletter flettingen eksempelet igjen
+    pendingNote.source = 'seed';   // én hendelse «Eksempel-epics lastet inn», ikke 25 «ny»
     save(); render();
   });
   function downloadFile(name, text, mime){
@@ -1281,7 +1427,8 @@ window.__bootTimeline = function(){
 
   document.addEventListener('keydown', e => {
     if(e.key !== 'Escape') return;
-    if(dlgBack.classList.contains('open')) dlgClose(false);
+    if(reasonBack.classList.contains('open')) closeReason('ingen', null);
+    else if(dlgBack.classList.contains('open')) dlgClose(false);
     else if(editorBack.classList.contains('open')) closeEditor();
     else if(epicBack.classList.contains('open')) closeEpicEditor();
     else if(linkSource) cancelLink();
