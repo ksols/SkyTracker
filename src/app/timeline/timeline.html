@@ -328,6 +328,17 @@
   .reason-text textarea{width:100%;font:inherit;font-size:14px;padding:6px 12px;border:1px solid var(--line);border-radius:4px;background:var(--input-bg);color:var(--text);min-height:64px;resize:vertical}
   .reason-text textarea:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)}
 
+  /* ---------- rekkefølge: dra rader i navnekolonnen ---------- */
+  .grip{position:absolute;left:4px;top:50%;transform:translateY(-50%);width:12px;color:var(--text-4);font-size:12px;line-height:1;letter-spacing:-2px;cursor:grab;opacity:0;user-select:none}
+  .lane-label:hover .grip,.task-label:hover .grip{opacity:1}
+  .lane-label{padding-left:20px}
+  .task-label{padding-left:24px}
+  .drop-before{box-shadow:inset 0 2px 0 var(--accent)}
+  .drop-after{box-shadow:inset 0 -2px 0 var(--accent)}
+  .drop-into{box-shadow:inset 0 0 0 2px var(--accent)}
+  .dragging-row{opacity:.5}
+  .ed-field select{width:100%;font:inherit;font-size:14px;padding:6px 12px;border:1px solid var(--line);border-radius:4px;background:var(--input-bg);color:var(--text)}
+
   footer{
     margin-top:24px;display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap;
     font-size:11px;color:var(--text-4);border-top:1px solid var(--line-soft);padding-top:12px;
@@ -436,6 +447,7 @@
     <div class="modal-body">
       <div class="ed-body">
         <label class="ed-field"><span>Navn</span><input id="edName" type="text"></label>
+        <label class="ed-field"><span>Epic</span><select id="edLane"></select></label>
         <div class="ed-field"><span>Type</span>
           <div class="ed-kind" id="edKind">
             <button type="button" data-k="discovery">Utredning – sluttdato</button>
@@ -475,6 +487,7 @@
           <label class="ed-check"><input type="checkbox" id="epProvisional"> Foreløpig – settes endelig etter utredning</label>
         </div>
         <label class="ed-field"><span>ADO-id (Epic)</span><input id="epAdo" type="number" min="1" step="1" placeholder="valgfritt"></label>
+        <label class="ed-field"><span>Prioritet (1 = øverst på tidslinjen)</span><input id="epPriority" type="number" min="1" step="1"></label>
       </div>
     </div>
     <div class="modal-foot">
@@ -608,7 +621,7 @@ window.__bootTimeline = function(){
   }
   const getTask = id => state.tasks.find(t => t.id === id);
   const getLane = key => state.lanes.find(l => l.key === key);
-  const laneTasks = key => state.tasks.filter(t => t.lane === key);
+  const laneTasks = key => state.tasks.filter(t => t.lane === key).sort((a, b) => (a.order || 0) - (b.order || 0));
 
   /* Feltversjoner: klienten bumper gruppen den endrer; serveren fletter per gruppe (høyest vinner). */
   const pendingTouch = new Map();
@@ -641,6 +654,31 @@ window.__bootTimeline = function(){
     });
   }
 
+  /* ================== rekkefølge: prioritet (epics) og order (features) ================== */
+  function moveLane(key, toIndex){           // toIndex: plass i listen uten raden selv (0 = øverst)
+    const keys = state.lanes.map(l => l.key).filter(k => k !== key);
+    keys.splice(Math.max(0, Math.min(keys.length, toIndex)), 0, key);
+    keys.forEach((k, i) => { const l = getLane(k); if(l.priority !== i + 1){ l.priority = i + 1; bumpLane(l); } });
+    state.example = false;
+    normalizePlan(state);
+  }
+  function renumberLane(laneKey){
+    laneTasks(laneKey).forEach((t, i) => { if(t.order !== i + 1){ t.order = i + 1; touch(t, 'meta'); } });
+  }
+  function moveTask(id, laneKey, toIndex){   // toIndex: plass i målepicen uten featuren selv
+    const t = getTask(id);
+    if(!t || !getLane(laneKey)) return;
+    const fromLane = t.lane;
+    if(fromLane !== laneKey){ t.lane = laneKey; touch(t, 'meta'); }
+    const ids = laneTasks(laneKey).map(v => v.id).filter(v => v !== id);
+    ids.splice(Math.max(0, Math.min(ids.length, toIndex)), 0, id);
+    ids.forEach((v, i) => { const q = getTask(v); if(q.order !== i + 1){ q.order = i + 1; touch(q, 'meta'); } });
+    if(fromLane !== laneKey) renumberLane(fromLane);
+    state.example = false;
+    normalizePlan(state);
+    pushDeps();
+  }
+
   /* ================== hovedvisning ================== */
   let barRefs = {}, rowRefs = {}, rangeRefs = {}, labelDateRefs = {}, depSvg = null;
 
@@ -656,6 +694,11 @@ window.__bootTimeline = function(){
       : 'Legg til en epic med ＋ Epic, eller last inn eksempelet fra ledermøtedecken.';
   }
 
+  let rowDrag = null;   // { type:'lane', key } | { type:'task', id } mens en rad dras i navnekolonnen
+  const dropHalf = (e, elm) => { const r = elm.getBoundingClientRect(); return (e.clientY - r.top) < r.height / 2; };   // true = slipp FØR raden
+  function clearDropMarks(){
+    labels.querySelectorAll('.drop-before,.drop-after,.drop-into,.dragging-row').forEach(x => x.classList.remove('drop-before', 'drop-after', 'drop-into', 'dragging-row'));
+  }
   function render(){
     showEmpty();
     exampleBadge.hidden = !state.example;
@@ -711,7 +754,38 @@ window.__bootTimeline = function(){
       const add = el('button', 'add-feature', '＋');
       add.title = 'Ny feature i denne epicen (utredning eller estimert velges i redigeringen)';
       add.addEventListener('click', e => { e.stopPropagation(); addFeature(lane.key, 'discovery'); });
-      ll.append(ln, lm, add);
+      const grip = el('span', 'grip', '⋮⋮');
+      grip.title = 'Dra for å endre prioritet';
+      grip.draggable = true;
+      grip.addEventListener('dragstart', e => { rowDrag = { type: 'lane', key: lane.key }; e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', lane.key); ll.classList.add('dragging-row'); });
+      grip.addEventListener('dragend', () => { rowDrag = null; clearDropMarks(); });
+      ll.addEventListener('dragover', e => {
+        if(!rowDrag) return;
+        e.preventDefault();
+        clearDropMarks();
+        ll.classList.add(rowDrag.type === 'lane' ? (dropHalf(e, ll) ? 'drop-before' : 'drop-after') : 'drop-into');
+      });
+      ll.addEventListener('drop', e => {
+        if(!rowDrag) return;
+        e.preventDefault();
+        const d = rowDrag; rowDrag = null; clearDropMarks();
+        if(d.type === 'lane'){
+          if(d.key === lane.key) return;
+          const from = state.lanes.findIndex(v => v.key === d.key) + 1;
+          const keys = state.lanes.map(v => v.key).filter(k => k !== d.key);
+          const to = keys.indexOf(lane.key) + (dropHalf(e, ll) ? 0 : 1);
+          moveLane(d.key, to);
+          if(ASK_REASON_FOR.epicReordered && from !== to + 1) askReason([getLane(d.key).name + ': prioritet ' + from + ' → ' + (to + 1)]);
+        } else {
+          const t = getTask(d.id);
+          if(!t) return;
+          const fromLane = t.lane;
+          moveTask(d.id, lane.key, laneTasks(lane.key).filter(v => v.id !== d.id).length);
+          if(fromLane !== lane.key && ASK_REASON_FOR.movedToOtherEpic) askReason([t.label + ': flyttet fra «' + getLane(fromLane).name + '» til «' + lane.name + '»']);
+        }
+        save(); render();
+      });
+      ll.append(grip, ln, lm, add);
       labels.appendChild(ll);
 
       const lb = el('div', 'lane-band');
@@ -735,9 +809,33 @@ window.__bootTimeline = function(){
           '<button class="del" title="Slett feature">×</button>';
         acts.querySelector('.link').addEventListener('click', e => { e.stopPropagation(); startLink(t.id); });
         acts.querySelector('.del').addEventListener('click', e => { e.stopPropagation(); removeTask(t.id); });
-        tl.append(tt, dd, acts);
+        const tg = el('span', 'grip', '⋮⋮');
+        tg.title = 'Dra for å endre rekkefølgen, eller slipp på en annen epic';
+        tg.draggable = true;
+        tg.addEventListener('dragstart', e => { rowDrag = { type: 'task', id: t.id }; e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', t.id); tl.classList.add('dragging-row'); });
+        tg.addEventListener('dragend', () => { rowDrag = null; clearDropMarks(); });
+        tl.addEventListener('dragover', e => {
+          if(!rowDrag || rowDrag.type !== 'task') return;
+          e.preventDefault();
+          clearDropMarks();
+          tl.classList.add(dropHalf(e, tl) ? 'drop-before' : 'drop-after');
+        });
+        tl.addEventListener('drop', e => {
+          if(!rowDrag || rowDrag.type !== 'task') return;
+          e.preventDefault();
+          const d = rowDrag; rowDrag = null; clearDropMarks();
+          if(d.id === t.id) return;
+          const m = getTask(d.id);
+          if(!m) return;
+          const fromLane = m.lane;
+          const ids = laneTasks(t.lane).map(v => v.id).filter(v => v !== d.id);
+          moveTask(d.id, t.lane, ids.indexOf(t.id) + (dropHalf(e, tl) ? 0 : 1));
+          if(fromLane !== t.lane && ASK_REASON_FOR.movedToOtherEpic) askReason([m.label + ': flyttet fra «' + getLane(fromLane).name + '» til «' + getLane(t.lane).name + '»']);
+          save(); render();
+        });
+        tl.append(tg, tt, dd, acts);
         tl.addEventListener('click', e => {
-          if(e.target.closest('.row-actions') || e.target.tagName === 'A') return;
+          if(e.target.closest('.row-actions') || e.target.tagName === 'A' || e.target.classList.contains('grip')) return;
           if(linkSource){ completeLink(t.id); return; }
           openEditor(t.id);
         });
@@ -915,13 +1013,13 @@ window.__bootTimeline = function(){
   /* ================== features: legg til / fjern ================== */
   function addFeature(laneKey, kind){
     const start = snapTo(Math.max(todayUnit(), VIEW_FROM), SNAP);
+    const order = Math.max(0, ...laneTasks(laneKey).map(v => v.order || 0)) + 1;
     const t = kind === 'discovery'
-      ? {id: uid(), lane: laneKey, label: 'Ny utredning', kind: 'discovery', start, end: start + 2 * WEEK, deps: [], fv: {}}
-      : {id: uid(), lane: laneKey, label: 'Ny feature', kind: 'estimate', start, endLikely: start + 4 * WEEK, end: start + 6 * WEEK, deps: [], fv: {}};
+      ? {id: uid(), lane: laneKey, label: 'Ny utredning', kind: 'discovery', start, end: start + 2 * WEEK, deps: [], fv: {}, order}
+      : {id: uid(), lane: laneKey, label: 'Ny feature', kind: 'estimate', start, endLikely: start + 4 * WEEK, end: start + 6 * WEEK, deps: [], fv: {}, order};
     if(myName){ t.editedBy = myName; t.editedAt = new Date().toISOString(); }
-    let idx = -1;
-    state.tasks.forEach((v, i) => { if(v.lane === laneKey) idx = i; });
-    if(idx === -1) state.tasks.push(t); else state.tasks.splice(idx + 1, 0, t);
+    state.tasks.push(t);
+    normalizePlan(state);
     save(); render();
     openEditor(t.id);
   }
@@ -1114,6 +1212,7 @@ window.__bootTimeline = function(){
     $('edTitle').textContent = t.kind === 'discovery' ? 'Rediger utredning' : 'Rediger feature';
     $('edDates').textContent = rangeText(t);
     $('edName').value = t.label;
+    $('edLane').innerHTML = state.lanes.map(l => '<option value="' + esc(l.key) + '"' + (l.key === t.lane ? ' selected' : '') + '>' + esc(l.name) + '</option>').join('');
     edSel = { kind: t.kind };
     paintEdKind();
     $('edStart').value = toDateInput(t.start);
@@ -1180,6 +1279,8 @@ window.__bootTimeline = function(){
     if(t.adoId !== newAdo){ if(newAdo) t.adoId = newAdo; else delete t.adoId; touch(t, 'meta'); }
     const keep = [...document.querySelectorAll('#edDeps .depchip')].map(c => c.dataset.id);
     if(keep.length !== t.deps.length){ t.deps = t.deps.filter(d => keep.includes(d)); touch(t, 'deps'); }
+    const newLane = $('edLane').value;
+    if(newLane && newLane !== t.lane && getLane(newLane)) moveTask(t.id, newLane, laneTasks(newLane).length);
     normalizePlan(state);
     pushDeps();
     const lines = editReasonLines(before, t);
@@ -1221,6 +1322,7 @@ window.__bootTimeline = function(){
     $('epGoal').value = typeof l.goalDate === 'number' ? toDateInput(l.goalDate) : '';
     $('epProvisional').checked = !!l.goalProvisional;
     $('epAdo').value = l.adoId || '';
+    $('epPriority').value = state.lanes.findIndex(v => v.key === key) + 1;
     epicBack.classList.add('open');
     setTimeout(() => $('epName').focus(), 0);
   }
@@ -1242,6 +1344,14 @@ window.__bootTimeline = function(){
     const ado = parseInt($('epAdo').value, 10);
     const newAdo = isFinite(ado) && ado > 0 ? ado : undefined;
     if(l.adoId !== newAdo){ if(newAdo) l.adoId = newAdo; else delete l.adoId; changed = true; }
+    const pri = parseInt($('epPriority').value, 10);
+    const cur = state.lanes.findIndex(v => v.key === epicKey) + 1;
+    if(isFinite(pri) && pri >= 1 && pri !== cur){
+      const target = Math.min(state.lanes.length, pri);
+      moveLane(epicKey, target - 1);
+      if(ASK_REASON_FOR.epicReordered) lines.push(l.name + ': prioritet ' + cur + ' → ' + target);
+      changed = true;
+    }
     if(ASK_REASON_FOR.goalChanged && typeof before.goalDate === 'number'){
       if(typeof l.goalDate !== 'number') lines.push(l.name + ': måldato fjernet (var ' + fmtDate(unitToDate(before.goalDate)) + ')');
       else if(Math.abs(l.goalDate - before.goalDate) > 1e-9) lines.push(l.name + ': måldato ' + fmtDate(unitToDate(before.goalDate)) + ' → ' + fmtDate(unitToDate(l.goalDate)));
