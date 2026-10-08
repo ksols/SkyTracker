@@ -37,7 +37,7 @@ export async function GET(req: Request) {
   const after = normalizePlan(clone(current.data)) as Plan;
   const net = diffPlans(before, after);
   const rows = await prisma.timelineEvent.findMany({
-    where: { at: { gt: baseline.at } },
+    where: { at: { gt: baseline.at }, NOT: { code: "plan.baseline", targetId: baseline.id } },   // the baseline's own event is not a change since itself
     orderBy: [{ at: "desc" }, { id: "desc" }],
     take: 500,
     include: { changeset: { select: { id: true, at: true, editor: true, reason: true, reasonCode: true, source: true } } },

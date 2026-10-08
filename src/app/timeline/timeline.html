@@ -1711,6 +1711,7 @@ window.__bootTimeline = function(){
       serverReady = true;
       roBanner.hidden = canWrite;
       roTag.hidden = canWrite;
+      $('baselineBtn').hidden = !canWrite;   // lesere kan sammenligne, ikke merke baseliner
       whoami.textContent = myName || '';
       refreshHistoryBadge();
       loadSnapshots();
@@ -1742,6 +1743,7 @@ window.__bootTimeline = function(){
         canWrite = false;
         roBanner.hidden = false;
         roTag.hidden = false;
+        $('baselineBtn').hidden = true;
         setSaveNote('kun lesetilgang – endringer forblir lokale');
         return;
       }
