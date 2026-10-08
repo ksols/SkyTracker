@@ -44,7 +44,13 @@ function normalizePlan(plan) {
     if (num(l.goalDate, null) === null) delete l.goalDate;
     if (!l.goalProvisional) delete l.goalProvisional;
     if (num(l.adoId, null) === null) delete l.adoId;
+    if (typeof l.metric !== "string" || !l.metric.trim()) delete l.metric;
+    if (!l.externalDate) delete l.externalDate;
   });
+  // priority = the order on the timeline (1 = top). Data, not array order, so it survives the merge.
+  let nextPri = Math.max(0, ...p.lanes.map((l) => num(l.priority, 0)));
+  p.lanes.forEach((l) => { if (num(l.priority, null) === null) l.priority = ++nextPri; });
+  p.lanes.sort((a, b) => a.priority - b.priority); // stable: equal priorities keep their order
   const laneKeys = new Set(p.lanes.map((l) => l.key));
   p.tasks = p.tasks.filter((t) => t && typeof t.id === "string" && laneKeys.has(t.lane));
   p.tasks.forEach((t) => {
@@ -65,6 +71,12 @@ function normalizePlan(plan) {
   p.tasks.forEach((t) => {
     t.deps = t.deps.filter((d) => d !== t.id && ids.has(d));
   });
+  // order = position inside the epic; missing ones go after the lane's max
+  const nextOrd = {};
+  p.tasks.forEach((t) => { if (num(t.order, null) !== null) nextOrd[t.lane] = Math.max(nextOrd[t.lane] || 0, t.order); });
+  p.tasks.forEach((t) => { if (num(t.order, null) === null) t.order = nextOrd[t.lane] = (nextOrd[t.lane] || 0) + 1; });
+  const laneIdx = new Map(p.lanes.map((l, i) => [l.key, i]));
+  p.tasks.sort((a, b) => laneIdx.get(a.lane) - laneIdx.get(b.lane) || a.order - b.order);
   return p;
 }
 
@@ -104,19 +116,20 @@ function shiftTask(t, d) {
 
 function resolveDeps(plan) {
   const byId = new Map(plan.tasks.map((t) => [t.id, t]));
-  const shifted = [];
+  const shifted = []; // [{ id, by }]: by = the blocker whose late end forced the shift
   let changed = true;
   let guard = 0;
   while (changed && guard++ < 200) {
     changed = false;
     for (const t of plan.tasks) {
-      let req = -Infinity;
+      let req = -Infinity, by = null;
       t.deps.forEach((d) => {
         const p = byId.get(d);
-        if (p) req = Math.max(req, p.end);
+        if (p && p.end > req) { req = p.end; by = d; }
       });
       if (req > t.start + 1e-9 && shiftTask(t, req - t.start) !== 0) {
-        if (!shifted.includes(t.id)) shifted.push(t.id);
+        const prev = shifted.find((s) => s.id === t.id);
+        if (prev) prev.by = by; else shifted.push({ id: t.id, by });
         changed = true;
       }
     }
@@ -138,6 +151,29 @@ function rangeLabel(t) {
 function goalText(lane) {
   if (typeof lane.goalDate !== "number") return "Måldato settes etter utredning";
   return (lane.goalProvisional ? "Foreløpig mål " : "Måldato ") + fmtDate(unitToDate(lane.goalDate));
+}
+
+/* ---------- delivery window in ISO weeks, overdue discoveries ---------- */
+function isoWeek(d) {
+  const t = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+  const day = t.getUTCDay() || 7;
+  t.setUTCDate(t.getUTCDate() + 4 - day);
+  const jan1 = new Date(Date.UTC(t.getUTCFullYear(), 0, 1));
+  return Math.ceil(((t - jan1) / 86400000 + 1) / 7);
+}
+function weekSpan(u1, u2) {
+  const w1 = isoWeek(unitToDate(u1)), w2 = isoWeek(unitToDate(u2));
+  return "uke " + (w1 === w2 ? w1 : w1 + "–" + w2);
+}
+function windowLabel(t) {
+  return t.kind === "estimate" ? weekSpan(t.endLikely, t.end) : "";
+}
+function epicWindowText(plan, laneKey) {
+  const st = epicStatus(plan, laneKey);
+  return typeof st.likely === "number" ? "Leveres " + weekSpan(st.likely, st.late) : "";
+}
+function discoveryOverdue(t, today) {
+  return t.kind === "discovery" && t.end < today - 1e-9;
 }
 
 /* ---------- example seed (deck slides 6, 22, 23, 24) ---------- */
@@ -204,5 +240,6 @@ if (typeof module !== "undefined") {
     BASE_Y, BASE_M, N_MONTHS, WEEK, SCHEMA, OWNER_DEFAULT, STATUS_LABEL,
     dateToUnit, unitToDate, fmtDate, normalizePlan, epicStatus, shiftTask, resolveDeps,
     rangeWeeks, rangeLabel, goalText, exampleSeed,
+    isoWeek, weekSpan, windowLabel, epicWindowText, discoveryOverdue,
   };
 }

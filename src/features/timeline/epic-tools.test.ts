@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   WEEK, N_MONTHS, dateToUnit, unitToDate, normalizePlan, epicStatus, resolveDeps,
   rangeLabel, goalText, exampleSeed, STATUS_LABEL,
+  isoWeek, weekSpan, windowLabel, epicWindowText, discoveryOverdue,
 } from "./epic-tools.js";
 import type { Plan, PlanTask } from "./merge";
 
@@ -70,7 +71,7 @@ describe("epicStatus", () => {
 describe("resolveDeps", () => {
   it("pushes a blocked feature to the blocker's late end and shifts its whole range", () => {
     const p = plan([est({ id: "a", start: 4, endLikely: 5, end: 6 }), est({ id: "b", start: 4, endLikely: 5, end: 7, deps: ["a"] })]);
-    expect(resolveDeps(p)).toEqual(["b"]);
+    expect(resolveDeps(p)).toEqual([{ id: "b", by: "a" }]);
     expect(p.tasks[1]).toMatchObject({ start: 6, endLikely: 7, end: 9 });
   });
 
@@ -80,7 +81,7 @@ describe("resolveDeps", () => {
       est({ id: "b", start: 3, endLikely: 4, end: 5, deps: ["a"] }),
       est({ id: "c", start: 1, endLikely: 2, end: 3, deps: ["b"] }),
     ]);
-    expect(resolveDeps(p)).toEqual(["c"]);
+    expect(resolveDeps(p)).toEqual([{ id: "c", by: "b" }]);
     expect(p.tasks[2]).toMatchObject({ start: 5, endLikely: 6, end: 7 });
     expect(resolveDeps(p)).toEqual([]);
   });
@@ -135,5 +136,65 @@ describe("exampleSeed(prev) over a plan that was emptied by deletes", () => {
     expect(s.lanes.every((l) => l.v === undefined)).toBe(true);
     expect(s.tasks.every((t) => Object.keys(t.fv!).length === 0)).toBe(true);
     expect(s.deleted).toEqual({});
+  });
+});
+
+describe("priority and order", () => {
+  it("assigns priority 1..n in array order when none is set, and order 1..n per lane", () => {
+    const p = normalizePlan({
+      lanes: [{ key: "a", name: "A" }, { key: "b", name: "B" }],
+      tasks: [est({ id: "t1", lane: "b" }), est({ id: "t2", lane: "a" }), est({ id: "t3", lane: "b" })],
+    });
+    expect(p.lanes.map((l) => [l.key, l.priority])).toEqual([["a", 1], ["b", 2]]);
+    expect(p.tasks.map((t) => [t.id, t.lane, t.order])).toEqual([["t2", "a", 1], ["t1", "b", 1], ["t3", "b", 2]]);
+  });
+
+  it("sorts lanes by priority and tasks by order; missing values are appended after the max", () => {
+    const p = normalizePlan({
+      lanes: [{ key: "a", name: "A", priority: 2 }, { key: "b", name: "B" }, { key: "c", name: "C", priority: 1 }],
+      tasks: [est({ id: "t1", lane: "a", order: 5 }), est({ id: "t2", lane: "a" }), est({ id: "t3", lane: "a", order: 1 })],
+    });
+    expect(p.lanes.map((l) => [l.key, l.priority])).toEqual([["c", 1], ["a", 2], ["b", 3]]);
+    expect(p.tasks.map((t) => [t.id, t.order])).toEqual([["t3", 1], ["t1", 5], ["t2", 6]]);
+  });
+
+  it("duplicate priorities keep array order (stable), nothing is renumbered", () => {
+    const p = normalizePlan({ lanes: [{ key: "a", name: "A", priority: 1 }, { key: "b", name: "B", priority: 1 }], tasks: [] });
+    expect(p.lanes.map((l) => [l.key, l.priority])).toEqual([["a", 1], ["b", 1]]);
+  });
+
+  it("strips an empty metric and a false externalDate, keeps real ones", () => {
+    const p = normalizePlan({ lanes: [{ key: "a", name: "A", metric: "  ", externalDate: false }, { key: "b", name: "B", metric: "3 kunder", externalDate: true }], tasks: [] });
+    expect(p.lanes[0]).not.toHaveProperty("metric");
+    expect(p.lanes[0]).not.toHaveProperty("externalDate");
+    expect(p.lanes[1]).toMatchObject({ metric: "3 kunder", externalDate: true });
+  });
+});
+
+describe("week windows and overdue", () => {
+  it("isoWeek follows ISO 8601", () => {
+    expect(isoWeek(new Date(2026, 11, 15))).toBe(51);
+    expect(isoWeek(new Date(2026, 11, 31))).toBe(53);
+    expect(isoWeek(new Date(2027, 0, 4))).toBe(1);
+    expect(isoWeek(new Date(2027, 1, 1))).toBe(5);
+  });
+
+  it("weekSpan, windowLabel and epicWindowText", () => {
+    const likely = dateToUnit(new Date(2026, 11, 1)), late = dateToUnit(new Date(2026, 11, 15));
+    expect(weekSpan(likely, late)).toBe("uke 49–51");
+    expect(weekSpan(late, late)).toBe("uke 51");
+    // start 3.5 (mid Nov): normalizePlan clamps endLikely to start + 1 week, so a start of 4 (= 1 Dec) would move it
+    expect(windowLabel(est({ start: 3.5, endLikely: likely, end: late }))).toBe("uke 49–51");
+    expect(windowLabel(disc({}))).toBe("");
+    const p = plan([est({ id: "a", start: 3.5, endLikely: likely, end: late })], { goalDate: 6 });
+    expect(epicWindowText(p, "x")).toBe("Leveres uke 49–51");
+    expect(epicWindowText(plan([disc({})]), "x")).toBe("");
+    expect(epicWindowText(plan([]), "x")).toBe("");
+  });
+
+  it("discoveryOverdue only for discoveries whose end is before today", () => {
+    expect(discoveryOverdue(disc({ start: 2, end: 3 }), 3.5)).toBe(true);
+    expect(discoveryOverdue(disc({ start: 2, end: 3 }), 2.5)).toBe(false);
+    expect(discoveryOverdue(est({ end: 3 }), 3.5)).toBe(false);
   });
 });
