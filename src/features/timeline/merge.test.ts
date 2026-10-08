@@ -65,6 +65,12 @@ describe("mergePlans - field-level versioning", () => {
     expect(m.lanes.find((l) => l.key === "ny")).toBeTruthy();
   });
 
+  it("order travels with lane in the meta group", () => {
+    const stored = plan([task({ id: "a", lane: "x", order: 2, fv: { meta: 1 } })]);
+    const incoming = plan([task({ id: "a", lane: "y", order: 1, fv: { meta: 2 } })]);
+    expect(mergePlans(stored, incoming).tasks[0]).toMatchObject({ lane: "y", order: 1 });
+  });
+
   it("lane tombstone removes an unedited lane and loses to a lane bumped past it", () => {
     const stored = plan([], { lanes: [{ key: "x", name: "Epic X", v: 1 }, { key: "y", name: "Epic Y", v: 1 }] });
     const removed = mergePlans(stored, plan([], { lanes: [], deletedLanes: { x: 1, y: 1 } }));

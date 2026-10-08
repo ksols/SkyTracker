@@ -16,7 +16,7 @@ export const GROUP_PROPS: Record<TaskFieldGroup, string[]> = {
   tid: ["start", "end", "endLikely"],
   label: ["label"],
   deps: ["deps"],
-  meta: ["lane", "kind", "adoId"],
+  meta: ["lane", "kind", "adoId", "order"],
 };
 
 export type PlanTask = {
@@ -29,6 +29,7 @@ export type PlanTask = {
   endLikely?: number;
   adoId?: number;
   deps?: string[];
+  order?: number;
   fv?: Partial<Record<TaskFieldGroup, number>>;
   [key: string]: unknown;
 };
@@ -41,6 +42,9 @@ export type PlanLane = {
   goalDate?: number;
   goalProvisional?: boolean;
   adoId?: number;
+  priority?: number;
+  metric?: string;
+  externalDate?: boolean;
 };
 
 export type Plan = {
