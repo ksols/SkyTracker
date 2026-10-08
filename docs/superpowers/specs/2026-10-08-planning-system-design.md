@@ -135,13 +135,14 @@ Features not yet placed in an epic live in the reserved lane `_backlog` (hidden 
 TimelineChangeset { id, at, editor, source: "bruker" | "seed" | "ado" | "import" | "system",
                     reason?, reasonCode?, planVersion, eventCount }
 TimelineEvent     { id, changesetId, at, editor,
-                    targetType: "epic" | "feature", targetId, targetLabel, laneKey,
-                    code,                 // vocabulary in §4.1
-                    from Json?, to Json?, // the changed values only
-                    cause: "bruker" | "avhengighet" | "flette" | "ado" | "system",
-                    causeRef?,            // e.g. the blocker's id for cause = avhengighet
-                    summary }             // the Norwegian sentence, rendered once on write
-TimelineSnapshot  { id, at, kind: "dag" | "baseline" | "sprint", label?, planVersion, data Json, createdBy? }
+                    targetType: "epic" | "feature" | "plan", targetId, targetLabel, laneKey?,
+                    code,                       // vocabulary in §4.1
+                    before Json?, after Json?,  // the changed values only
+                    cause: "bruker" | "avhengighet" | "ado" | "system",
+                    causeRef?,                  // e.g. the blocker's id for cause = avhengighet
+                    summary }                   // the Norwegian sentence, rendered once on write
+TimelineSnapshot  { id, at, kind: "dag" | "baseline" | "sprint", day? (YYYY-MM-DD in Europe/Oslo, kind = dag),
+                    label?, planVersion, data Json, createdBy?; unique (kind, day) }
 ```
 
 `TimelineChange` (the table from August) stays as is, unused, like `BufferSnapshot`; it is dropped in a later
@@ -213,7 +214,10 @@ which replaces `plan-delta.ts`). Epics are included; today only features are log
 | `feature.prioritet` | `order` changes inside the epic | 4 → 1 | «Prioritet i epicen: 4 → 1» |
 | `feature.avhengighet` | `deps` changes | added/removed ids | «Blokkeres nå av IAM» · «Avhengighet til IAM fjernet» |
 | `feature.tilstand`, `feature.eier`, `feature.estimat-hentet`, `feature.fremdrift`, `feature.levert` | R2–R4 fields | | «Klar for veikart» · «Eier: THM» · «Estimat hentet fra utredningen: 4–6 (uendret buffer 1 uke)» · «Fremdrift: 13 av 21 poeng» · «Levert 3. des» |
-| `plan.seed`, `plan.baseline`, `ado.push`, `ado.konflikt`, `ado.lest` | system events | | «Eksempel lastet» · «Baseline «Produktforum 5. nov»» · «Pushet til ADO #4791» |
+| `feature.utredning` | `kind` estimate → discovery (sent back) | | «Tilbake til utredning (til 20. nov)» |
+| `epic.ado`, `feature.ado` | `adoId` | old → new | «ADO-id: #4791» · «ADO-id fjernet» |
+| `plan.begrunnelse` | a reason added afterwards (`PATCH`, §4.6) | | «Begrunnelse lagt til: Prioritert om i produktforum – …» |
+| `plan.seed`, `plan.baseline`, `ado.push`, `ado.konflikt`, `ado.lest` | system events | | «Eksempel-epics lastet inn (7 epics, 18 features)» · «Baseline «Produktforum 5. nov»» · «Pushet til ADO #4791» |
 
 A drag that moves the start and widens the range produces two events. A save by the example seed produces one
 `plan.seed` event, not 25 «ny» rows (the changeset's `source` collapses it).
@@ -246,7 +250,8 @@ A drag that moves the start and widens the range produces two events. A save by 
 - **Causes.** `resolveDeps` returns `{ id, by }` instead of ids; the page sends `causes: { [taskId]: "dep:<blocker>" }`
   with the save, and the server marks those events `cause: avhengighet`, `causeRef: <blocker>`, summary «Flyttet 2
   uker av avhengighet IAM». Today these pushes are logged as if the editor had dragged them, which is exactly the
-  confusion GO wants gone. A field the merge took from another client is `cause: flette`; sync writes are `ado`.
+  confusion GO wants gone. `Cause = bruker | avhengighet | ado | system`: the merge never changes a stored value on
+  its own (it only keeps the newer of two edits), so there is no merge cause; sync writes are `ado`.
 
 ### 4.3 Capture: the save path
 
@@ -301,7 +306,7 @@ page can attach a late reason. The daily snapshot stores the plan *as it was at 
 | Route | Who | Does |
 |---|---|---|
 | `PUT /api/timeline-plan` | writer | As today plus `note` in the body and `changesetId` in the response |
-| `GET /api/timeline-changes?lane=&target=&since=&until=&before=&limit=` | any | Events with their changeset (reason, source); newest first; paged |
+| `GET /api/timeline-changes?lane=&target=&before=&limit=` | any | `{ events, missing14d }`: events with their changeset (reason, source), newest first, paged by `before`; `missing14d` = changesets of the last 14 days saved without a reason |
 | `PATCH /api/timeline-changes` body `{ changesetId, reason, reasonCode }` | writer | Adds or edits a reason; logged as `system` event «Begrunnelse lagt til» |
 | `GET /api/timeline-snapshots` · `POST { label }` | any · writer | List baselines; create a named baseline from the current plan |
 | `GET /api/timeline-compare?from=<snapshotId \| YYYY-MM-DD>` | any | `{ baseline: { at, label, data }, net: Event[], path: Event[] (with reasons) }` |
@@ -471,4 +476,4 @@ step 4) are listed in the gap analysis §3; they are not changed by this plan.
 | The first push meets an Entra consent prompt («Need admin approval») or a stale token | The permission is on the app registration; the person consents at sign-in, or an admin grants it once with one command; the page says «Logg inn på nytt» instead of failing half-way; the dry run needs no token |
 | Progress from ADO needs stories with points, which need the discovery process to run | R4 starts with the manual field on day 10, so the traffic light works from the first sprint |
 | Plan JSON grows (snapshots per day) | ≤ 1 daily snapshot of a few tens of KB; named baselines on demand; a yearly clean-up of daily snapshots older than 12 months if ever needed |
-| Two editors in the forum at once | The field merge is unchanged; the history records `cause: flette` where a field came from the other client, so nothing silent happens |
+| Two editors in the forum at once | The field merge is unchanged; each save is diffed against the stored plan, so every change is logged under the editor who made it and nothing silent happens |
