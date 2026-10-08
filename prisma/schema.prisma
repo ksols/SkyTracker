@@ -188,6 +188,64 @@ model TimelineChange {
   @@index([at])
 }
 
+// ─────────────────────────────────────────────────────────────
+// Timeline history — one changeset per save, one event per
+// semantic change (features/timeline/events.ts), and plan
+// snapshots: one per day before the first change, plus named
+// baselines (R1b). TimelineChange above is the old log, unused.
+// ─────────────────────────────────────────────────────────────
+
+model TimelineChangeset {
+  id          String          @id @default(cuid())
+  at          DateTime        @default(now())
+  editor      String?
+  source      String          @default("bruker") // bruker | seed | import | ado | system
+  reason      String?
+  reasonCode  String?                            // utredning | avhengighet | … | annet | ingen (skipped)
+  planVersion Int
+  eventCount  Int             @default(0)
+  events      TimelineEvent[]
+
+  @@index([at])
+}
+
+model TimelineEvent {
+  id          String   @id @default(cuid())
+  changesetId String
+  at          DateTime @default(now())
+  editor      String?
+  targetType  String   // epic | feature | plan
+  targetId    String
+  targetLabel String
+  laneKey     String?
+  code        String   // epic.maldato, feature.spenn, …
+  before      Json?
+  after       Json?
+  cause       String   @default("bruker") // bruker | avhengighet | ado | system
+  causeRef    String?
+  summary     String
+
+  changeset TimelineChangeset @relation(fields: [changesetId], references: [id], onDelete: Cascade)
+
+  @@index([at])
+  @@index([laneKey, at])
+  @@index([targetId, at])
+}
+
+model TimelineSnapshot {
+  id          String   @id @default(cuid())
+  at          DateTime @default(now())
+  kind        String   // dag | baseline | sprint
+  day         String?  // YYYY-MM-DD in Europe/Oslo, set for kind = dag
+  label       String?
+  planVersion Int
+  data        Json
+  createdBy   String?
+
+  @@unique([kind, day])
+  @@index([at])
+}
+
 model BufferSnapshot {
   id          String   @id @default(cuid())
   week        String   // ISO-uke, f.eks. "2026-W33"
