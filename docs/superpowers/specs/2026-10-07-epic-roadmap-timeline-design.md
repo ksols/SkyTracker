@@ -68,9 +68,13 @@ served at `/timeline/epic-tools.js`, imported by the browser and by vitest. It h
 
 - **Left column:** epic header row (name, status chip, goal text, "+ Utredning" / "+ Estimert" buttons) and one
   row per feature (name; range text; chips: ADO link `#4742`, dependency count, last-editor initials).
-- **Chart:** month axis from Oct 2026; orange "I DAG" line; a dark goal-date line drawn only across the epic's own
-  rows; bars: discovery = hatched orange; estimate = dark blue to `endLikely` + light blue to `end`, with the
-  range label ("4–7 uker") right of the bar; dependency arrows as today. Legend as slide 23.
+- **Chart:** month axis from Oct 2026; red "I DAG" line; a goal-date line drawn only across the epic's own
+  rows; bars: discovery = hatched amber; estimate = dark blue (ocean-5) to `endLikely` + light blue to `end`, with
+  the range label ("4–7 uker") right of the bar; dependency arrows as today. Legend as slide 23.
+- **Styling:** the page follows SkyTracker's own look (`globals.css` + the board components): Arial, slate greys
+  with the ocean/skyblue palette, white cards with slate-300 borders and 4–6 px radii, ocean-5 primary buttons,
+  amber/green/red badges, dark mode via `prefers-color-scheme`. The top bar mirrors the board header and has a
+  "← SkyTracker" link back to `/`, the signed-in name and a "Lesetilgang" tag for readers.
 - **Interactions:** drag a bar to move it (dependents follow); handles: left = start, middle = likely end
   (estimate only), right = end. Snap to 0.25 month. Click a feature name -> editor (name, kind, start date,
   discovery end date or likely/late weeks, ADO id, dependency chips, "Koble avhengighet", delete). Click an
