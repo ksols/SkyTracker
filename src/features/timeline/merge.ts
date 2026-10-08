@@ -8,15 +8,17 @@
 // tombstones (`deleted[taskId] = version`, `deletedLanes[key] = version`):
 // a tombstone wins over an item whose version hasn't been bumped past it.
 
-export type TaskFieldGroup = "tid" | "label" | "deps" | "meta";
-export const TASK_FIELD_GROUPS: TaskFieldGroup[] = ["tid", "label", "deps", "meta"];
+export type TaskFieldGroup = "tid" | "label" | "deps" | "meta" | "state" | "est";
+export const TASK_FIELD_GROUPS: TaskFieldGroup[] = ["tid", "label", "deps", "meta", "state", "est"];
 
 // Which task properties belong to which field group.
 export const GROUP_PROPS: Record<TaskFieldGroup, string[]> = {
   tid: ["start", "end", "endLikely"],
   label: ["label"],
   deps: ["deps"],
-  meta: ["lane", "kind", "adoId", "order"],
+  meta: ["lane", "kind", "adoId", "order", "assignee"],
+  state: ["state", "committedRange", "activatedAt", "deliveredAt"],
+  est: ["raw", "bufferWeeks"],
 };
 
 export type PlanTask = {
@@ -30,6 +32,13 @@ export type PlanTask = {
   adoId?: number;
   deps?: string[];
   order?: number;
+  state?: "ny" | "utredes" | "klar" | "aktiv" | "levert";
+  assignee?: string;
+  raw?: { likely: number; late: number; source?: string; pulledAt?: string };
+  bufferWeeks?: number;
+  committedRange?: { likely: number; late: number; start: number };
+  activatedAt?: string;
+  deliveredAt?: string;
   fv?: Partial<Record<TaskFieldGroup, number>>;
   [key: string]: unknown;
 };
@@ -45,6 +54,10 @@ export type PlanLane = {
   priority?: number;
   metric?: string;
   externalDate?: boolean;
+  state?: "forslag" | "aktiv" | "avsluttet";
+  closedReason?: string;
+  closedAt?: string;
+  outcome?: "nådd" | "ikke nådd" | "endret";
 };
 
 export type Plan = {

@@ -71,6 +71,14 @@ describe("mergePlans - field-level versioning", () => {
     expect(mergePlans(stored, incoming).tasks[0]).toMatchObject({ lane: "y", order: 1 });
   });
 
+  it("state and est are their own groups; assignee rides with meta", () => {
+    const stored = plan([task({ id: "a", state: "klar", raw: { likely: 4, late: 6 }, fv: { state: 1, est: 1 } })]);
+    const incoming = plan([task({ id: "a", state: "aktiv", committedRange: { likely: 4, late: 6, start: 1 }, activatedAt: "2026-11-05", assignee: "THM", fv: { state: 2, meta: 1 } })]);
+    const m = mergePlans(stored, incoming).tasks[0];
+    expect(m).toMatchObject({ state: "aktiv", activatedAt: "2026-11-05", assignee: "THM", raw: { likely: 4, late: 6 } });
+    expect(m.fv).toMatchObject({ state: 2, est: 1, meta: 1 });
+  });
+
   it("lane tombstone removes an unedited lane and loses to a lane bumped past it", () => {
     const stored = plan([], { lanes: [{ key: "x", name: "Epic X", v: 1 }, { key: "y", name: "Epic Y", v: 1 }] });
     const removed = mergePlans(stored, plan([], { lanes: [], deletedLanes: { x: 1, y: 1 } }));
