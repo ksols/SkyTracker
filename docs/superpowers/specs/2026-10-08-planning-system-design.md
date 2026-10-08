@@ -88,6 +88,10 @@ sprints (progress) → delivered. Every step leaves a record.
    the price shown first). A separate forum page is not built unless the shelf proves too small.
 7. **Each release is usable on its own**, behind the same login and roles as today, with its migration shipped by
    `vercel-build` (`prisma migrate deploy`). No step depends on a later one to be useful.
+8. **Capacity is the planners' judgement** (GO 08.10). A feature is placed in time from its estimate and who is free;
+   only then does the colour show whether the goal date holds. Adding an epic moves nothing by itself, and there is no
+   limit on how many epics are active: the tool shows a count, never a warning. The queue rule in R5 computes a start
+   from blockers and the same developer's earlier work, and a person can always override it.
 
 ## 3. Target data model
 
@@ -106,7 +110,7 @@ and when it arrives. Fields marked R0 exist today.
 | `priority` | number | Order on the timeline, 1 = top. A **priority shift** is a change of this number | R1a |
 | `metric` | text | Måltall, shown under the name | R1a |
 | `externalDate` | bool | «Ekstern dato» badge; darker header (NSR, Telenor, revisjon) | R1a |
-| `state` | `forslag` \| `aktiv` \| `avsluttet` | Proposal until produktforum chooses it; summary «2 aktive av 7», soft warning above 3 | R2 |
+| `state` | `forslag` \| `aktiv` \| `avsluttet` | Proposal until produktforum chooses it; the page shows how many are active, with no limit and no warning (GO 08.10: capacity is the planners' judgement, not a count) | R2 |
 | `closedReason`, `closedAt`, `outcome` | text, ISO, `nådd` \| `ikke nådd` \| `endret` | The «nei» case and the investor's målopnåelse | R2 (fields), R6 (reports) |
 | `ado` | `{ pushedAt, snapshot }` | What the last push wrote (conflict detection) | R3 |
 
@@ -365,8 +369,9 @@ Scope: `state` on features with the transitions and the actions «Start utrednin
 date), «Klar for veikart» (sets the range; discovery → estimate), «Legg i epic» (sets `lane`, `order`, `state:
 aktiv`, writes `committedRange` and `activatedAt`); the `_backlog` lane drawn as a collapsible shelf under the chart
 («Klar for veikart»: range, spec link, dependencies) with drag into an epic and a **price preview** (the target
-epic's new colour and the features that move, computed on a cloned plan before the drop is confirmed); epic
-`state` forslag / aktiv / avsluttet with `closedReason` and `outcome`, summary «2 aktive av 7»; `raw` + `bufferWeeks`
+epic's new colour where the feature lands, computed on a cloned plan before the drop is confirmed; nothing else moves
+until the queue rule in R5 exists, and the preview says so); epic `state` forslag / aktiv / avsluttet with
+`closedReason` and `outcome`, a plain count of active epics with no limit; `raw` + `bufferWeeks`
 with the label «4–6 uker + 1 uke buffer» and the editor field «Buffer (uker)»; «Hent estimat fra utredningen»
 button wired to a stub that shows old → new (the Specs reader lands in R3); S/M/L/XL class from the discovery's
 duration; new merge groups `state`, `est`. Every transition is an event (`feature.tilstand`, `feature.estimert`,
