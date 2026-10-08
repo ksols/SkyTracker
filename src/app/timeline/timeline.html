@@ -406,6 +406,10 @@
   .preview{font-size:13px;padding:10px 12px;border-radius:6px;background:var(--bg);border:1px solid var(--line-soft);margin:0 20px 16px}
   .preview b.st-gronn{color:var(--ok-fg)} .preview b.st-gul{color:var(--warn-fg)} .preview b.st-rod{color:var(--bad-fg)}
   .lane-label .chip.preview-chip{background:var(--accent);color:#fff}
+  .lane-label.closed{opacity:.55}
+  .lane-label.closed .ln{text-decoration:line-through}
+  .lane-label.proposal .ln{font-style:italic}
+  .chip.st-forslag{background:var(--badge-bg);color:var(--badge-fg);border:1px dashed var(--text-4)}
 
   footer{
     margin-top:24px;display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap;
@@ -474,6 +478,14 @@
         <p>Hver lagring logges: hvem, når, hva. Flytter du en måldato, utvider et spenn, flytter en feature senere eller endrer
         prioritet, spør siden <b>hvorfor</b>. Svaret følger endringen i <b>Historikk</b>. Du kan lagre uten begrunnelse; de mangler da i
         tellingen på knappen til du fyller dem inn.</p></div>
+      <div class="help-card"><h4>Hylla og livssyklusen</h4>
+        <p>Et ønske forumet har sagt ja til <b>registreres</b> på hylla «Klar for veikart». <b>Start utredning</b> gir det én eier og en
+        sluttdato. <b>Klar for veikart</b> setter byggetiden fra utredningen. <b>Legg i epic</b> viser prisen først: fargen epicen får.
+        Da blir featuren aktiv med et lovet spenn. Epics er <b>forslag</b> til forumet velger dem, og kan <b>avsluttes</b> med et utfall.</p></div>
+      <div class="help-card"><h4>Buffer og rått estimat</h4>
+        <p>Spennet på linjen er det planlagte: utredningens tall pluss forumets <b>buffer</b> («4–6 uker + 1 uke buffer»). Det
+        rå estimatet står urørt, så gjennomføringsevnen måles mot det som ble lovet. Antall aktive epics er et tall, ikke en grense:
+        kapasiteten er planleggernes vurdering.</p></div>
       <div class="help-card"><h4>Prioritet</h4>
         <p>Rekkefølgen på epicene er prioriteten produktforum har satt; rekkefølgen i en epic er byggerekkefølgen. Dra i <b>⋮⋮</b>
         for å flytte en rad, eller sett tallet i redigeringen. Dra en feature til en annen epic for å flytte den dit. En utredning
@@ -565,6 +577,11 @@
           <label class="ed-field" id="edLateField"><span>Senest (uker)</span><input id="edLate" type="number" min="1" step="1"></label>
         </div>
         <label class="ed-field"><span>ADO-id (Feature)</span><input id="edAdo" type="number" min="1" step="1" placeholder="f.eks. 4742"></label>
+        <div class="ed-row">
+          <label class="ed-field"><span>Eier (initialer)</span><input id="edOwner" type="text" placeholder="THM"></label>
+          <label class="ed-field" id="edBufferField"><span>Buffer (uker)</span><input id="edBuffer" type="number" min="0" step="1"></label>
+        </div>
+        <div class="ed-row" id="edPullRow"><button class="ghost" type="button" id="edPull" title="Henter det rå estimatet fra Skytale.Specs (etappe 4)">Hent estimat fra utredningen</button></div>
         <div class="ed-field"><span>Venter på (blokkere)</span><div class="ed-deps" id="edDeps"></div></div>
         <div class="ed-row"><button class="ghost" type="button" id="edLink">Koble avhengighet …</button></div>
       </div>
@@ -594,6 +611,11 @@
         <label class="ed-check"><input type="checkbox" id="epExternal"> Ekstern dato (NSR, Telenor, revisjon) – datoen er satt utenfra</label>
         <label class="ed-field"><span>ADO-id (Epic)</span><input id="epAdo" type="number" min="1" step="1" placeholder="valgfritt"></label>
         <label class="ed-field"><span>Prioritet (1 = øverst på tidslinjen)</span><input id="epPriority" type="number" min="1" step="1"></label>
+        <div class="ed-row">
+          <label class="ed-field"><span>Tilstand</span><select id="epState"><option value="forslag">Forslag – ikke valgt ennå</option><option value="aktiv">Aktiv – valgt i produktforum</option><option value="avsluttet">Avsluttet</option></select></label>
+          <label class="ed-field" id="epOutcomeField"><span>Utfall</span><select id="epOutcome"><option value="nådd">Måltallet nådd</option><option value="ikke nådd">Ikke nådd</option><option value="endret">Endret underveis</option></select></label>
+        </div>
+        <label class="ed-field" id="epClosedField"><span>Hvorfor avsluttet (kort)</span><input id="epClosedReason" type="text"></label>
       </div>
     </div>
     <div class="modal-foot">
@@ -892,7 +914,7 @@ window.__bootTimeline = function(){
       const st = epicStatus(state, lane.key);
       const hasGoal = typeof lane.goalDate === 'number';
 
-      const ll = el('div', 'lane-label' + (lane.externalDate ? ' ext' : ''));
+      const ll = el('div', 'lane-label' + (lane.externalDate ? ' ext' : '') + (lane.state === 'avsluttet' ? ' closed' : lane.state === 'forslag' ? ' proposal' : ''));
       ll.dataset.key = lane.key;
       const ln = el('span', 'ln', lane.name);
       ln.title = 'Klikk for å redigere epicen';
@@ -900,7 +922,10 @@ window.__bootTimeline = function(){
       const lm = el('div', 'lm');
       const overdue = laneTasks(lane.key).filter(t => discoveryOverdue(t, todayUnit())).length;
       const win = epicWindowText(state, lane.key);
-      lm.innerHTML = '<span class="chip st-' + st.code + '">' + esc(STATUS_LABEL[st.code]) + '</span>' +
+      const stateChip = lane.state === 'avsluttet'
+        ? '<span class="chip" title="Epicen er avsluttet">Avsluttet: ' + esc(lane.outcome || 'uten utfall') + '</span>'
+        : (lane.state === 'forslag' ? '<span class="chip st-forslag" title="Ikke valgt i produktforum ennå">Forslag</span>' : '') + '<span class="chip st-' + st.code + '">' + esc(STATUS_LABEL[st.code]) + '</span>';
+      lm.innerHTML = stateChip +
         (lane.externalDate ? '<span class="chip ext-chip" title="Datoen er satt utenfra">Ekstern dato</span>' : '') +
         (overdue ? '<span class="chip st-gul">' + overdue + ' utredning' + (overdue > 1 ? 'er' : '') + ' forsinket</span>' : '') +
         '<span class="goal">' + esc((win ? win + ' · ' : '') + goalText(lane)) + '</span>' +
@@ -1128,9 +1153,11 @@ window.__bootTimeline = function(){
   function updateTlSummary(){
     const n = { gronn:0, gul:0, rod:0, venter:0, other:0 };
     state.lanes.forEach(l => { const c = epicStatus(state, l.key).code; if(n[c] !== undefined) n[c]++; else n.other++; });
+    const c = epicCounts(state);   // et antall, aldri en grense: kapasitet er planleggernes vurdering
     tlSummary.innerHTML = state.lanes.length
       ? '<span><i class="st-gronn"></i>' + n.gronn + '</span><span><i class="st-gul"></i>' + n.gul + '</span>' +
-        '<span><i class="st-rod"></i>' + n.rod + '</span><span><i></i>' + (n.venter + n.other) + ' venter</span>'
+        '<span><i class="st-rod"></i>' + n.rod + '</span><span><i></i>' + (n.venter + n.other) + ' venter</span>' +
+        '<span title="Epics etter tilstand">' + c.aktiv + ' aktive · ' + c.forslag + ' forslag · ' + c.avsluttet + ' avsluttet</span>'
       : '';
   }
 
@@ -1703,6 +1730,10 @@ window.__bootTimeline = function(){
     $('edLikely').value = r.likely;
     $('edLate').value = r.late;
     $('edAdo').value = t.adoId || '';
+    $('edOwner').value = t.assignee || '';
+    $('edBuffer').value = t.bufferWeeks || 0;
+    $('edBufferField').hidden = t.kind !== 'estimate';
+    $('edPullRow').hidden = !HOSTED;
     $('edDeps').innerHTML = t.deps.length ? t.deps.map(d => {
       const p = getTask(d);
       return '<span class="depchip" data-id="' + esc(d) + '">⇠ ' + esc(p ? p.label : d) + ' <button type="button" title="Fjern avhengigheten">×</button></span>';
@@ -1759,6 +1790,18 @@ window.__bootTimeline = function(){
     const ado = parseInt($('edAdo').value, 10);
     const newAdo = isFinite(ado) && ado > 0 ? ado : undefined;
     if(t.adoId !== newAdo){ if(newAdo) t.adoId = newAdo; else delete t.adoId; touch(t, 'meta'); }
+    const owner = $('edOwner').value.trim();
+    if((t.assignee || '') !== owner){ if(owner) t.assignee = owner; else delete t.assignee; touch(t, 'meta'); }
+    if(t.kind === 'estimate'){
+      const buf = Math.max(0, parseInt($('edBuffer').value, 10) || 0);
+      if((t.bufferWeeks || 0) !== buf){
+        const r0 = rangeWeeks(t), oldBuf = t.bufferWeeks || 0;
+        if(buf) t.bufferWeeks = buf; else delete t.bufferWeeks;
+        touch(t, 'est');
+        // bufferen legges på begge ender av spennet; det rå estimatet (raw) står urørt
+        t.endLikely = t.start + (r0.likely - oldBuf + buf) * WEEK; t.end = t.start + (r0.late - oldBuf + buf) * WEEK; touch(t, 'tid');
+      }
+    }
     const keep = [...document.querySelectorAll('#edDeps .depchip')].map(c => c.dataset.id);
     if(keep.length !== t.deps.length){ t.deps = t.deps.filter(d => keep.includes(d)); touch(t, 'deps'); }
     const newLane = $('edLane').value;
@@ -1774,6 +1817,15 @@ window.__bootTimeline = function(){
   $('edClose').addEventListener('click', closeEditor);
   editorBack.addEventListener('click', e => { if(e.target === editorBack) closeEditor(); });
   $('edLink').addEventListener('click', () => { const id = editorTaskId; closeEditor(); startLink(id); });
+  $('edPull').addEventListener('click', async () => {   // etappe 4 fyller ruten; nå svarer den med en melding
+    const t = getTask(editorTaskId); if(!t) return;
+    try{
+      const r = await fetch('api/specs-estimate?id=' + encodeURIComponent(t.id), {cache:'no-store'});
+      const j = await r.json();
+      if(r.ok && j.raw){ $('edLikely').value = j.raw.likely; $('edLate').value = j.raw.late; }
+      else askDialog('Hent estimat fra utredningen', j.message || 'Ikke tilgjengelig ennå.', {confirmText:'OK', noCancel:true});
+    }catch(e){ askDialog('Hent estimat fra utredningen', 'Fikk ikke kontakt med Skytale.Specs.', {confirmText:'OK', noCancel:true}); }
+  });
   $('edDelete').addEventListener('click', async () => {
     const t = getTask(editorTaskId);
     if(!t) return;
@@ -1789,7 +1841,7 @@ window.__bootTimeline = function(){
   let epicKey = null;
   function addEpic(){
     const key = 'e' + Date.now().toString(36) + Math.random().toString(36).slice(2, 4);
-    state.lanes.push({ key, name: 'Ny epic', owner: OWNER_DEFAULT, v: 1 });
+    state.lanes.push({ key, name: 'Ny epic', owner: OWNER_DEFAULT, v: 1, state: 'forslag' });   // et forslag til forumet velger det
     state.example = false;   // eksplisitt false: en slettet nøkkel overlever flettingen på serveren
     save(); render();
     openEpicEditor(key);
@@ -1807,10 +1859,16 @@ window.__bootTimeline = function(){
     $('epMetric').value = l.metric || '';
     $('epExternal').checked = !!l.externalDate;
     $('epPriority').value = state.lanes.findIndex(v => v.key === key) + 1;
+    $('epState').value = l.state || 'aktiv';
+    $('epOutcome').value = l.outcome || 'nådd';
+    $('epClosedReason').value = l.closedReason || '';
+    paintEpState();
     epicBack.classList.add('open');
     setTimeout(() => $('epName').focus(), 0);
   }
   function closeEpicEditor(){ epicKey = null; epicBack.classList.remove('open'); }
+  function paintEpState(){ const closed = $('epState').value === 'avsluttet'; $('epOutcomeField').hidden = !closed; $('epClosedField').hidden = !closed; }
+  $('epState').addEventListener('change', paintEpState);
   $('epSave').addEventListener('click', () => {
     const l = getLane(epicKey);
     if(!l){ closeEpicEditor(); return; }
@@ -1832,6 +1890,21 @@ window.__bootTimeline = function(){
     if((l.metric || '') !== metric){ if(metric) l.metric = metric; else delete l.metric; changed = true; }
     const ext = $('epExternal').checked;
     if(ext !== !!l.externalDate){ if(ext) l.externalDate = true; else delete l.externalDate; changed = true; }
+    const newState = $('epState').value, oldState = l.state || 'aktiv';
+    if(newState !== oldState || (newState === 'avsluttet' && (($('epOutcome').value !== l.outcome) || ($('epClosedReason').value.trim() !== (l.closedReason || ''))))){
+      l.state = newState;
+      if(newState === 'avsluttet'){
+        l.outcome = $('epOutcome').value;
+        const why = $('epClosedReason').value.trim();
+        if(why) l.closedReason = why; else delete l.closedReason;
+        if(!l.closedAt || newState !== oldState) l.closedAt = new Date().toISOString().slice(0, 10);
+        lines.push(l.name + ': avsluttet (' + l.outcome + ')');
+      } else {
+        delete l.outcome; delete l.closedReason; delete l.closedAt;
+        lines.push(l.name + (newState === 'aktiv' ? ': valgt i produktforum' : ': tilbake til forslag'));
+      }
+      changed = true;
+    }
     const pri = parseInt($('epPriority').value, 10);
     const cur = state.lanes.findIndex(v => v.key === epicKey) + 1;
     if(isFinite(pri) && pri >= 1 && pri !== cur){
