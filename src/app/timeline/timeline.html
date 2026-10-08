@@ -364,6 +364,21 @@
   .chip.ext-chip{background:var(--text);color:var(--surface)}
   .lane-label .metric{color:var(--text-3);overflow:hidden;text-overflow:ellipsis;min-width:0}
 
+  /* ---------- sammenligning ---------- */
+  .cmp-bar{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin:12px 0 0;padding:8px 12px;border:1px solid var(--accent);border-radius:6px;background:var(--accent-soft);font-size:12px;color:var(--text)}
+  .cmp-bar[hidden]{display:none}
+  .cmp-bar b{font-weight:600}
+  .cmp-bar .sp{flex:1}
+  .cmp-list{margin:8px 0 0;border:1px solid var(--line);border-radius:6px;background:var(--surface);padding:10px 14px;font-size:13px}
+  .cmp-list[hidden]{display:none}
+  .cmp-list h4{font-size:12px;font-weight:600;margin:10px 0 4px;color:var(--text)}
+  .cmp-list h4:first-child{margin-top:0}
+  .cmp-list .row{display:flex;gap:8px;align-items:baseline;flex-wrap:wrap;padding:2px 0 2px 10px;border-left:2px solid var(--line-soft)}
+  .cmp-list .row .who{font-size:11px;color:var(--text-3)}
+  .cmp-list .empty{color:var(--text-4)}
+  #cmpSelect,#cmpDate{font:inherit;font-size:12px;padding:5px 8px;border:1px solid var(--line);border-radius:4px;background:var(--input-bg);color:var(--text);max-width:240px}
+  #cmpDate[hidden],#cmpSelect[hidden]{display:none}
+
   footer{
     margin-top:24px;display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap;
     font-size:11px;color:var(--text-4);border-top:1px solid var(--line-soft);padding-top:12px;
@@ -386,6 +401,9 @@
     <span class="save-note" id="dirtyNote"></span>
     <span class="whoami" id="whoami"></span>
     <span class="ro-tag" id="roTag" hidden>Lesetilgang</span>
+    <button id="baselineBtn" title="Lagre planen slik den er nå, som et punkt å sammenligne med">Merk baseline…</button>
+    <select id="cmpSelect" title="Sammenlign planen med et tidligere punkt"><option value="">Sammenlign med …</option></select>
+    <input id="cmpDate" type="date" hidden title="Planen slik den var om morgenen denne dagen">
     <button id="exportBtn">Eksporter (JSON)</button>
     <button id="histBtn" title="Hva har flyttet seg, og hvorfor">Historikk<span class="count" id="histBadge" hidden></span></button>
     <button id="helpBtn">Hjelp</button>
@@ -439,6 +457,14 @@
     <span id="linkText"></span>
     <button id="linkCancel">Avbryt (Esc)</button>
   </div>
+
+  <div class="cmp-bar" id="cmpBar" hidden>
+    <span id="cmpStrip"></span><span class="sp"></span>
+    <button id="cmpSince">Siden sist</button>
+    <button id="cmpExport" title="Kopier listen som tekst (markdown)">Eksporter</button>
+    <button class="text" id="cmpClose">Avslutt sammenligning</button>
+  </div>
+  <div class="cmp-list" id="cmpList" hidden></div>
 
   <div class="legend">
     <span><i class="sw discovery"></i>Utredning</span>
@@ -1162,7 +1188,7 @@ window.__bootTimeline = function(){
       $('dlgMsg').textContent = msg;
       const inp = $('dlgInput');
       inp.hidden = !opts.input;
-      inp.value = '';
+      inp.value = opts.value || '';
       inp.placeholder = opts.placeholder || '';
       const yes = $('dlgYes');
       yes.textContent = opts.confirmText || 'OK';
@@ -1326,6 +1352,106 @@ window.__bootTimeline = function(){
   $('histBtn').addEventListener('click', () => histDrawer.hidden ? openHistory() : (histDrawer.hidden = true));
   $('epHistory').addEventListener('click', () => { const k = epicKey; closeEpicEditor(); openHistory({ lane: k }); });
   $('edHistory').addEventListener('click', () => { const id = editorTaskId; closeEditor(); openHistory({ target: id }); });
+
+  /* ================== baseline og sammenligning ================== */
+  const cmpBar = $('cmpBar'), cmpStrip = $('cmpStrip'), cmpList = $('cmpList'), cmpSelect = $('cmpSelect'), cmpDate = $('cmpDate');
+  let cmp = null;   // { id, label, at, lanes, tasks, strip, path, exportText } når sammenligning er på
+  $('baselineBtn').hidden = !HOSTED; cmpSelect.hidden = !HOSTED;
+  function defaultBaselineLabel(){ const d = new Date(); return 'Produktforum ' + d.getDate() + '. ' + MND_S[d.getMonth()]; }
+  async function loadSnapshots(){
+    if(!HOSTED) return;
+    try{
+      const r = await fetch('api/timeline-snapshots', {cache:'no-store'});
+      if(!r.ok) return;
+      const list = (await r.json()).snapshots.filter(s => s.kind === 'baseline');
+      const cur = cmp ? cmp.id : '';
+      cmpSelect.innerHTML = '<option value="">Sammenlign med …</option>' +
+        list.map(s => '<option value="' + esc(s.id) + '">' + esc(s.label) + ' · ' + esc(fmtDate(new Date(s.at))) + '</option>').join('') +
+        '<option value="__date">Dato …</option>';
+      cmpSelect.value = cur;
+    }catch(e){}
+  }
+  $('baselineBtn').addEventListener('click', async () => {
+    const label = await askDialog('Merk baseline', 'Planen slik den er nå lagres som et punkt å sammenligne med.', {input:true, placeholder:'Produktforum 5. nov', confirmText:'Lagre', value: defaultBaselineLabel()});
+    if(label === false || label === null) return;
+    const text = String(label).trim() || defaultBaselineLabel();
+    try{
+      const r = await fetch('api/timeline-snapshots', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ label: text })});
+      if(!r.ok) throw new Error('HTTP ' + r.status);
+      setSaveNote('baseline «' + text + '» lagret');
+      await loadSnapshots();
+      refreshHistoryBadge();
+    }catch(e){ askDialog('Kunne ikke lagre baselinen', 'Prøv igjen om litt.', {confirmText:'OK', noCancel:true}); }
+  });
+  async function startCompare(from){
+    try{
+      const r = await fetch('api/timeline-compare?from=' + encodeURIComponent(from), {cache:'no-store'});
+      const j = await r.json();
+      if(!r.ok){ endCompare(); askDialog('Ingen sammenligning', j.message || 'Fant ingen plan å sammenligne med.', {confirmText:'OK', noCancel:true}); return; }
+      const base = normalizePlan(JSON.parse(JSON.stringify(j.baseline.data)));
+      cmp = {
+        id: j.baseline.id, at: j.baseline.at, label: j.baseline.label || fmtDate(new Date(j.baseline.at)),
+        lanes: Object.fromEntries(base.lanes.map(l => [l.key, l])), tasks: Object.fromEntries(base.tasks.map(t => [t.id, t])),
+        strip: j.strip, path: j.path, exportText: j.exportText,
+      };
+      renderCompareBar();
+      render();
+    }catch(e){ endCompare(); setSaveNote('kunne ikke hente sammenligningen'); }
+  }
+  async function refreshCompare(){ if(cmp) await startCompare(cmp.id); }
+  function endCompare(){
+    cmp = null;
+    cmpBar.hidden = true; cmpList.hidden = true;
+    cmpSelect.value = ''; cmpDate.hidden = true;
+    render();
+  }
+  function renderCompareBar(){
+    cmpBar.hidden = false;
+    cmpStrip.innerHTML = '<b>' + esc(cmp.strip) + '</b>';
+    if(!cmpList.hidden) renderCompareList();
+  }
+  function renderCompareList(){
+    const byLane = new Map();
+    cmp.path.forEach(e => {
+      const key = e.laneKey || '';
+      if(!byLane.has(key)) byLane.set(key, []);
+      byLane.get(key).push(e);
+    });
+    if(!cmp.path.length){ cmpList.innerHTML = '<div class="empty">Ingen endringer siden ' + esc(cmp.label) + '.</div>'; return; }
+    let html = '';
+    byLane.forEach((evs, key) => {
+      const lane = key ? (getLane(key) || cmp.lanes[key]) : null;
+      html += '<h4>' + esc(lane ? lane.name : 'Planen') + '</h4>' + evs.map(e => {
+        const cs = e.changeset || {};
+        const why = e.cause === 'avhengighet' ? '<span class="chip cause">avhengighet' + (e.causeRef ? ': ' + esc((getTask(e.causeRef) || cmp.tasks[e.causeRef] || {label: e.causeRef}).label) : '') + '</span>'
+          : cs.reasonCode && cs.reasonCode !== 'ingen' ? '<span class="chip reason">' + esc(REASON_LABEL[cs.reasonCode] || cs.reasonCode) + (cs.reason ? ' – ' + esc(cs.reason) : '') + '</span>'
+          : cs.reasonCode === 'ingen' ? '<span class="chip reason missing">Begrunnelse mangler</span>' : '';
+        return '<div class="row"><span>' + (e.targetType === 'feature' ? esc(e.targetLabel) + ': ' : '') + esc(e.summary) + '</span>' + why +
+          '<span class="who">' + esc(cs.editor || e.editor || 'system') + ' · ' + esc(fmtWhen(cs.at || e.at)) + '</span></div>';
+      }).join('');
+    });
+    cmpList.innerHTML = html;
+  }
+  cmpSelect.addEventListener('change', () => {
+    const v = cmpSelect.value;
+    if(v === '__date'){ cmpDate.hidden = false; cmpDate.value = ''; setTimeout(() => cmpDate.focus(), 0); return; }
+    cmpDate.hidden = true;
+    if(!v){ endCompare(); return; }
+    startCompare(v);
+  });
+  cmpDate.addEventListener('change', () => { if(cmpDate.value) startCompare(cmpDate.value); });
+  $('cmpSince').addEventListener('click', () => { cmpList.hidden = !cmpList.hidden; if(!cmpList.hidden) renderCompareList(); });
+  $('cmpClose').addEventListener('click', endCompare);
+  $('cmpExport').addEventListener('click', async () => {
+    if(!cmp) return;
+    try{
+      await navigator.clipboard.writeText(cmp.exportText);
+      setSaveNote('«Siden sist» kopiert som tekst');
+    }catch(e){
+      downloadFile('siden-' + cmp.label.replace(/[^\wæøåÆØÅ-]+/g, '-').toLowerCase() + '.md', cmp.exportText, 'text/markdown');
+      setSaveNote('«Siden sist» lastet ned som tekst');
+    }
+  });
 
   /* ================== feature-editor ================== */
   let editorTaskId = null;
@@ -1528,6 +1654,7 @@ window.__bootTimeline = function(){
     pendingTouch.clear();     // dytt fra fletting er ikke en egen redigering
     render();
     applyingRemote = false;
+    if(cmp) refreshCompare();
   }
   async function initServerPlan(){
     if(!HOSTED) return;
@@ -1543,6 +1670,7 @@ window.__bootTimeline = function(){
       roTag.hidden = canWrite;
       whoami.textContent = myName || '';
       refreshHistoryBadge();
+      loadSnapshots();
       if(j.plan){
         applyRemote(j.plan.data, j.plan.version);
         setSaveNote('delt plan lastet' + (canWrite ? '' : ' – kun lesetilgang'));
@@ -1578,6 +1706,7 @@ window.__bootTimeline = function(){
       if(!r.ok) throw new Error('HTTP ' + r.status);
       const j = await r.json();
       refreshHistoryBadge();
+      if(cmp) refreshCompare();
       const tid = new Date().toLocaleTimeString('nb-NO', {hour:'2-digit', minute:'2-digit'});
       if(drag || colDrag){
         // brukeren drar: ikke bytt ut tilstanden under hånden. serverVersion holdes gammel,
@@ -1682,6 +1811,7 @@ window.__bootTimeline = function(){
     else if(dlgBack.classList.contains('open')) dlgClose(false);
     else if(editorBack.classList.contains('open')) closeEditor();
     else if(epicBack.classList.contains('open')) closeEpicEditor();
+    else if(cmp && !cmpList.hidden) cmpList.hidden = true;
     else if(!histDrawer.hidden) histDrawer.hidden = true;
     else if(linkSource) cancelLink();
     else if(helpPanel.classList.contains('open')) helpPanel.classList.remove('open');
