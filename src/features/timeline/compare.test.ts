@@ -59,6 +59,8 @@ describe("exportMarkdown", () => {
     expect(md).toContain("## Begrunnelser mangler\n- 6. nov, THM: Spenn: 4–7 → 4–9 uker (utvidet 2 uker); Flyttet 2 uker av avhengighet «IAM»");
     expect(md).not.toContain("## Prioritet");
     expect(exportMarkdown("Siden 5. nov", "Siden 5. nov: ingen endringer", [], () => "")).toBe("# Siden 5. nov\n\nSiden 5. nov: ingen endringer\n");
+    const shelfMd = exportMarkdown("Siden 5. nov", "x", [path({ code: "feature.tilstand", laneKey: "_backlog", targetLabel: "Kontaktkort", summary: "Klar for veikart" })], (k) => k);
+    expect(shelfMd).toContain("- Klar for veikart › Kontaktkort: Klar for veikart");   // the shelf's key never leaks into the export
   });
 });
 

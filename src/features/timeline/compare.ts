@@ -58,13 +58,15 @@ export function sinceLabel(b: { kind: string; label: string | null; at: string |
 
 const SECTIONS: [string, PlanEvent["code"][]][] = [
   ["Måldatoer", ["epic.maldato"]],
-  ["Spenn", ["feature.spenn", "feature.estimert"]],
+  ["Spenn", ["feature.spenn", "feature.estimert", "feature.buffer", "feature.raw"]],
   ["Flyttet", ["feature.flyttet", "feature.utredning-slutt"]],
   ["Prioritet", ["epic.prioritet", "feature.prioritet", "feature.epic"]],
+  ["Tilstand", ["epic.tilstand", "feature.tilstand", "feature.eier"]],
   ["Nye og fjernet", ["epic.ny", "epic.slettet", "feature.ny", "feature.slettet", "feature.utredning"]],
 ];
+const SHELF_NAME = "Klar for veikart";   // the reserved lane key never leaks into a text people read
 export function exportMarkdown(title: string, strip: string, path: PathEvent[], laneName: (key: string) => string): string {
-  const where = (e: PathEvent) => (e.targetType === "feature" && e.laneKey ? laneName(e.laneKey) + " › " : "") + e.targetLabel;
+  const where = (e: PathEvent) => (e.targetType === "feature" && e.laneKey ? (e.laneKey === "_backlog" ? SHELF_NAME : laneName(e.laneKey)) + " › " : "") + e.targetLabel;
   const why = (e: PathEvent) => {
     if (e.cause === "avhengighet") return "avhengighet";
     const c = e.changeset?.reasonCode;
