@@ -378,6 +378,13 @@
   .cmp-list .empty{color:var(--text-4)}
   #cmpSelect,#cmpDate{font:inherit;font-size:12px;padding:5px 8px;border:1px solid var(--line);border-radius:4px;background:var(--input-bg);color:var(--text);max-width:240px}
   #cmpDate[hidden],#cmpSelect[hidden]{display:none}
+  .bar.ghost{opacity:.35;pointer-events:none;z-index:1;cursor:default;filter:none}
+  .bar.ghost .h{display:none}
+  .goal-line.ghost{background:none;border-left:2px dashed var(--goal);opacity:.6;z-index:2}
+  .task-label.gone .t{text-decoration:line-through;color:var(--text-4)}
+  .task-label.gone .d{color:var(--text-4)}
+  .row.gone{background:repeating-linear-gradient(135deg,transparent 0 6px,var(--line-soft) 6px 7px)}
+  .chip.new{background:var(--ado-bg);color:var(--ado-fg)}
 
   footer{
     margin-top:24px;display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap;
@@ -772,6 +779,18 @@ window.__bootTimeline = function(){
   function clearDropMarks(){
     labels.querySelectorAll('.drop-before,.drop-after,.drop-into,.dragging-row').forEach(x => x.classList.remove('drop-before', 'drop-after', 'drop-into', 'dragging-row'));
   }
+  function ghostBar(t){   // en falmet kopi av linjen slik den sto i baselinen
+    const g = el('div', 'bar ghost ' + t.kind);
+    g.dataset.id = t.id;
+    const left = x(t.start), width = Math.max(14, (t.end - t.start) * MONTH_W);
+    g.style.left = left + 'px'; g.style.width = width + 'px';
+    if(t.kind === 'estimate'){
+      const lw = Math.max(0, Math.min(width, (t.endLikely - t.start) * MONTH_W));
+      g.innerHTML = '<div class="seg likely" style="width:' + lw + 'px"></div><div class="seg late" style="width:' + Math.max(0, width - lw) + 'px"></div>';
+    }
+    g.title = 'Baseline: ' + rangeText(t);
+    return g;
+  }
   function render(){
     showEmpty();
     exampleBadge.hidden = !state.example;
@@ -874,6 +893,12 @@ window.__bootTimeline = function(){
         gt.style.left = x(lane.goalDate) + 'px';
         lb.appendChild(gt);
       }
+      if(cmp){
+        const bl = cmp.lanes[lane.key];
+        if(bl && typeof bl.goalDate === 'number' && (!hasGoal || Math.abs(bl.goalDate - lane.goalDate) > 1e-9)){
+          const gg = el('div', 'goal-line ghost'); gg.style.left = x(bl.goalDate) + 'px'; gg.title = 'Baseline: ' + goalText(bl); lb.appendChild(gg);
+        }
+      }
       chart.appendChild(lb);
 
       laneTasks(lane.key).forEach(t => {
@@ -928,12 +953,30 @@ window.__bootTimeline = function(){
         bar.innerHTML = (t.kind === 'estimate' ? '<div class="seg likely"></div><div class="seg late"></div>' : '') +
           '<div class="h l"></div><span class="bl">' + esc(t.label) + '</span>' +
           (t.kind === 'estimate' ? '<div class="h m"></div>' : '') + '<div class="h r"></div>';
+        if(cmp){
+          const bt = cmp.tasks[t.id];
+          if(bt && bt.lane === t.lane && (Math.abs(bt.start - t.start) > 1e-9 || Math.abs(bt.end - t.end) > 1e-9 || Math.abs((bt.endLikely || 0) - (t.endLikely || 0)) > 1e-9)) row.appendChild(ghostBar(bt));
+          if(!bt) tt.insertAdjacentHTML('beforeend', ' <span class="chip new" title="Fantes ikke i baselinen">ny</span>');
+        }
         row.appendChild(bar);
         const rl = el('div', 'range-lbl');
         row.appendChild(rl);
         chart.appendChild(row);
         barRefs[t.id] = bar; rowRefs[t.id] = row; rangeRefs[t.id] = rl;
       });
+      if(cmp){   // features som fantes i baselinen, men er fjernet: en gjennomstreket rad med spøkelset
+        const liveIds = new Set(state.tasks.map(t => t.id));
+        Object.values(cmp.tasks).filter(bt => bt.lane === lane.key && !liveIds.has(bt.id)).forEach(bt => {
+          const tl = el('div', 'task-label gone');
+          tl.dataset.id = bt.id;
+          tl.innerHTML = '<span class="t">' + esc(bt.label) + '</span><span class="d">Fjernet siden baselinen · ' + esc(rangeText(bt)) + '</span>';
+          labels.appendChild(tl);
+          const row = el('div', 'row gone');
+          row.style.width = CHART_W + 'px';
+          row.appendChild(ghostBar(bt));
+          chart.appendChild(row);
+        });
+      }
     });
 
     // piler (sist = tegnes øverst)
