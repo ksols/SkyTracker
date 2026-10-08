@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>SkyTracker – Veikart</title>
+<title>SkyTracker – Tidslinjen</title>
 <link rel="icon" href="/icon.svg" type="image/svg+xml">
 <style>
   /* Fonts, colours and controls follow SkyTracker (src/app/globals.css + the board components):
@@ -360,6 +360,9 @@
   #histBtn{position:relative}
   .count{position:absolute;top:-7px;right:-7px;min-width:18px;height:18px;padding:0 5px;border-radius:9px;background:var(--warn);color:#fff;font-size:10px;font-weight:700;line-height:18px;text-align:center}
   .count[hidden]{display:none}
+  .lane-label.ext{background:var(--line-soft)}
+  .chip.ext-chip{background:var(--text);color:var(--surface)}
+  .lane-label .metric{color:var(--text-3);overflow:hidden;text-overflow:ellipsis;min-width:0}
 
   footer{
     margin-top:24px;display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap;
@@ -376,7 +379,7 @@
 <header class="topbar">
   <div class="tb-left">
     <a class="btn" id="backLink" href="/" title="Tilbake til tavlen">← SkyTracker</a>
-    <h1>Veikart <span class="sub">– epics</span></h1>
+    <h1>Tidslinjen <span class="sub">– epics</span></h1>
     <span class="badge warn" id="exampleBadge" hidden>Eksempel, ikke en plan</span>
   </div>
   <div class="tb-right">
@@ -399,12 +402,13 @@
   <div class="ro-banner" id="roBanner" hidden><b>👁 Lesetilgang</b> – endringer du gjør deles ikke og forsvinner når siden lastes på nytt.</div>
 
   <div class="help" id="helpPanel">
-    <h3>Slik bruker du veikartet</h3>
+    <h3>Slik bruker du tidslinjen</h3>
     <button class="x close-help" id="helpClose" title="Lukk">✕</button>
     <div class="help-grid">
-      <div class="help-card"><h4>Epic og måldato</h4>
-        <p>Hver uthevet rad er en <b>epic</b>: et resultat ledelsen vil ha, eid av PM + CTO. Klikk navnet for å sette
-        navn, måldato (eller foreløpig mål) og ADO-id. <b>＋ Epic</b> øverst lager en ny. Måldatoen tegnes som en loddrett strek i raden.</p></div>
+      <div class="help-card"><h4>Epic, måltall og måldato</h4>
+        <p>Hver uthevet rad er en <b>epic</b>: et resultat ledelsen vil ha, eid av PM + CTO. Klikk navnet for å sette navn,
+        <b>måltall</b>, måldato (eller foreløpig mål), <b>ekstern dato</b> og prioritet. <b>＋ Epic</b> øverst lager en ny. Måldatoen tegnes som en
+        loddrett strek i raden; «Leveres uke 49–51» er vinduet spennene gir.</p></div>
       <div class="help-card"><h4>Utredning og estimat</h4>
         <p><b>＋</b> på epic-raden legger til en feature. I redigeringen velger du <b>Utredning</b> (stripet, med sluttdato)
         eller <b>Estimert</b> (spenn: sannsynlig i uker + senest i uker). Klikk et feature-navn for å redigere. Utredning tar utviklertid og vises derfor.</p></div>
@@ -420,6 +424,14 @@
       <div class="help-card"><h4>Lagring og deling</h4>
         <p>Alt du gjør <b>autolagres for alle</b> (☁-status øverst), og andres endringer dukker opp innen ~10 sekunder.
         Endringer flettes egenskap for egenskap, så dere kan jobbe samtidig. Lesetilgang gir en lokal, flyktig kopi.</p></div>
+      <div class="help-card"><h4>Historikk og begrunnelser</h4>
+        <p>Hver lagring logges: hvem, når, hva. Flytter du en måldato, utvider et spenn, flytter en feature senere eller endrer
+        prioritet, spør siden <b>hvorfor</b>. Svaret følger endringen i <b>Historikk</b>. Du kan lagre uten begrunnelse; de mangler da i
+        tellingen på knappen til du fyller dem inn.</p></div>
+      <div class="help-card"><h4>Prioritet</h4>
+        <p>Rekkefølgen på epicene er prioriteten produktforum har satt; rekkefølgen i en epic er byggerekkefølgen. Dra i <b>⋮⋮</b>
+        for å flytte en rad, eller sett tallet i redigeringen. Dra en feature til en annen epic for å flytte den dit. En utredning
+        som har passert sluttdatoen sin merkes <b>Utredning forsinket</b>.</p></div>
     </div>
   </div>
 
@@ -453,7 +465,7 @@
   </div>
 
   <footer>
-    <span>Skytale AS · Veikart for utviklingsavdelingen</span>
+    <span>Skytale AS · Tidslinjen for utviklingsavdelingen</span>
     <span>Estimater og avhengigheter bor her · ADO speiler dem og eier stories og sprinter</span>
   </footer>
 </main>
@@ -519,6 +531,8 @@
           <label class="ed-field"><span>Måldato</span><input id="epGoal" type="date"></label>
           <label class="ed-check"><input type="checkbox" id="epProvisional"> Foreløpig – settes endelig etter utredning</label>
         </div>
+        <label class="ed-field"><span>Måltall (hva som er sant når epicen er levert)</span><input id="epMetric" type="text" placeholder="f.eks. 3 kunder i drift på 2.0"></label>
+        <label class="ed-check"><input type="checkbox" id="epExternal"> Ekstern dato (NSR, Telenor, revisjon) – datoen er satt utenfra</label>
         <label class="ed-field"><span>ADO-id (Epic)</span><input id="epAdo" type="number" min="1" step="1" placeholder="valgfritt"></label>
         <label class="ed-field"><span>Prioritet (1 = øverst på tidslinjen)</span><input id="epPriority" type="number" min="1" step="1"></label>
       </div>
@@ -776,14 +790,19 @@ window.__bootTimeline = function(){
       const st = epicStatus(state, lane.key);
       const hasGoal = typeof lane.goalDate === 'number';
 
-      const ll = el('div', 'lane-label');
+      const ll = el('div', 'lane-label' + (lane.externalDate ? ' ext' : ''));
       ll.dataset.key = lane.key;
       const ln = el('span', 'ln', lane.name);
       ln.title = 'Klikk for å redigere epicen';
       ln.addEventListener('click', () => openEpicEditor(lane.key));
       const lm = el('div', 'lm');
+      const overdue = laneTasks(lane.key).filter(t => discoveryOverdue(t, todayUnit())).length;
+      const win = epicWindowText(state, lane.key);
       lm.innerHTML = '<span class="chip st-' + st.code + '">' + esc(STATUS_LABEL[st.code]) + '</span>' +
-        '<span class="goal">' + esc(goalText(lane)) + '</span>';
+        (lane.externalDate ? '<span class="chip ext-chip" title="Datoen er satt utenfra">Ekstern dato</span>' : '') +
+        (overdue ? '<span class="chip st-gul">' + overdue + ' utredning' + (overdue > 1 ? 'er' : '') + ' forsinket</span>' : '') +
+        '<span class="goal">' + esc((win ? win + ' · ' : '') + goalText(lane)) + '</span>' +
+        (lane.metric ? '<span class="metric" title="Måltall">' + esc(lane.metric) + '</span>' : '');
       const add = el('button', 'add-feature', '＋');
       add.title = 'Ny feature i denne epicen (utredning eller estimert velges i redigeringen)';
       add.addEventListener('click', e => { e.stopPropagation(); addFeature(lane.key, 'discovery'); });
@@ -925,11 +944,12 @@ window.__bootTimeline = function(){
     }
     const rl = rangeRefs[t.id];
     rl.style.left = (left + width) + 'px';
-    rl.textContent = t.kind === 'estimate' ? rangeLabel(t) : 'til ' + fmtDate(unitToDate(t.end));
+    rl.textContent = t.kind === 'estimate' ? rangeLabel(t) + ' → ' + windowLabel(t) : 'til ' + fmtDate(unitToDate(t.end));
     rl.className = 'range-lbl ' + (t.kind === 'estimate' ? 'weeks' : 'date');
     const chips = [];
     if(t.adoId) chips.push('<a class="chip ado" target="_blank" rel="noopener" href="' + ADO_URL(t.adoId) + '" title="Åpne i Azure DevOps">#' + t.adoId + '</a>');
     if(t.deps.length) chips.push('<span class="chip" title="Venter på ' + t.deps.length + ' feature(s)">⇠ ' + t.deps.length + '</span>');
+    if(discoveryOverdue(t, todayUnit())) chips.push('<span class="chip st-gul" title="Sluttdatoen er passert: sett en ny før den passerer">Utredning forsinket</span>');
     if(t.editedBy){
       const when = t.editedAt ? new Date(t.editedAt).toLocaleString('nb-NO', {day:'numeric', month:'short', hour:'2-digit', minute:'2-digit'}) : '';
       chips.push('<span class="chip who" title="Sist endret av ' + esc(t.editedBy) + (when ? ' · ' + esc(when) : '') + '">' + esc(initials(t.editedBy)) + '</span>');
@@ -1435,6 +1455,8 @@ window.__bootTimeline = function(){
     $('epGoal').value = typeof l.goalDate === 'number' ? toDateInput(l.goalDate) : '';
     $('epProvisional').checked = !!l.goalProvisional;
     $('epAdo').value = l.adoId || '';
+    $('epMetric').value = l.metric || '';
+    $('epExternal').checked = !!l.externalDate;
     $('epPriority').value = state.lanes.findIndex(v => v.key === key) + 1;
     epicBack.classList.add('open');
     setTimeout(() => $('epName').focus(), 0);
@@ -1457,6 +1479,10 @@ window.__bootTimeline = function(){
     const ado = parseInt($('epAdo').value, 10);
     const newAdo = isFinite(ado) && ado > 0 ? ado : undefined;
     if(l.adoId !== newAdo){ if(newAdo) l.adoId = newAdo; else delete l.adoId; changed = true; }
+    const metric = $('epMetric').value.trim();
+    if((l.metric || '') !== metric){ if(metric) l.metric = metric; else delete l.metric; changed = true; }
+    const ext = $('epExternal').checked;
+    if(ext !== !!l.externalDate){ if(ext) l.externalDate = true; else delete l.externalDate; changed = true; }
     const pri = parseInt($('epPriority').value, 10);
     const cur = state.lanes.findIndex(v => v.key === epicKey) + 1;
     if(isFinite(pri) && pri >= 1 && pri !== cur){
@@ -1620,7 +1646,7 @@ window.__bootTimeline = function(){
   $('exportBtn').addEventListener('click', () => {
     const d = new Date();
     const ymd = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
-    downloadFile('skytale-veikart-' + ymd + '.json', JSON.stringify(state, null, 2), 'application/json');
+    downloadFile('skytale-tidslinjen-' + ymd + '.json', JSON.stringify(state, null, 2), 'application/json');
   });
   $('helpBtn').addEventListener('click', () => helpPanel.classList.toggle('open'));
   $('helpClose').addEventListener('click', () => helpPanel.classList.remove('open'));
