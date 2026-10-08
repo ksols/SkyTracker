@@ -386,6 +386,27 @@
   .row.gone{background:repeating-linear-gradient(135deg,transparent 0 6px,var(--line-soft) 6px 7px)}
   .chip.new{background:var(--ado-bg);color:var(--ado-fg)}
 
+  /* ---------- hylla: klar for veikart ---------- */
+  .shelf{margin-top:14px;border:1px dashed var(--line);border-radius:6px;background:var(--surface)}
+  .shelf[hidden]{display:none}
+  .shelf-head{display:flex;align-items:center;gap:10px;padding:10px 14px;cursor:pointer}
+  .shelf-head h3{font-size:14px;font-weight:600;flex:1;color:var(--text)}
+  .shelf-head .cnt{font-size:11px;color:var(--text-3)}
+  .shelf-body{display:grid;gap:4px;padding:0 10px 10px}
+  .shelf.closed .shelf-body{display:none}
+  .shelf-row{display:flex;align-items:center;gap:10px;padding:6px 8px 6px 20px;border-radius:4px;position:relative;font-size:13px}
+  .shelf-row:hover{background:var(--raised)}
+  .shelf-row .nm{font-weight:600;color:var(--text);cursor:pointer}
+  .shelf-row .nm:hover{text-decoration:underline}
+  .shelf-row .st{font-size:11px;color:var(--text-3);flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .shelf-row .acts{display:flex;gap:4px;opacity:0}
+  .shelf-row:hover .acts{opacity:1}
+  .shelf-row .grip{opacity:1}
+  .shelf-empty{padding:0 14px 12px;font-size:12px;color:var(--text-4)}
+  .preview{font-size:13px;padding:10px 12px;border-radius:6px;background:var(--bg);border:1px solid var(--line-soft);margin:0 20px 16px}
+  .preview b.st-gronn{color:var(--ok-fg)} .preview b.st-gul{color:var(--warn-fg)} .preview b.st-rod{color:var(--bad-fg)}
+  .lane-label .chip.preview-chip{background:var(--accent);color:#fff}
+
   footer{
     margin-top:24px;display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap;
     font-size:11px;color:var(--text-4);border-top:1px solid var(--line-soft);padding-top:12px;
@@ -497,6 +518,11 @@
     <div class="col-resizer" id="colResizer" title="Dra for å justere kolonnebredden · dobbeltklikk for standard"></div>
   </div>
 
+  <section class="shelf" id="shelf" hidden>
+    <div class="shelf-head" id="shelfToggle"><h3>Klar for veikart <span class="cnt" id="shelfCount"></span></h3><button id="registerBtn" title="Registrer et ønske produktforum har sagt ja til">＋ Registrer ønske</button></div>
+    <div class="shelf-body" id="shelfList"></div>
+  </section>
+
   <footer>
     <span>Skytale AS · Tidslinjen for utviklingsavdelingen</span>
     <span>Estimater og avhengigheter bor her · ADO speiler dem og eier stories og sprinter</span>
@@ -595,6 +621,29 @@
   </div>
 </div>
 
+<!-- livssyklus: start utredning, klar for veikart, legg i epic -->
+<div class="modal-back" id="startBack"><div class="modal" style="width:min(460px,100%)">
+  <div class="modal-head"><div><h2>Start utredning</h2><div class="md">Én eier og sluttdatoen vi lover nå.</div></div></div>
+  <div class="modal-body"><div class="ed-body">
+    <label class="ed-field"><span>Eier (initialer)</span><input id="startOwner" type="text" placeholder="THM"></label>
+    <label class="ed-field"><span>Utredning ferdig</span><input id="startEnd" type="date"></label>
+  </div></div>
+  <div class="modal-foot"><span></span><span class="btns"><button class="text" id="startCancel">Avbryt</button><button class="primary" id="startSave">Start</button></span></div>
+</div></div>
+<div class="modal-back" id="readyBack"><div class="modal" style="width:min(460px,100%)">
+  <div class="modal-head"><div><h2>Klar for veikart</h2><div class="md">Byggetiden utredningen ga, i uker. Buffer legger forumet på senere.</div></div></div>
+  <div class="modal-body"><div class="ed-body"><div class="ed-row">
+    <label class="ed-field"><span>Sannsynlig (uker)</span><input id="readyLikely" type="number" min="1" step="1"></label>
+    <label class="ed-field"><span>Senest (uker)</span><input id="readyLate" type="number" min="1" step="1"></label>
+  </div></div></div>
+  <div class="modal-foot"><span></span><span class="btns"><button class="text" id="readyCancel">Avbryt</button><button class="primary" id="readySave">Klar</button></span></div>
+</div></div>
+<div class="modal-back" id="placeBack"><div class="modal" style="width:min(500px,100%)">
+  <div class="modal-head"><div><h2>Legg i epic</h2><div class="md">Prisen vises før beslutningen: fargen epicen får.</div></div></div>
+  <div class="modal-body"><div class="ed-body"><label class="ed-field"><span>Epic</span><select id="placeLane"></select></label></div><div class="preview" id="placePreview"></div></div>
+  <div class="modal-foot"><span></span><span class="btns"><button class="text" id="placeCancel">Avbryt</button><button class="primary" id="placeSave">Legg i epicen</button></span></div>
+</div></div>
+
 <!-- bekreftelses-/inndata-dialog -->
 <div class="modal-back" id="dlgBack">
   <div class="modal" style="width:min(480px,100%)">
@@ -624,7 +673,7 @@ window.__bootTimeline = function(){
   const ADO_URL = id => 'https://dev.azure.com/SkytaleAS/Skytale/_workitems/edit/' + id;
   const MND_UP = ['JAN','FEB','MAR','APR','MAI','JUN','JUL','AUG','SEP','OKT','NOV','DES'];
   const MND_S = ['jan','feb','mar','apr','mai','jun','jul','aug','sep','okt','nov','des'];
-  const FV_FIELDS = ['tid','label','deps','meta'];
+  const FV_FIELDS = ['tid','label','deps','meta','state','est'];
   const REASON_CODES = [
     ['utredning', 'Utredningen viste mer/mindre arbeid'], ['avhengighet', 'En avhengighet flyttet seg'],
     ['kapasitet', 'Kapasitet: annet gikk foran'], ['prioritering', 'Prioritert om i produktforum'],
@@ -747,9 +796,17 @@ window.__bootTimeline = function(){
   }
   function moveTask(id, laneKey, toIndex){   // toIndex: plass i målepicen uten featuren selv
     const t = getTask(id);
-    if(!t || !getLane(laneKey)) return;
+    if(!t || !(getLane(laneKey) || laneKey === BACKLOG)) return;
     const fromLane = t.lane;
-    if(fromLane !== laneKey){ t.lane = laneKey; touch(t, 'meta'); }
+    if(fromLane !== laneKey){
+      t.lane = laneKey; touch(t, 'meta');
+      // livssyklus: inn i en epic fra hylla = aktiv med lovet spenn; tilbake på hylla = klar igjen
+      if(laneKey === BACKLOG && t.state === 'aktiv'){ t.state = 'klar'; delete t.committedRange; delete t.activatedAt; touch(t, 'state'); }
+      else if(fromLane === BACKLOG && laneKey !== BACKLOG && t.kind === 'estimate' && t.state !== 'levert'){
+        const r = rangeWeeks(t);
+        t.state = 'aktiv'; t.committedRange = { likely: r.likely, late: r.late, start: t.start }; t.activatedAt = new Date().toISOString().slice(0, 10); touch(t, 'state');
+      }
+    }
     const ids = laneTasks(laneKey).map(v => v.id).filter(v => v !== id);
     ids.splice(Math.max(0, Math.min(ids.length, toIndex)), 0, id);
     ids.forEach((v, i) => { const q = getTask(v); if(q.order !== i + 1){ q.order = i + 1; touch(q, 'meta'); } });
@@ -799,7 +856,7 @@ window.__bootTimeline = function(){
     chart.innerHTML = '';
     barRefs = {}; rowRefs = {}; rangeRefs = {}; labelDateRefs = {};
     updateTlSummary();
-    if(!state.lanes.length) return;
+    if(!state.lanes.length){ renderShelf(); return; }
 
     const corner = el('div', 'corner', 'Epic / feature');
     labels.appendChild(corner);
@@ -861,11 +918,16 @@ window.__bootTimeline = function(){
         e.preventDefault();
         clearDropMarks();
         ll.classList.add(rowDrag.type === 'lane' ? (dropHalf(e, ll) ? 'drop-before' : 'drop-after') : 'drop-into');
+        clearPreviewChips();
+        if(rowDrag.type === 'task' && getTask(rowDrag.id) && getTask(rowDrag.id).lane === BACKLOG){   // prisen før beslutningen
+          const pv = previewPlacement(state, rowDrag.id, lane.key);
+          if(pv) lm.insertAdjacentHTML('beforeend', '<span class="chip preview-chip">→ ' + esc({gronn:'grønn', gul:'gul', rod:'rød'}[pv.after] || pv.after) + '</span>');
+        }
       });
       ll.addEventListener('drop', e => {
         if(!rowDrag) return;
         e.preventDefault();
-        const d = rowDrag; rowDrag = null; clearDropMarks();
+        const d = rowDrag; rowDrag = null; clearDropMarks(); clearPreviewChips();
         if(d.type === 'lane'){
           if(d.key === lane.key) return;
           const from = state.lanes.findIndex(v => v.key === d.key) + 1;
@@ -878,7 +940,8 @@ window.__bootTimeline = function(){
           if(!t) return;
           const fromLane = t.lane;
           moveTask(d.id, lane.key, laneTasks(lane.key).filter(v => v.id !== d.id).length);
-          if(fromLane !== lane.key && ASK_REASON_FOR.movedToOtherEpic) askReason([t.label + ': flyttet fra «' + getLane(fromLane).name + '» til «' + lane.name + '»']);
+          if(fromLane === BACKLOG) pendingNote.reasonCode = 'prioritering';   // forumet plasserer: forhåndsvalgt begrunnelse
+          if(fromLane !== lane.key && ASK_REASON_FOR.movedToOtherEpic) askReason([t.label + ': flyttet fra «' + (fromLane === BACKLOG ? 'Klar for veikart' : getLane(fromLane).name) + '» til «' + lane.name + '»']);
         }
         save(); render();
       });
@@ -992,6 +1055,7 @@ window.__bootTimeline = function(){
     positionAll();
     if(linkSource) markLinkSource();
     chartScroll.scrollLeft = sx;
+    renderShelf();
   }
 
   function positionAll(){
@@ -1013,7 +1077,7 @@ window.__bootTimeline = function(){
     }
     const rl = rangeRefs[t.id];
     rl.style.left = (left + width) + 'px';
-    rl.textContent = t.kind === 'estimate' ? rangeLabel(t) + ' → ' + windowLabel(t) : 'til ' + fmtDate(unitToDate(t.end));
+    rl.textContent = t.kind === 'estimate' ? bufferLabel(t) + ' → ' + windowLabel(t) : 'til ' + fmtDate(unitToDate(t.end));
     rl.className = 'range-lbl ' + (t.kind === 'estimate' ? 'weeks' : 'date');
     const chips = [];
     if(t.adoId) chips.push('<a class="chip ado" target="_blank" rel="noopener" href="' + ADO_URL(t.adoId) + '" title="Åpne i Azure DevOps">#' + t.adoId + '</a>');
@@ -1023,7 +1087,8 @@ window.__bootTimeline = function(){
       const when = t.editedAt ? new Date(t.editedAt).toLocaleString('nb-NO', {day:'numeric', month:'short', hour:'2-digit', minute:'2-digit'}) : '';
       chips.push('<span class="chip who" title="Sist endret av ' + esc(t.editedBy) + (when ? ' · ' + esc(when) : '') + '">' + esc(initials(t.editedBy)) + '</span>');
     }
-    labelDateRefs[t.id].innerHTML = esc(rangeText(t)) + chips.join('');
+    const size = sizeClass(t);
+    labelDateRefs[t.id].innerHTML = esc(rangeText(t) + (size ? ' · ' + size : '') + (t.kind === 'estimate' && rawLabel(t) ? ' · ' + rawLabel(t) : '')) + chips.join('');
     bar.title = t.label + ' · ' + rangeText(t);
   }
 
@@ -1311,9 +1376,10 @@ window.__bootTimeline = function(){
     if(b.kind === 'discovery' && t.kind === 'discovery' && ASK_REASON_FOR.discoveryEndLater && t.end > b.end + 1e-9)
       lines.push(t.label + ': utredning slutt ' + fmtDate(unitToDate(b.end)) + ' → ' + fmtDate(unitToDate(t.end)));
     if(b.lane !== t.lane && ASK_REASON_FOR.movedToOtherEpic)
-      lines.push(t.label + ': flyttet fra «' + (getLane(b.lane) || {name: b.lane}).name + '» til «' + (getLane(t.lane) || {name: t.lane}).name + '»');
+      lines.push(t.label + ': flyttet fra «' + laneDisplayName(b.lane) + '» til «' + laneDisplayName(t.lane) + '»');
     return lines;
   }
+  const laneDisplayName = key => key === BACKLOG ? 'Klar for veikart' : (getLane(key) || {name: key}).name;
 
   /* ================== historikk ================== */
   const histDrawer = $('histDrawer'), histList = $('histList'), histLane = $('histLane'), histBadge = $('histBadge');
@@ -1496,6 +1562,119 @@ window.__bootTimeline = function(){
     }
   });
 
+  /* ================== hylla: klar for veikart ================== */
+  const shelf = $('shelf'), shelfList = $('shelfList'), shelfCount = $('shelfCount');
+  function shelfState(t){
+    if(t.state === 'ny') return 'Registrert';
+    if(t.state === 'utredes') return 'Utredes' + (t.assignee ? ' · ' + t.assignee : '') + ' · til ' + fmtDate(unitToDate(t.end)) + (sizeClass(t) ? ' · ' + sizeClass(t) : '');
+    return 'Klar for veikart · ' + bufferLabel(t) + (rawLabel(t) ? ' · ' + rawLabel(t) : '') + (t.deps.length ? ' · venter på ' + t.deps.length : '');
+  }
+  function renderShelf(){
+    const items = shelfTasks(state);
+    shelf.hidden = !items.length && !(HOSTED && canWrite);
+    shelfCount.textContent = items.length ? '(' + items.length + ')' : '';
+    $('registerBtn').hidden = !(HOSTED && canWrite);
+    shelfList.innerHTML = items.length ? '' : '<div class="shelf-empty">Ingen features venter på plass i en epic. Registrer et ønske produktforum har sagt ja til.</div>';
+    items.forEach(t => {
+      const r = el('div', 'shelf-row');
+      r.dataset.id = t.id;
+      const g = el('span', 'grip', '⋮⋮'); g.title = 'Dra inn i en epic'; g.draggable = canWrite;
+      g.addEventListener('dragstart', e => { rowDrag = { type: 'task', id: t.id }; e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', t.id); r.classList.add('dragging-row'); });
+      g.addEventListener('dragend', () => { rowDrag = null; clearDropMarks(); clearPreviewChips(); });
+      const nm = el('span', 'nm', t.label); nm.addEventListener('click', () => openEditor(t.id));
+      const st = el('span', 'st', shelfState(t));
+      const acts = el('span', 'acts');
+      if(canWrite){
+        if(t.state === 'ny') acts.innerHTML = '<button class="act-start">Start utredning</button>';
+        else if(t.state === 'utredes') acts.innerHTML = '<button class="act-ready">Klar for veikart</button>';
+        else acts.innerHTML = '<button class="act-place primary">Legg i epic …</button>';
+        acts.innerHTML += '<button class="del" title="Slett">×</button>';
+        const b1 = acts.querySelector('.act-start'); if(b1) b1.addEventListener('click', () => startDiscovery(t.id));
+        const b2 = acts.querySelector('.act-ready'); if(b2) b2.addEventListener('click', () => markReady(t.id));
+        const b3 = acts.querySelector('.act-place'); if(b3) b3.addEventListener('click', () => placeDialog(t.id));
+        acts.querySelector('.del').addEventListener('click', () => removeTask(t.id));
+      }
+      r.append(g, nm, st, acts);
+      shelfList.appendChild(r);
+    });
+  }
+  async function registerWish(){
+    const name = await askDialog('Registrer ønske', 'Et ønske produktforum har sagt ja til. Det ligger på hylla til utredningen starter.', {input:true, placeholder:'Kontaktkort for bedrifter', confirmText:'Registrer'});
+    if(!name || typeof name !== 'string' || !name.trim()) return;
+    const start = snapTo(Math.max(todayUnit(), VIEW_FROM), SNAP);
+    const t = { id: uid(), lane: BACKLOG, label: name.trim(), kind: 'discovery', state: 'ny', start, end: start + WEEK, deps: [], fv: {} };
+    if(myName){ t.editedBy = myName; t.editedAt = new Date().toISOString(); }
+    state.tasks.push(t); touch(t, 'state'); state.example = false;
+    normalizePlan(state); save(); render();
+  }
+  let lifecycleId = null;
+  function startDiscovery(id){
+    const t = getTask(id); if(!t) return;
+    lifecycleId = id;
+    $('startOwner').value = t.assignee || '';
+    $('startEnd').value = toDateInput(Math.max(todayUnit(), VIEW_FROM) + 2 * WEEK);
+    $('startBack').classList.add('open'); setTimeout(() => $('startOwner').focus(), 0);
+  }
+  $('startSave').addEventListener('click', () => {
+    const t = getTask(lifecycleId); if(!t){ $('startBack').classList.remove('open'); return; }
+    const end = fromDateInput($('startEnd').value); if(end === null){ $('startEnd').focus(); return; }
+    const owner = $('startOwner').value.trim();
+    t.kind = 'discovery'; t.state = 'utredes'; t.start = snapTo(Math.max(todayUnit(), VIEW_FROM), SNAP); t.end = Math.max(t.start + MIN_DUR, end); delete t.endLikely;
+    if(owner) t.assignee = owner; else delete t.assignee;
+    touch(t, 'tid'); touch(t, 'meta'); touch(t, 'state');
+    $('startBack').classList.remove('open'); lifecycleId = null;
+    normalizePlan(state); pushDeps(); save(); render();
+  });
+  $('startCancel').addEventListener('click', () => { $('startBack').classList.remove('open'); lifecycleId = null; });
+  function markReady(id){
+    const t = getTask(id); if(!t) return;
+    lifecycleId = id;
+    $('readyLikely').value = t.raw ? t.raw.likely : 4; $('readyLate').value = t.raw ? t.raw.late : 6;
+    $('readyBack').classList.add('open'); setTimeout(() => $('readyLikely').focus(), 0);
+  }
+  $('readySave').addEventListener('click', () => {
+    const t = getTask(lifecycleId); if(!t){ $('readyBack').classList.remove('open'); return; }
+    const lw = Math.max(1, parseInt($('readyLikely').value, 10) || 1), hw = Math.max(lw, parseInt($('readyLate').value, 10) || lw);
+    t.kind = 'estimate'; t.raw = { likely: lw, late: hw, source: 'utredning', pulledAt: new Date().toISOString().slice(0, 10) };
+    const b = t.bufferWeeks || 0;
+    t.endLikely = t.start + (lw + b) * WEEK; t.end = t.start + (hw + b) * WEEK;
+    touch(t, 'tid'); touch(t, 'meta'); touch(t, 'est'); touch(t, 'state');
+    $('readyBack').classList.remove('open'); lifecycleId = null;
+    normalizePlan(state); pushDeps(); save(); render();
+  });
+  $('readyCancel').addEventListener('click', () => { $('readyBack').classList.remove('open'); lifecycleId = null; });
+  function placeDialog(id){
+    const t = getTask(id); if(!t) return;
+    lifecycleId = id;
+    $('placeLane').innerHTML = '<option value="">Velg epic …</option>' + state.lanes.filter(l => l.state !== 'avsluttet').map(l => '<option value="' + esc(l.key) + '">' + esc(l.name) + '</option>').join('');
+    $('placePreview').textContent = 'Velg en epic for å se prisen.';
+    $('placeBack').classList.add('open');
+  }
+  function previewText(id, laneKey){
+    const pv = previewPlacement(state, id, laneKey), lane = getLane(laneKey);
+    if(!pv || !lane) return '';
+    const word = c => ({ gronn: 'grønn', gul: 'gul', rod: 'rød', venter: 'venter på utredning', 'ingen-mal': 'uten måldato', tom: 'tom' })[c] || c;
+    return esc(lane.name) + ' blir <b class="st-' + pv.after + '">' + word(pv.after) + '</b>' + (pv.before !== pv.after ? ' (var ' + word(pv.before) + ')' : ' (uendret)') + (pv.window ? ' · ' + esc(pv.window) : '') + '. Ingenting annet flyttes.';
+  }
+  $('placeLane').addEventListener('change', () => { $('placePreview').innerHTML = $('placeLane').value ? previewText(lifecycleId, $('placeLane').value) : 'Velg en epic for å se prisen.'; });
+  $('placeSave').addEventListener('click', () => {
+    const key = $('placeLane').value, t = getTask(lifecycleId);
+    if(!key || !t){ $('placeLane').focus(); return; }
+    $('placeBack').classList.remove('open'); lifecycleId = null;
+    placeInEpic(t.id, key);
+  });
+  $('placeCancel').addEventListener('click', () => { $('placeBack').classList.remove('open'); lifecycleId = null; });
+  function placeInEpic(id, laneKey){
+    const t = getTask(id), lane = getLane(laneKey); if(!t || !lane) return;
+    moveTask(id, laneKey, laneTasks(laneKey).length);
+    pendingNote.reasonCode = 'prioritering';   // forhåndsvalgt: forumet plasserer
+    askReason([t.label + ': lagt i «' + lane.name + '»']);
+    save(); render();
+  }
+  function clearPreviewChips(){ labels.querySelectorAll('.preview-chip').forEach(c => c.remove()); }
+  $('registerBtn').addEventListener('click', registerWish);
+  $('shelfToggle').addEventListener('click', e => { if(e.target.closest('button')) return; shelf.classList.toggle('closed'); });
+
   /* ================== feature-editor ================== */
   let editorTaskId = null;
   let edSel = { kind: 'estimate' };
@@ -1514,7 +1693,8 @@ window.__bootTimeline = function(){
     $('edTitle').textContent = t.kind === 'discovery' ? 'Rediger utredning' : 'Rediger feature';
     $('edDates').textContent = rangeText(t);
     $('edName').value = t.label;
-    $('edLane').innerHTML = state.lanes.map(l => '<option value="' + esc(l.key) + '"' + (l.key === t.lane ? ' selected' : '') + '>' + esc(l.name) + '</option>').join('');
+    $('edLane').innerHTML = '<option value="_backlog"' + (t.lane === BACKLOG ? ' selected' : '') + '>Klar for veikart (hylla)</option>' +
+      state.lanes.map(l => '<option value="' + esc(l.key) + '"' + (l.key === t.lane ? ' selected' : '') + '>' + esc(l.name) + '</option>').join('');
     edSel = { kind: t.kind };
     paintEdKind();
     $('edStart').value = toDateInput(t.start);
@@ -1582,7 +1762,7 @@ window.__bootTimeline = function(){
     const keep = [...document.querySelectorAll('#edDeps .depchip')].map(c => c.dataset.id);
     if(keep.length !== t.deps.length){ t.deps = t.deps.filter(d => keep.includes(d)); touch(t, 'deps'); }
     const newLane = $('edLane').value;
-    if(newLane && newLane !== t.lane && getLane(newLane)) moveTask(t.id, newLane, laneTasks(newLane).length);
+    if(newLane && newLane !== t.lane && (getLane(newLane) || newLane === BACKLOG)) moveTask(t.id, newLane, laneTasks(newLane).length);
     normalizePlan(state);
     pushDeps();
     const lines = editReasonLines(before, t);
@@ -1712,6 +1892,7 @@ window.__bootTimeline = function(){
       roBanner.hidden = canWrite;
       roTag.hidden = canWrite;
       $('baselineBtn').hidden = !canWrite;   // lesere kan sammenligne, ikke merke baseliner
+      $('registerBtn').hidden = !canWrite;
       whoami.textContent = myName || '';
       refreshHistoryBadge();
       loadSnapshots();
@@ -1783,7 +1964,8 @@ window.__bootTimeline = function(){
     clearTimeout(saveTimer);
     saveTimer = setTimeout(pushPlan, 900);
   }
-  const anyModalOpen = () => editorBack.classList.contains('open') || epicBack.classList.contains('open') || dlgBack.classList.contains('open') || reasonBack.classList.contains('open');
+  const anyModalOpen = () => editorBack.classList.contains('open') || epicBack.classList.contains('open') || dlgBack.classList.contains('open') || reasonBack.classList.contains('open') ||
+    $('startBack').classList.contains('open') || $('readyBack').classList.contains('open') || $('placeBack').classList.contains('open');
   async function pollTick(){
     if(!HOSTED || !serverReady) return;
     if(drag || colDrag || linkSource || anyModalOpen()) return;   // ikke midt i brukerens egen redigering
@@ -1854,6 +2036,9 @@ window.__bootTimeline = function(){
     if(e.key !== 'Escape') return;
     if(reasonBack.classList.contains('open')) closeReason('ingen', null);
     else if(dlgBack.classList.contains('open')) dlgClose(false);
+    else if($('startBack').classList.contains('open')) { $('startBack').classList.remove('open'); lifecycleId = null; }
+    else if($('readyBack').classList.contains('open')) { $('readyBack').classList.remove('open'); lifecycleId = null; }
+    else if($('placeBack').classList.contains('open')) { $('placeBack').classList.remove('open'); lifecycleId = null; }
     else if(editorBack.classList.contains('open')) closeEditor();
     else if(epicBack.classList.contains('open')) closeEpicEditor();
     else if(cmp && !cmpList.hidden) cmpList.hidden = true;
