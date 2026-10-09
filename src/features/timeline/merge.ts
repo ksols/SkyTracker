@@ -21,6 +21,13 @@ export const GROUP_PROPS: Record<TaskFieldGroup, string[]> = {
   est: ["raw", "bufferWeeks"],
 };
 
+export type Sprint = { name: string; path: string; start: string; finish: string };
+/** What the last push wrote to ADO, field by field, so a refresh can tell «changed in ADO» from «changed here». */
+export type AdoSnapshot = Partial<Record<"title" | "description" | "state" | "targetDate" | "startDate", string | null>>;
+export type AdoConflict = { field: string; ours: string | null; theirs: string | null };
+export type LaneAdo = { pushedAt: string; snapshot: AdoSnapshot; conflicts?: AdoConflict[] };
+export type TaskAdo = LaneAdo & { storyId?: number; stories?: { count: number; pointsTotal: number; pointsDone: number; iteration: string | null; at: string } };
+
 export type PlanTask = {
   id: string;
   lane: string;
@@ -34,11 +41,13 @@ export type PlanTask = {
   order?: number;
   state?: "ny" | "utredes" | "klar" | "aktiv" | "levert";
   assignee?: string;
-  raw?: { likely: number; late: number; source?: string; pulledAt?: string };
+  raw?: { likely: number; late: number; source?: string; pulledAt?: string; by?: string; date?: string };
   bufferWeeks?: number;
   committedRange?: { likely: number; late: number; start: number };
   activatedAt?: string;
   deliveredAt?: string;
+  specPath?: string;
+  ado?: TaskAdo;
   fv?: Partial<Record<TaskFieldGroup, number>>;
   [key: string]: unknown;
 };
@@ -58,6 +67,7 @@ export type PlanLane = {
   closedReason?: string;
   closedAt?: string;
   outcome?: "nådd" | "ikke nådd" | "endret";
+  ado?: LaneAdo;
 };
 
 export type Plan = {
@@ -66,6 +76,8 @@ export type Plan = {
   tasks: PlanTask[];
   deleted?: Record<string, number>;
   deletedLanes?: Record<string, number>;
+  sprints?: { at: string; items: Sprint[] };
+  sprintGoals?: Record<string, { text: string; at: string }>;
   [key: string]: unknown;
 };
 

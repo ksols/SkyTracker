@@ -45,6 +45,14 @@ function normalizePlan(plan) {
   p.tasks = Array.isArray(p.tasks) ? p.tasks : [];
   p.deleted = p.deleted && typeof p.deleted === "object" ? p.deleted : {};
   p.deletedLanes = p.deletedLanes && typeof p.deletedLanes === "object" ? p.deletedLanes : {};
+  // sprints (from ADO's iterations, cached by the sprints route) and the sprint goals typed on the page
+  const isDay = (s) => typeof s === "string" && /^\d{4}-\d{2}-\d{2}$/.test(s);
+  const okSprint = (s) => !!s && typeof s === "object" && typeof s.name === "string" && isDay(s.start) && isDay(s.finish);
+  if (p.sprints && typeof p.sprints === "object" && typeof p.sprints.at === "string" && Array.isArray(p.sprints.items)) p.sprints.items = p.sprints.items.filter(okSprint);
+  else delete p.sprints;
+  if (p.sprintGoals && typeof p.sprintGoals === "object" && !Array.isArray(p.sprintGoals)) {
+    Object.keys(p.sprintGoals).forEach((k) => { const g = p.sprintGoals[k]; if (!g || typeof g !== "object" || typeof g.text !== "string" || typeof g.at !== "string") delete p.sprintGoals[k]; });
+  } else delete p.sprintGoals;
   p.lanes.forEach((l) => {
     if (typeof l.owner !== "string" || !l.owner) l.owner = OWNER_DEFAULT;
     if (num(l.goalDate, null) === null) delete l.goalDate;
@@ -76,6 +84,7 @@ function normalizePlan(plan) {
       delete t.endLikely;
     }
     if (num(t.adoId, null) === null) delete t.adoId;
+    if (typeof t.specPath !== "string" || !/^[A-Za-z0-9._-]+$/.test(t.specPath)) delete t.specPath;   // a folder under spec/ in Skytale.Specs
     if (typeof t.assignee !== "string" || !t.assignee.trim()) delete t.assignee; else t.assignee = t.assignee.trim();
     if (num(t.bufferWeeks, null) === null || t.bufferWeeks <= 0) delete t.bufferWeeks; else t.bufferWeeks = Math.round(t.bufferWeeks);
     if (!t.raw || typeof t.raw !== "object" || num(t.raw.likely, null) === null || num(t.raw.late, null) === null) delete t.raw;
@@ -293,6 +302,23 @@ function exampleSeed(prev) {
   return p;
 }
 
+/* ---------- sprints: from ADO's iterations, cached in plan.sprints ---------- */
+function dayKey(d) { return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0"); }
+function currentSprint(sprints, date) {
+  const k = dayKey(date);
+  return (Array.isArray(sprints) ? sprints : []).find((s) => s.start <= k && k <= s.finish) || null;
+}
+function sprintDay(sprint, date) {   // working days (Mon–Fri) from the sprint's start through `date`, 1-based; day 10 is a two-week sprint's last day
+  const [y, m, d] = sprint.start.split("-").map(Number);
+  let n = 0;
+  for (const c = new Date(y, m - 1, d); dayKey(c) <= dayKey(date); c.setDate(c.getDate() + 1)) if (c.getDay() !== 0 && c.getDay() !== 6) n++;
+  return Math.max(1, n);
+}
+function sprintLabel(sprints, date) {
+  const s = currentSprint(sprints, date);
+  return s ? s.name + " · dag " + sprintDay(s, date) : "";
+}
+
 if (typeof module !== "undefined") {
   module.exports = {
     BASE_Y, BASE_M, N_MONTHS, WEEK, SCHEMA, OWNER_DEFAULT, STATUS_LABEL,
@@ -301,5 +327,6 @@ if (typeof module !== "undefined") {
     rangeWeeks, rangeLabel, goalText, exampleSeed,
     isoWeek, weekSpan, windowLabel, epicWindowText, discoveryOverdue,
     shelfTasks, epicCounts, sizeClass, bufferLabel, rawLabel, previewPlacement,
+    dayKey, currentSprint, sprintDay, sprintLabel,
   };
 }

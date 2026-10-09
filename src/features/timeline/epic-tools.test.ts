@@ -4,6 +4,7 @@ import {
   rangeLabel, goalText, exampleSeed, STATUS_LABEL,
   isoWeek, weekSpan, windowLabel, epicWindowText, discoveryOverdue,
   shelfTasks, epicCounts, sizeClass, bufferLabel, rawLabel, previewPlacement,
+  currentSprint, sprintDay, sprintLabel,
 } from "./epic-tools.js";
 import type { Plan, PlanTask } from "./merge";
 
@@ -262,5 +263,39 @@ describe("lifecycle: shelf, states, sizes, buffer, preview", () => {
     expect(pv).toEqual({ before: "gronn", after: "rod", window: expect.stringMatching(/^Leveres uke \d+–\d+$/) });
     expect(p.tasks.find((t) => t.id === "s")!.lane).toBe("_backlog");   // the plan itself is untouched
     expect(previewPlacement(p, "nope", "x")).toBeNull();
+  });
+});
+
+describe("sprints", () => {
+  const sprints = [
+    { name: "Sprint 70", path: "Skytale\\Sprint 70", start: "2026-09-21", finish: "2026-10-02" },
+    { name: "Sprint 71", path: "Skytale\\Sprint 71", start: "2026-10-05", finish: "2026-10-16" },
+  ];
+  it("currentSprint finds the sprint containing the day, by calendar day, or null", () => {
+    expect(currentSprint(sprints, new Date(2026, 9, 9, 23, 59))!.name).toBe("Sprint 71");
+    expect(currentSprint(sprints, new Date(2026, 9, 3))).toBeNull();
+    expect(currentSprint([], new Date())).toBeNull();
+  });
+  it("sprintDay counts working days from the start: Fri 9.10 = 5, the weekend stays 5, Mon 12.10 = 6, Fri 16.10 = 10", () => {
+    expect(sprintDay(sprints[1], new Date(2026, 9, 5))).toBe(1);
+    expect(sprintDay(sprints[1], new Date(2026, 9, 9))).toBe(5);
+    expect(sprintDay(sprints[1], new Date(2026, 9, 10))).toBe(5);
+    expect(sprintDay(sprints[1], new Date(2026, 9, 12))).toBe(6);
+    expect(sprintDay(sprints[1], new Date(2026, 9, 16))).toBe(10);
+  });
+  it("sprintLabel reads «Sprint 71 · dag 5» and is empty outside every sprint", () => {
+    expect(sprintLabel(sprints, new Date(2026, 9, 9))).toBe("Sprint 71 · dag 5");
+    expect(sprintLabel(sprints, new Date(2026, 9, 3))).toBe("");
+  });
+  it("normalizePlan keeps a valid spec folder, sprints and sprint goals, and drops invalid ones", () => {
+    const p = normalizePlan({ lanes: [{ key: "a", name: "A" }], tasks: [
+      { id: "t1", lane: "a", label: "x", kind: "estimate", start: 2, end: 3, specPath: "Threading" },
+      { id: "t2", lane: "a", label: "y", kind: "estimate", start: 2, end: 3, specPath: "../etc" },
+    ], sprints: { at: "2026-10-09T08:00:00.000Z", items: sprints }, sprintGoals: { "Sprint 71": { text: "Tråder i beta", at: "2026-10-09T08:00:00.000Z" }, bad: "x" } });
+    expect(p.tasks[0].specPath).toBe("Threading");
+    expect(p.tasks[1].specPath).toBeUndefined();
+    expect(p.sprints!.items.length).toBe(2);
+    expect(Object.keys(p.sprintGoals!)).toEqual(["Sprint 71"]);
+    expect(normalizePlan({ lanes: [], tasks: [], sprints: "nope", sprintGoals: 3 })).not.toHaveProperty("sprints");
   });
 });

@@ -1,0 +1,14 @@
+{
+  "id": 1,
+  "name": "Skytale",
+  "structureType": "iteration",
+  "hasChildren": true,
+  "children": [
+    { "id": 2, "name": "After MVP", "structureType": "iteration", "hasChildren": false, "path": "\\Skytale\\Iteration\\After MVP" },
+    { "id": 113, "name": "Sprint 71", "structureType": "iteration", "hasChildren": false, "attributes": { "startDate": "2026-10-05T00:00:00Z", "finishDate": "2026-10-16T00:00:00Z" }, "path": "\\Skytale\\Iteration\\Sprint 71" },
+    { "id": 104, "name": "Sprint 68", "structureType": "iteration", "hasChildren": false, "attributes": { "startDate": "2026-08-24T00:00:00Z", "finishDate": "2026-09-04T00:00:00Z" }, "path": "\\Skytale\\Iteration\\Sprint 68" },
+    { "id": 106, "name": "Sprint 70", "structureType": "iteration", "hasChildren": false, "attributes": { "startDate": "2026-09-21T00:00:00Z", "finishDate": "2026-10-02T00:00:00Z" }, "path": "\\Skytale\\Iteration\\Sprint 70" },
+    { "id": 105, "name": "Sprint 69", "structureType": "iteration", "hasChildren": false, "attributes": { "startDate": "2026-09-07T00:00:00Z", "finishDate": "2026-09-18T00:00:00Z" }, "path": "\\Skytale\\Iteration\\Sprint 69" }
+  ],
+  "path": "\\Skytale\\Iteration"
+}

@@ -1,4 +1,9 @@
-import type { Plan, PlanLane, PlanTask } from "./merge";
+import type { Plan, PlanLane, PlanTask, Sprint } from "./merge";
+
+export declare function dayKey(d: Date): string;
+export declare function currentSprint(sprints: Sprint[] | undefined | null, date: Date): Sprint | null;
+export declare function sprintDay(sprint: Sprint, date: Date): number;
+export declare function sprintLabel(sprints: Sprint[] | undefined | null, date: Date): string;
 
 export declare const BASE_Y: number;
 export declare const BASE_M: number;

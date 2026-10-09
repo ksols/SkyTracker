@@ -1,0 +1,52 @@
+[
+  {
+    "id": 4742,
+    "rev": 12,
+    "fields": {
+      "System.WorkItemType": "Feature",
+      "System.State": "Active",
+      "System.Title": "Calls",
+      "System.IterationPath": "Skytale",
+      "System.Tags": "Backend; Discovery; Frontend"
+    },
+    "relations": [
+      { "rel": "System.LinkTypes.Related", "url": "https://dev.azure.com/SkytaleAS/_apis/wit/workItems/4781", "attributes": { "name": "Related" } },
+      { "rel": "System.LinkTypes.Hierarchy-Forward", "url": "https://dev.azure.com/SkytaleAS/_apis/wit/workItems/4743", "attributes": { "name": "Child" } },
+      { "rel": "System.LinkTypes.Hierarchy-Forward", "url": "https://dev.azure.com/SkytaleAS/_apis/wit/workItems/4794", "attributes": { "name": "Child" } },
+      { "rel": "System.LinkTypes.Hierarchy-Forward", "url": "https://dev.azure.com/SkytaleAS/_apis/wit/workItems/4795", "attributes": { "name": "Child" } }
+    ]
+  },
+  {
+    "id": 4743,
+    "fields": {
+      "System.WorkItemType": "User Story",
+      "System.State": "Closed",
+      "System.Title": "Ring opp fra kontaktkortet",
+      "System.IterationPath": "Skytale\\Sprint 70",
+      "Microsoft.VSTS.Scheduling.StoryPoints": 3,
+      "Microsoft.VSTS.Common.ClosedDate": "2026-10-01T12:00:00Z"
+    },
+    "relations": [{ "rel": "System.LinkTypes.Hierarchy-Reverse", "url": "https://dev.azure.com/SkytaleAS/_apis/wit/workItems/4742", "attributes": { "name": "Parent" } }]
+  },
+  {
+    "id": 4794,
+    "fields": {
+      "System.WorkItemType": "User Story",
+      "System.State": "New",
+      "System.Title": "Utredning: Calls",
+      "System.IterationPath": "Skytale"
+    },
+    "relations": [{ "rel": "System.LinkTypes.Hierarchy-Reverse", "url": "https://dev.azure.com/SkytaleAS/_apis/wit/workItems/4742", "attributes": { "name": "Parent" } }]
+  },
+  {
+    "id": 4795,
+    "fields": {
+      "System.WorkItemType": "User Story",
+      "System.State": "Active",
+      "System.Title": "Samtalelogg",
+      "System.IterationPath": "Skytale\\Sprint 71",
+      "Microsoft.VSTS.Scheduling.StoryPoints": 5
+    },
+    "relations": [{ "rel": "System.LinkTypes.Hierarchy-Reverse", "url": "https://dev.azure.com/SkytaleAS/_apis/wit/workItems/4742", "attributes": { "name": "Parent" } }]
+  }
+]
