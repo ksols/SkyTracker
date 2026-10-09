@@ -323,6 +323,7 @@
   .ed-row .ed-field{flex:1;min-width:140px}
   .ed-kind{display:flex;gap:6px;flex-wrap:wrap}
   .ed-kind button{padding:6px 10px}
+  .ed-kind button.on[data-c]{background:var(--accent);border-color:var(--accent);color:#fff}
   .ed-kind button.on[data-k=discovery]{background:var(--warn-bg);border-color:var(--warn);color:var(--warn-fg)}
   .ed-kind button.on[data-k=estimate]{background:var(--accent);border-color:var(--accent);color:#fff}
   .ed-check{display:flex;gap:8px;align-items:center;font-size:13px;color:var(--text);cursor:pointer;padding-bottom:8px}
@@ -744,6 +745,7 @@
   <div class="modal-head"><div><h2>Start utredning</h2><div class="md">Én eier og sluttdatoen vi lover nå.</div></div></div>
   <div class="modal-body"><div class="ed-body">
     <label class="ed-field"><span>Eier (initialer)</span><input id="startOwner" type="text" placeholder="THM"></label>
+    <div class="ed-field"><span>Størrelse</span><div class="ed-kind" id="startClass"><button data-c="S">S · 1 uke</button><button data-c="M" class="on">M · 2 uker</button><button data-c="L">L · 4 uker</button><button data-c="XL">XL · 6 uker</button></div></div>
     <label class="ed-field"><span>Utredning ferdig</span><input id="startEnd" type="date"></label>
   </div></div>
   <div class="modal-foot"><span></span><span class="btns"><button class="text" id="startCancel">Avbryt</button><button class="primary" id="startSave">Start</button></span></div>
@@ -1249,10 +1251,12 @@ window.__bootTimeline = function(){
     const psig = progressSignal(t, todayUnit());
     if(psig) chips.push('<span class="chip sig st-' + psig.code + '" title="Andre signal: fremdrift mot tid i det sannsynlige vinduet (teller ikke i epicens farge)">' + esc(progressText(t, psig)) + '</span>');
     if(t.pinned){ const fl = queueFloor(state, t.id).floor; chips.push('<span class="chip pinned" title="Dratt foran køen med vilje' + (fl !== null ? ' (køen sier start ' + esc(fmtDate(unitToDate(fl))) + ')' : '') + '. Slå på «Følger køen» i redigeringen for å slippe den.">overstyrt</span>'); }
-    if(!t.pinned && t.kind === 'estimate' && t.lane !== BACKLOG && t.state !== 'levert'){   // køen: hvem den venter på, synlig uten Historikk
+    if(!t.pinned && t.lane !== BACKLOG && t.state !== 'levert'){   // køen: hvem den venter på, synlig uten Historikk
       const q = queueFloor(state, t.id), qb = q.by ? getTask(q.by) : null;
-      if(q.kind === 'queue' && qb && q.floor !== null && Math.abs(q.floor - t.start) < 1e-6)
-        chips.push('<span class="chip queue" title="Starter når ' + esc(t.assignee || 'eieren') + ' er ferdig med «' + esc(qb.label) + '». Dra den foran for å overstyre.">i kø bak «' + esc(qb.label) + '» (' + esc(t.assignee || '') + ')</span>');
+      if(q.kind === 'queue' && qb && q.floor !== null && Math.abs(q.floor - t.start) < 1e-6){
+        const who = (qb.kind === 'discovery' ? 'utredning ' : '') + '«' + esc(qb.label) + '»';
+        chips.push('<span class="chip queue" title="Starter når ' + esc(t.assignee || 'eieren') + ' er ferdig med ' + who + '. Dra den foran for å overstyre.">i kø bak ' + who + ' (' + esc(t.assignee || '') + ')</span>');
+      }
     }
     if(t.deps.length) chips.push('<span class="chip" title="Venter på ' + t.deps.length + ' feature(s)">⇠ ' + t.deps.length + '</span>');
     if(discoveryOverdue(t, todayUnit())) chips.push('<span class="chip st-gul" title="Sluttdatoen er passert: sett en ny før den passerer">Utredning forsinket</span>');
@@ -1260,7 +1264,7 @@ window.__bootTimeline = function(){
       const when = t.editedAt ? new Date(t.editedAt).toLocaleString('nb-NO', {day:'numeric', month:'short', hour:'2-digit', minute:'2-digit'}) : '';
       chips.push('<span class="chip who" title="Sist endret av ' + esc(t.editedBy) + (when ? ' · ' + esc(when) : '') + '">' + esc(initials(t.editedBy)) + '</span>');
     }
-    const size = sizeClass(t);
+    const size = sizeClassText(t);
     labelDateRefs[t.id].innerHTML = esc(rangeText(t) + (size ? ' · ' + size : '') + (t.kind === 'estimate' && rawLabel(t) ? ' · ' + rawLabel(t) : '')) + chips.join('');
     bar.title = t.label + ' · ' + rangeText(t);
   }
@@ -1760,7 +1764,7 @@ window.__bootTimeline = function(){
   const shelf = $('shelf'), shelfList = $('shelfList'), shelfCount = $('shelfCount');
   function shelfState(t){
     if(t.state === 'ny') return 'Registrert';
-    if(t.state === 'utredes') return 'Utredes' + (t.assignee ? ' · ' + t.assignee : '') + ' · til ' + fmtDate(unitToDate(t.end)) + (sizeClass(t) ? ' · ' + sizeClass(t) : '');
+    if(t.state === 'utredes') return 'Utredes' + (t.assignee ? ' · ' + t.assignee : '') + ' · til ' + fmtDate(unitToDate(t.end)) + (sizeClassText(t) ? ' · ' + sizeClassText(t) : '');
     return 'Klar for veikart · ' + bufferLabel(t) + (rawLabel(t) ? ' · ' + rawLabel(t) : '') + (t.deps.length ? ' · venter på ' + t.deps.length : '');
   }
   function renderShelf(){
@@ -1808,11 +1812,15 @@ window.__bootTimeline = function(){
     normalizePlan(state); save(); render();
   }
   let lifecycleId = null;
+  const CLASS_WEEKS = { S: 1, M: 2, L: 4, XL: 6 };   // spec R7–R9 decision 3
+  let startClass = 'M';
+  function setStartClass(c){ startClass = c; [...$('startClass').querySelectorAll('button')].forEach(b => b.classList.toggle('on', b.dataset.c === c)); $('startEnd').value = toDateInput(snapTo(Math.max(todayUnit(), VIEW_FROM), SNAP) + CLASS_WEEKS[c] * WEEK); }
+  $('startClass').addEventListener('click', e => { const b = e.target.closest('button[data-c]'); if(b) setStartClass(b.dataset.c); });
   function startDiscovery(id){
     const t = getTask(id); if(!t) return;
     lifecycleId = id;
     $('startOwner').value = t.assignee || '';
-    $('startEnd').value = toDateInput(Math.max(todayUnit(), VIEW_FROM) + 2 * WEEK);
+    setStartClass(t.sizeClass || 'M');
     $('startBack').classList.add('open'); setTimeout(() => $('startOwner').focus(), 0);
   }
   $('startSave').addEventListener('click', () => {
@@ -1820,6 +1828,8 @@ window.__bootTimeline = function(){
     const end = fromDateInput($('startEnd').value); if(end === null){ $('startEnd').focus(); return; }
     const owner = $('startOwner').value.trim();
     t.kind = 'discovery'; t.state = 'utredes'; t.start = snapTo(Math.max(todayUnit(), VIEW_FROM), SNAP); t.end = Math.max(t.start + MIN_DUR, end); delete t.endLikely;
+    t.sizeClass = startClass;   // the promise; the dates may drift from it later
+    t.startedAt = new Date().toISOString();   // its place in the owner's queue of discoveries
     if(owner) t.assignee = owner; else delete t.assignee;
     touch(t, 'tid'); touch(t, 'meta'); touch(t, 'state');
     $('startBack').classList.remove('open'); lifecycleId = null;

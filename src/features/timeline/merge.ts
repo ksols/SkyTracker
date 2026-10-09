@@ -17,7 +17,7 @@ export const GROUP_PROPS: Record<TaskFieldGroup, string[]> = {
   label: ["label"],
   deps: ["deps"],
   meta: ["lane", "kind", "adoId", "order", "assignee", "specPath", "pinned", "description"],
-  state: ["state", "committedRange", "activatedAt", "deliveredAt"],
+  state: ["state", "committedRange", "activatedAt", "deliveredAt", "startedAt"],
   est: ["raw", "bufferWeeks"],
   ado: ["ado"],
   progress: ["progress"],
@@ -74,6 +74,8 @@ export type PlanTask = {
   committedRange?: { likely: number; late: number; start: number };
   activatedAt?: string;
   deliveredAt?: string;
+  /** ISO: when «Start utredning» (or the intake, or an import) started the discovery; discoveries of one owner run in this order (R8). */
+  startedAt?: string;
   specPath?: string;
   /** The size class the forum promised when the discovery started (R8): S 1, M 2, L 4, XL 6 weeks. */
   sizeClass?: "S" | "M" | "L" | "XL";

@@ -106,6 +106,7 @@ function normalizePlan(plan) {
     if (typeof t.description !== "string" || !t.description.trim()) delete t.description; else t.description = t.description.trim().slice(0, 4000);
     if (t.pinned) t.pinned = true; else delete t.pinned;   // the planner's override of the queue
     if (!SIZE_CLASSES.includes(t.sizeClass)) delete t.sizeClass;   // the class the forum promised at «Start utredning» (R8)
+    if (typeof t.startedAt !== "string" || !t.startedAt) delete t.startedAt;   // when the discovery was started: its place in the owner's queue (R8)
     // progress: points (ADO or typed) or a percent; the source says who wrote it
     if (t.progress && typeof t.progress === "object") {
       const pr = t.progress, out = {};
@@ -201,8 +202,10 @@ function queueOrder(plan) {   // active estimates in epics, in priority order; a
     .sort((a, b) => idx.get(a.lane) - idx.get(b.lane) || (a.order || 0) - (b.order || 0));
 }
 // R8: a discovery with an owner occupies them from start to end (spec decision 4): the owner's features start when it ends
+// in the order they were started (the forum's earlier decision keeps its place; a new one queues behind), else by start
 function discoveryAnchors(plan) {
-  return plan.tasks.filter((t) => t.kind === "discovery" && t.state !== "levert" && t.assignee).sort((a, b) => a.start - b.start || (a.order || 0) - (b.order || 0));
+  return plan.tasks.filter((t) => t.kind === "discovery" && t.state !== "levert" && t.assignee)
+    .sort((a, b) => (a.startedAt || "").localeCompare(b.startedAt || "") || a.start - b.start || (a.order || 0) - (b.order || 0));
 }
 const occupies = (d, t) => d.start < t.end - 1e-9 && d.end >= t.start - 1e-9;   // the discovery runs into the feature's window (touching counts: the feature starts when it ends)
 function floorOf(plan, t, earlier) {
@@ -274,7 +277,8 @@ function goalText(lane) {
 function sizeClassDerived(t) {
   if (t.kind !== "discovery") return "";
   const w = (t.end - t.start) / WEEK;
-  return w <= 1 + 1e-9 ? "S" : w <= 2 + 1e-9 ? "M" : w <= 4 + 1e-9 ? "L" : "XL";
+  const slack = 0.2;   // a date typed or computed to the day lands up to a day and a half off the week grid: still the same class
+  return w <= 1 + slack ? "S" : w <= 2 + slack ? "M" : w <= 4 + slack ? "L" : "XL";
 }
 /** The class the forum promised when it exists (R8), else the derived one. */
 function sizeClass(t) {

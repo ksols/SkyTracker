@@ -480,6 +480,13 @@ describe("R8: a discovery occupies its owner", () => {
     expect(startOf(p, "d2")).toBeCloseTo(S + 0.5);
     expect(p.tasks.find((t) => t.id === "d2")!.end).toBeCloseTo(S + 1.25);
   });
+  it("discoveries of one owner run in the order they were started: a new one starting today queues behind an older one already pushed", () => {
+    const p = mk([D({ id: "old", start: S + 0.5, end: S + 1, startedAt: "2026-10-01T10:00:00.000Z" }), D({ id: "fresh", start: S, end: S + 0.5, startedAt: "2026-10-09T10:00:00.000Z" })]);
+    expect(resolveQueue(p)).toEqual([{ id: "fresh", by: "old", kind: "queue" }]);
+    expect(startOf(p, "old")).toBeCloseTo(S + 0.5);
+    expect(startOf(p, "fresh")).toBeCloseTo(S + 1);
+    expect(normalizePlan({ lanes, tasks: [D({ startedAt: 7 as never })] }).tasks[0].startedAt).toBeUndefined();
+  });
   it("a feature pushed past one discovery lands after the next one too; the pin keeps it where it was dragged", () => {
     const p = mk([F(), D({ id: "d1" }), D({ id: "d2", start: S + 0.75, end: S + 1.25 })]);
     resolveQueue(p);

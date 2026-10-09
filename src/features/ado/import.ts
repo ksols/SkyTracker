@@ -152,6 +152,7 @@ export function importItems(plan: Plan, items: ImportCandidate[], ids: number[],
     if (c.description) base.description = c.description;
     if (c.state === "Discovery") {
       base.state = "utredes";
+      base.startedAt = nowIso;
       base.end = Math.max(start + WEEK, dayUnit(c.targetDate) ?? start + 2 * WEEK);
       const who = initialsFor(c.assignedEmail, c.assignedTo, opts.people);
       if (who) base.assignee = who;

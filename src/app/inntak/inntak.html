@@ -262,7 +262,7 @@ window.__bootInntak = function(){
     else {
       const start = todayUnit();
       const t = { id: uid('f'), lane: BACKLOG, label: w.title, kind: 'discovery', state: status === 'utred' ? 'utredes' : 'ny', start, end: status === 'utred' ? Math.max(start + WEEK, o.end) : start + WEEK, deps: [], fv: { state: 1, tid: 1, meta: 1 } };
-      if(status === 'utred'){ if(o.owner){ t.assignee = o.owner; w.owner = o.owner; } t.sizeClass = o.sizeClass; w.sizeClass = o.sizeClass; }
+      if(status === 'utred'){ if(o.owner){ t.assignee = o.owner; w.owner = o.owner; } t.sizeClass = o.sizeClass; w.sizeClass = o.sizeClass; t.startedAt = new Date().toISOString(); }
       if(w.note) t.description = w.note;
       if(myName){ t.editedBy = myName; t.editedAt = new Date().toISOString(); }
       state.tasks.push(t); w.featureId = t.id; state.example = false;
