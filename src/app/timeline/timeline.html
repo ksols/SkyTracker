@@ -428,6 +428,13 @@
   .shelf-row .acts{display:flex;gap:4px;opacity:0}
   .shelf-row:hover .acts{opacity:1}
   .shelf-row .grip{opacity:1}
+  .import-list{padding:4px 0 8px}
+  .import-row{display:grid;grid-template-columns:auto 110px 1fr auto;gap:4px 12px;align-items:center;padding:7px 20px;border-bottom:1px solid var(--line-soft);font-size:13px;cursor:pointer}
+  .import-row:hover{background:var(--surface-2,rgba(0,0,0,.03))}
+  .import-row .typ{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11px;color:var(--text-3)}
+  .import-row .ttl{font-weight:600;color:var(--text)}
+  .import-row .ttl .md{font-weight:400;color:var(--text-3)}
+  .import-row .map{font-size:11px;color:var(--text-2);text-align:right;white-space:nowrap}
   .shelf-group{font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--text-3);padding:8px 8px 2px}
   .shelf-empty{padding:0 14px 12px;font-size:12px;color:var(--text-4)}
   .preview{font-size:13px;padding:10px 12px;border-radius:6px;background:var(--bg);border:1px solid var(--line-soft);margin:0 20px 16px}
@@ -463,6 +470,7 @@
     <button id="baselineBtn" title="Lagre planen slik den er nå, som et punkt å sammenligne med">Merk baseline…</button>
     <select id="cmpSelect" title="Sammenlign planen med et tidligere punkt"><option value="">Sammenlign med …</option></select>
     <input id="cmpDate" type="date" hidden title="Planen slik den var om morgenen denne dagen">
+    <button id="adoImportBtn" hidden title="Epics og features som allerede ligger i ADO, inn i planen. Skriver ingenting til ADO.">Hent fra ADO</button>
     <button id="adoRefreshBtn" hidden title="Les tilbake fra ADO: stories, poeng, sprint og det som er lukket">Oppdater fra ADO</button>
     <button id="exportBtn">Eksporter (JSON)</button>
     <button id="histBtn" title="Hva har flyttet seg, og hvorfor">Historikk<span class="count" id="histBadge" hidden></span></button>
@@ -529,7 +537,7 @@
       <div class="help-card"><h4>ADO og sprinter</h4>
         <p>Tidslinjen eier epics, features, estimater og avhengigheter; ADO speiler dem. <b>Lagre og push til ADO</b> i redigeringen oppretter
         eller oppdaterer epicen/featuren (tittel, beskrivelse, tilstand, parent, datoer, avhengigheter) og en discovery-story med eier og sluttdato
-        mens featuren utredes. <b>Oppdater fra ADO</b> leser tilbake stories, poeng, sprint og det som er lukket («Levert»). Endres et felt i ADO
+        mens featuren utredes. <b>Hent fra ADO</b> lister epics og features som allerede ligger i ADO og tar de valgte inn i planen uten å skrive noe til ADO. <b>Oppdater fra ADO</b> leser tilbake stories, poeng, sprint og det som er lukket («Levert»). Endres et felt i ADO
         etter siste push, listes det som <b>konflikt</b> øverst og overskrives aldri uten at du ber om det. Sprintene på aksen kommer fra ADO;
         «Sprint 71 · dag 4» står på dagens strek, og sprintmålet ved tegnforklaringen. Mangler tilgangen, ber siden deg logge inn på nytt.</p></div>
       <div class="help-card"><h4>Fremdrift og sprintrapport</h4>
@@ -754,6 +762,11 @@
 </div></div>
 
 <!-- bekreftelses-/inndata-dialog -->
+<div class="modal-back" id="importBack"><div class="modal" style="width:min(760px,100%)">
+  <div class="modal-head"><div><h2>Hent fra ADO</h2><div class="md">Epics og features som ligger i ADO, men ikke i planen. Ingenting skrives til ADO; neste push endrer bare det du endrer her etterpå.</div></div></div>
+  <div class="modal-body"><div class="import-list" id="importList"></div></div>
+  <div class="modal-foot"><span class="md" id="importCount"></span><span class="btns"><button class="text" id="importCancel">Avbryt</button><button class="primary" id="importGo" disabled>Hent</button></span></div>
+</div></div>
 <div class="modal-back" id="dlgBack">
   <div class="modal" style="width:min(480px,100%)">
     <div class="modal-head"><div><h2 id="dlgTitle"></h2></div></div>
@@ -1482,7 +1495,7 @@ window.__bootTimeline = function(){
   $('dlgInput').addEventListener('keydown', e => { if(e.key === 'Enter') dlgClose(e.target.value); });
 
   /* ================== begrunnelse ================== */
-  const reasonBack = $('reasonBack');
+  const reasonBack = $('reasonBack'), importBack = $('importBack');
   let reasonOpen = false, reasonLate = null;   // reasonLate = { changesetId }: begrunnelse som legges til i etterkant (historikken)
   function askReason(lines, late){
     if(!HOSTED || !canWrite) return;           // lokal fil eller lesetilgang: ingen delt historikk å begrunne
@@ -2206,6 +2219,7 @@ window.__bootTimeline = function(){
       $('baselineBtn').hidden = !canWrite;   // lesere kan sammenligne, ikke merke baseliner
       $('registerBtn').hidden = !canWrite;
       $('adoRefreshBtn').hidden = !canWrite;
+      $('adoImportBtn').hidden = !canWrite;
       $('investorBtn').hidden = false;   // tallene er for alle som er logget inn
       $('mixField').hidden = !canWrite;
       whoami.textContent = myName || '';
@@ -2242,6 +2256,7 @@ window.__bootTimeline = function(){
         roTag.hidden = false;
         $('baselineBtn').hidden = true;
         $('adoRefreshBtn').hidden = true;
+        $('adoImportBtn').hidden = true;
         afterSaveQueue.length = 0;
         setSaveNote('kun lesetilgang – endringer forblir lokale');
         return;
@@ -2283,7 +2298,7 @@ window.__bootTimeline = function(){
     clearTimeout(saveTimer);
     saveTimer = setTimeout(pushPlan, 900);
   }
-  const anyModalOpen = () => editorBack.classList.contains('open') || epicBack.classList.contains('open') || dlgBack.classList.contains('open') || reasonBack.classList.contains('open') ||
+  const anyModalOpen = () => editorBack.classList.contains('open') || epicBack.classList.contains('open') || dlgBack.classList.contains('open') || reasonBack.classList.contains('open') || importBack.classList.contains('open') ||
     $('startBack').classList.contains('open') || $('readyBack').classList.contains('open') || $('placeBack').classList.contains('open');
   /* ================== ADO-speilet: push, tilbakelesing, konflikter, sprinter ================== */
   function afterSave(fn){ afterSaveQueue.push(fn); }
@@ -2378,6 +2393,49 @@ window.__bootTimeline = function(){
     pushToAdo(kind, id, { force: true });
   });
   $('adoRefreshBtn').addEventListener('click', refreshFromAdo);
+  /* «Hent fra ADO» (R7a): det som ligger i ADO og ikke i planen, valgt rad for rad; ingenting skrives til ADO */
+  let adoImportRows = [];
+  async function openImport(){
+    $('importList').innerHTML = '<div class="shelf-empty">Leser fra ADO…</div>'; $('importCount').textContent = ''; $('importGo').disabled = true; $('importGo').textContent = 'Hent';
+    importBack.classList.add('open');
+    let j;
+    try{ j = await adoCall('api/ado-import', { list: true }); }
+    catch(e){ importBack.classList.remove('open'); if(e.message !== 'ado-login') askDialog('Hent fra ADO', e.message, {confirmText:'OK', noCancel:true}); return; }
+    adoImportRows = j.items || [];
+    renderImportList();
+  }
+  function renderImportList(){
+    const list = $('importList');
+    if(!adoImportRows.length){ list.innerHTML = '<div class="shelf-empty">Alt som er åpent i ADO ligger allerede i planen.</div>'; updateImportCount(); return; }
+    list.innerHTML = adoImportRows.map(i => '<label class="import-row"><input type="checkbox" data-id="' + i.id + '"' + (i.suggested ? ' checked' : '') + '><span class="typ">' + esc(i.type) + ' #' + i.id + '</span>' +
+      '<span class="ttl">' + esc(i.title) + (i.parentTitle ? ' <span class="md">← ' + esc(i.parentTitle) + '</span>' : '') + '</span><span class="map">' + esc(i.mapping) + '</span></label>').join('');
+    updateImportCount();
+  }
+  function updateImportCount(){
+    const n = document.querySelectorAll('#importList input:checked').length;
+    $('importCount').textContent = adoImportRows.length ? n + ' av ' + adoImportRows.length + ' valgt' : '';
+    $('importGo').textContent = 'Hent' + (n ? ' ' + n : ''); $('importGo').disabled = !n;
+  }
+  $('importList').addEventListener('change', updateImportCount);
+  $('importCancel').addEventListener('click', () => importBack.classList.remove('open'));
+  importBack.addEventListener('click', e => { if(e.target === importBack) importBack.classList.remove('open'); });
+  $('importGo').addEventListener('click', async () => {
+    const ids = [...document.querySelectorAll('#importList input:checked')].map(c => parseInt(c.dataset.id, 10));
+    if(!ids.length) return;
+    $('importGo').disabled = true; setSaveNote('henter fra ADO…');
+    try{
+      const j = await adoCall('api/ado-import', { ids });
+      importBack.classList.remove('open');
+      if(j.data && !pendingSave && !drag) applyRemote(j.data, j.version);
+      setSaveNote('hentet ' + (j.imported || []).length + ' fra ADO');
+      refreshHistoryBadge();
+    }catch(e){
+      $('importGo').disabled = false;
+      if(e.message === 'ado-login'){ importBack.classList.remove('open'); setSaveNote('ADO: logg inn på nytt'); }
+      else askDialog('Hent fra ADO', e.message, {confirmText:'OK', noCancel:true});
+    }
+  });
+  $('adoImportBtn').addEventListener('click', openImport);
   const sprintItems = () => (state.sprints && state.sprints.items) || [];
   function renderSprintGoal(){
     const sg = $('sprintGoal');
