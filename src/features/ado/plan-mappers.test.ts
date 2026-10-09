@@ -103,3 +103,11 @@ describe("patches", () => {
     expect(relationPatch(cur, { parent: 4600, predecessors: [4701] })).toEqual([]);
   });
 });
+
+describe("review: what ADO hands back", () => {
+  it("a description ADO re-encoded (entities, nbsp, other tags) compares equal to what we wrote", () => {
+    const ours: Fields = { description: "<p>Planlagt i Tidslinjen (SkyTracker) under epicen «Telenor & co».</p><p>Spenn: 4–6 uker + 1 uke buffer → uke 49–51.</p>" };
+    const cur = item({ "System.Description": "<div>Planlagt&nbsp;i Tidslinjen (SkyTracker) under epicen &#171;Telenor &amp; co&#187;.</div><div>Spenn: 4&#8211;6 uker + 1 uke buffer &#8594; uke 49&#8211;51.</div>" });
+    expect(planFieldWrites(ours, cur, { description: "x" })).toEqual({ writes: {}, conflicts: [] });
+  });
+});

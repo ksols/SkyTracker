@@ -163,3 +163,19 @@ describe("refreshSprints", () => {
     expect((await refreshSprints(r.plan, ado.client, new Date(NOW.getTime() + 13 * 3600 * 1000))).changed).toBe(true);
   });
 });
+
+describe("review: a failure after the feature was created", () => {
+  it("keeps the feature's new ADO id in the partial plan when the discovery story fails, so the next push updates instead of duplicating", async () => {
+    const ado = fakeAdo();
+    let n = 0;
+    const failing: AdoClient = { ...ado.client, create: async (type, patch) => { if (++n === 3) throw new Error("story boom"); return ado.client.create(type, patch); } };
+    const err = await pushItem(plan(), { kind: "feature", id: "iam" }, failing, OPTS).catch((e) => e);
+    expect(err).toBeInstanceOf(PushFailed);
+    const partial = (err as PushFailed).partial;
+    expect(partial.items.map((i) => [i.kind, i.adoId])).toEqual([["epic", 5000], ["feature", 5001]]);
+    const iam = partial.plan.tasks.find((t) => t.id === "iam")!;
+    expect(iam.adoId).toBe(5001);
+    expect(iam.ado?.snapshot.title).toBe("IAM");
+    expect(iam.ado?.storyId).toBeUndefined();
+  });
+});

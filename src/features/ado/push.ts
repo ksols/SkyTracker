@@ -76,20 +76,22 @@ export async function pushItem(plan: Plan, target: PushTarget, client: AdoClient
     const predecessors = (task.deps ?? []).map((d) => p.tasks.find((t) => t.id === d)?.adoId).filter((x): x is number => !!x);
     const r = await pushOne(client, "Feature", task.adoId ?? null, featureFields(p, task), task.ado ?? null, { parent, predecessors }, opts);
     result.items.push({ kind: "feature", id: task.id, label: task.label, adoId: r.id, action: r.action, type: "Feature", patch: r.patch, conflicts: r.conflicts });
+    if (!opts.dry) { // record the feature's id and snapshot now: a failure in the story step must never lose them (a lost id means a duplicate next time)
+      if (r.id && task.adoId !== r.id) { task.adoId = r.id; bump(task, "meta"); }
+      const next: TaskAdo = { ...r.ado };
+      if (task.ado?.storyId) next.storyId = task.ado.storyId;
+      if (task.ado?.stories) next.stories = task.ado.stories;
+      task.ado = next;
+      bump(task, "ado");
+    }
     let story: { id: number | null; action: PushedItem["action"] } | undefined;
-    if (task.state === "utredes") { // the discovery story under the feature: owner and end date, no conflict detection (ADO owns stories)
+    if (task.state === "utredes") { // the discovery story under the feature: owner and end date; SkyTracker's, so no conflict detection
       const s = await pushOne(client, ADO_WORK_ITEM_TYPE, task.ado?.storyId ?? null, storyFields(task, opts.people), null, { parent: r.id }, opts);
       result.items.push({ kind: "story", id: task.id, label: "Utredning: " + task.label, adoId: s.id, action: s.action, type: ADO_WORK_ITEM_TYPE, patch: s.patch, conflicts: [] });
       story = { id: s.id, action: s.action };
+      if (!opts.dry && s.id && task.ado) task.ado.storyId = s.id;
     }
     if (opts.dry) return result;
-    if (r.id && task.adoId !== r.id) { task.adoId = r.id; bump(task, "meta"); }
-    const next: TaskAdo = { ...r.ado };
-    const storyId = story?.id ?? task.ado?.storyId;
-    if (storyId) next.storyId = storyId;
-    if (task.ado?.stories) next.stories = task.ado.stories;
-    task.ado = next;
-    bump(task, "ado");
     result.events.push(...pushEvents({ targetType: "feature", targetId: task.id, targetLabel: task.label, laneKey: task.lane }, r, "Feature", story));
     return result;
   } catch (e) {
