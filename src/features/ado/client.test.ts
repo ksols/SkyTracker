@@ -70,3 +70,19 @@ describe("the board's create-in-ADO helpers", () => {
     expect(body[0]).toEqual({ op: "add", path: "/relations/-", value: { rel: "System.LinkTypes.Dependency-Reverse", url: "https://dev.azure.com/SkytaleAS/_apis/wit/workItems/20" } });
   });
 });
+
+describe("createAdoClient.wiql", () => {
+  it("POSTs the query on the project url and returns the ids in ADO's order", async () => {
+    const f = vi.fn().mockResolvedValue(res(200, { queryType: "flat", workItems: [{ id: 4566, url: "u" }, { id: 4742, url: "u" }] }));
+    const ids = await client(f).wiql("SELECT [System.Id] FROM WorkItems WHERE [System.WorkItemType] = 'Feature'");
+    expect(ids).toEqual([4566, 4742]);
+    const [url, init] = f.mock.calls[0];
+    expect(String(url)).toBe("https://dev.azure.com/SkytaleAS/Skytale/_apis/wit/wiql?api-version=7.1");
+    expect(init.method).toBe("POST");
+    expect(JSON.parse(init.body)).toEqual({ query: "SELECT [System.Id] FROM WorkItems WHERE [System.WorkItemType] = 'Feature'" });
+  });
+  it("returns an empty list when nothing matches", async () => {
+    const f = vi.fn().mockResolvedValue(res(200, { workItems: [] }));
+    expect(await client(f).wiql("SELECT [System.Id] FROM WorkItems WHERE [System.Id] = 0")).toEqual([]);
+  });
+});

@@ -34,6 +34,7 @@ function fakeAdo(seed: AdoWorkItem[] = []) {
     create: async (type, patch) => { calls.push("create " + type); const w: AdoWorkItem = { id: next++, fields: { "System.WorkItemType": type, "System.State": "New" }, relations: [] }; apply(w, patch); items.set(w.id, w); return w; },
     patch: async (id, patch) => { calls.push("patch " + id); const w = items.get(id)!; apply(w, patch); return w; },
     iterations: async () => ({ name: "Skytale", children: [{ name: "Sprint 71", attributes: { startDate: "2026-10-05T00:00:00Z", finishDate: "2026-10-16T00:00:00Z" } }] }),
+    wiql: async () => [],
     gitItem: async () => null,
   };
   return { items, client, calls };

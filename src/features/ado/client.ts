@@ -16,6 +16,8 @@ export type AdoClient = {
   create(type: string, patch: JsonPatch[]): Promise<AdoWorkItem>;
   patch(id: number, patch: JsonPatch[]): Promise<AdoWorkItem>;
   iterations(): Promise<IterationNode>;
+  /** A WIQL query on the project; the ids in ADO's order (the caller batches them). */
+  wiql(query: string): Promise<number[]>;
   /** A file's text from a git repository, null when the path does not exist. */
   gitItem(repoId: string, path: string): Promise<string | null>;
 };
@@ -52,6 +54,10 @@ export function createAdoClient(authHeader: string, fetchImpl: typeof fetch = (.
     },
     create: async (type, patch) => (await request<AdoWorkItem>("POST", `${adoProjectUrl()}/_apis/wit/workitems/$${encodeURIComponent(type)}?${v}`, patch, "application/json-patch+json"))!,
     patch: async (id, patch) => (await request<AdoWorkItem>("PATCH", `${ADO_ORG_URL}/_apis/wit/workitems/${id}?${v}`, patch, "application/json-patch+json"))!,
+    async wiql(query) {
+      const r = await request<{ workItems?: { id: number }[] }>("POST", `${adoProjectUrl()}/_apis/wit/wiql?${v}`, { query });
+      return (r?.workItems ?? []).map((w) => w.id);
+    },
     iterations: async () => (await request<IterationNode>("GET", `${adoProjectUrl()}/_apis/wit/classificationnodes/iterations?$depth=2&${v}`))!,
     async gitItem(repoId, path) {
       const r = await request<{ content?: string }>("GET", `${adoProjectUrl()}/_apis/git/repositories/${repoId}/items?path=${encodeURIComponent(path)}&includeContent=true&${v}`, undefined, undefined, true);
