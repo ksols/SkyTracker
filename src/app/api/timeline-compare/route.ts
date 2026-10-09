@@ -2,8 +2,9 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { diffPlans } from "@/features/timeline/events";
 import { exportMarkdown, sinceLabel, snapshotForDay, summarizeNet, summaryLine, type PathEvent } from "@/features/timeline/compare";
-import { normalizePlan } from "@/features/timeline/epic-tools.js";
+import { dateToUnit, normalizePlan } from "@/features/timeline/epic-tools.js";
 import type { Plan } from "@/features/timeline/merge";
+import { sprintReportMarkdown } from "@/features/timeline/report";
 
 // Compare the current plan with a baseline (spec §4.4).
 // GET ?from=<snapshot id | YYYY-MM-DD>
@@ -18,7 +19,9 @@ const clone = <T,>(v: T): T => JSON.parse(JSON.stringify(v)) as T;
 export async function GET(req: Request) {
   const session = await auth();
   if (!session) return Response.json({ error: "unauthorized" }, { status: 401 });
-  const from = new URL(req.url).searchParams.get("from") ?? "";
+  const params = new URL(req.url).searchParams;
+  const from = params.get("from") ?? "";
+  const report = params.get("report") === "1";   // the sprint report: the export plus deliveries, progress and discoveries (stage 5)
   if (!from) return Response.json({ error: "from is required" }, { status: 400 });
 
   let id = from;
@@ -48,7 +51,10 @@ export async function GET(req: Request) {
   const strip = summaryLine(label, summary);
   const names = new Map<string, string>();
   for (const l of [...before.lanes, ...after.lanes]) names.set(l.key, l.name);
-  const exportText = exportMarkdown("Siden " + label, strip, path, (k) => names.get(k) ?? k);
+  const laneName = (k: string) => names.get(k) ?? k;
+  const exportText = report
+    ? sprintReportMarkdown({ title: baseline.kind === "sprint" ? "Sprintrapport " + (baseline.label ?? "").replace(/^Sprintstart /, "") : "Rapport siden " + label, strip, path, plan: after, laneName, todayUnit: dateToUnit(new Date()) })
+    : exportMarkdown("Siden " + label, strip, path, laneName);
   return Response.json({
     baseline: { id: baseline.id, at: baseline.at, kind: baseline.kind, day: baseline.day, label: baseline.label, data: baseline.data },
     net, path, summary, strip, exportText,
