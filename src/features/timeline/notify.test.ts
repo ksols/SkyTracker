@@ -60,3 +60,17 @@ describe("postSlack and notifyTurns", () => {
     await expect(notifyTurns(before, after, { editor: "GO" }, { SLACK_WEBHOOK_URL: "https://hooks.slack.com/y" }, boom as unknown as typeof fetch)).resolves.toBeUndefined();
   });
 });
+
+describe("review: what never notifies", () => {
+  it("the seed and an import are not news: no notice even when the loaded plan has yellow or red epics", async () => {
+    const before: Plan = { lanes: [], tasks: [], deleted: {} };
+    const after = plan([lane("a")], [est("a1", "a", S, 8, 10)]); // red from the start
+    const sent = vi.fn().mockResolvedValue({ ok: true, status: 200 });
+    const env = { SLACK_WEBHOOK_URL: "https://hooks.slack.com/y" };
+    await notifyTurns(before, after, { editor: "GO", source: "seed" }, env, sent as unknown as typeof fetch);
+    await notifyTurns(before, after, { editor: "GO", source: "import" }, env, sent as unknown as typeof fetch);
+    expect(sent).not.toHaveBeenCalled();
+    await notifyTurns(before, after, { editor: "GO", source: "bruker" }, env, sent as unknown as typeof fetch);
+    expect(sent).toHaveBeenCalledTimes(1);
+  });
+});

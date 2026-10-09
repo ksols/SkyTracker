@@ -87,7 +87,7 @@ export async function PUT(req: Request) {
 // The history is best-effort: a failed log write must never fail the save.
 async function logHistory(before: Plan, after: Plan, beforeVersion: number, afterVersion: number, editor: string | null, note: ReturnType<typeof parseNote>) {
   // the same-week notice rides on the save, never on its result (features/timeline/notify.ts)
-  void notifyTurns(before, after, { editor, reason: note.reason, reasonCode: note.reasonCode });
+  void notifyTurns(before, after, { editor, reason: note.reason, reasonCode: note.reasonCode, source: note.source });
   try {
     return await recordChangeset(prisma, { before, after, beforeVersion, afterVersion, editor, note });
   } catch {

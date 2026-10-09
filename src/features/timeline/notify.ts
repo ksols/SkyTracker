@@ -6,7 +6,7 @@ import { REASON_LABEL, type ReasonCode } from "./events";
 import type { Plan } from "./merge";
 
 export type EpicTurn = { key: string; name: string; from: EpicStatusCode; to: "gul" | "rod"; window: string; goal: string };
-export type NoticeCtx = { editor: string | null; reason?: string; reasonCode?: string; url?: string };
+export type NoticeCtx = { editor: string | null; reason?: string; reasonCode?: string; url?: string; source?: string };
 
 const RANK: Record<EpicStatusCode, number> = { gronn: 0, venter: 0, "ingen-mal": 0, tom: 0, gul: 1, rod: 2 };
 const COLOUR: Record<EpicStatusCode, string> = { gronn: "grønn", gul: "gul", rod: "rød", venter: "venter på utredning", "ingen-mal": "uten måldato", tom: "tom" };
@@ -49,6 +49,7 @@ export async function notifyTurns(before: Plan, after: Plan, ctx: NoticeCtx, env
   try {
     const hook = env.SLACK_WEBHOOK_URL?.trim();
     if (!hook) return;
+    if (ctx.source === "seed" || ctx.source === "import") return; // example data and imports are not news
     const turns = epicTurns(before, after);
     if (!turns.length) return;
     const base = env.SKYTRACKER_URL?.trim().replace(/\/$/, "");
