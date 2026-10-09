@@ -22,6 +22,11 @@ export default {
   session: { strategy: "jwt" },
   pages: { signIn: "/login" },
   callbacks: {
+    // One sign-in for the whole tool: without this callback next-auth's middleware lets every matched route through
+    // (`authorized` defaults to true), and each page guarded itself; the board at / did not.
+    authorized({ auth }) {
+      return !!auth;
+    },
     jwt({ token, profile, account }) {
       if (profile) {
         // Decode raw ID token to get all claims including groups

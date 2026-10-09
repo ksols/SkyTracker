@@ -3,10 +3,19 @@ const PROJECT = "Skytale";
 const TEAM = "Dev Team";
 const API = "7.1";
 
+import { execSync } from "node:child_process";
+
+// No PAT anywhere: the admin script runs as the person at the keyboard, through `az login`
+// (the same token the app's ADO_DEV_TOKEN override takes), like Skytale.QA's scripts.
+const ADO_RESOURCE = "499b84ac-1321-427f-aa17-267ca6975798";
+let cachedAuth: string | null = null;
 function authHeader(): string {
-  const pat = process.env.ADO_PAT;
-  if (!pat) throw new Error("ADO_PAT is not set (needed to manage iterations)");
-  return `Basic ${Buffer.from(`:${pat}`).toString("base64")}`;
+  if (cachedAuth) return cachedAuth;
+  const fromEnv = process.env.ADO_DEV_TOKEN?.trim();
+  const token = fromEnv || execSync(`az account get-access-token --resource ${ADO_RESOURCE} --query accessToken -o tsv`, { stdio: "pipe" }).toString().trim();
+  if (!token) throw new Error("No ADO token: run `az login` (or set ADO_DEV_TOKEN)");
+  cachedAuth = `Bearer ${token}`;
+  return cachedAuth;
 }
 
 async function adoFetch(url: string, init: RequestInit = {}): Promise<unknown> {
