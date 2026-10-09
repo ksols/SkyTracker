@@ -1,8 +1,7 @@
 // One thin REST client over fetch with the signed-in person's bearer token (token.ts). Used by the
-// board's create-in-ADO flow and by the timeline's push/refresh (push.ts). Mirrors the endpoints and
-// api-versions of Skytale.QA's client.
-import { ADO_API_VERSION, ADO_ORG_URL, ADO_PREDECESSOR_REL, ADO_PROJECT, ADO_WORK_ITEM_TYPE, adoProjectUrl, adoWorkItemApiUrl } from "./config";
-import { buildWorkItemPatch, matchIterationName } from "./mappers";
+// timeline's push/refresh/import (push.ts, import.ts). Mirrors the endpoints and api-versions of
+// Skytale.QA's client.
+import { ADO_API_VERSION, ADO_ORG_URL, adoProjectUrl } from "./config";
 
 export type JsonPatch = { op: "add" | "replace" | "remove"; path: string; value?: unknown };
 export type AdoRelation = { rel: string; url: string; attributes?: Record<string, unknown> };
@@ -64,17 +63,4 @@ export function createAdoClient(authHeader: string, fetchImpl: typeof fetch = (.
       return r?.content ?? null;
     },
   };
-}
-
-/* ----- the board's create-in-ADO flow (cards → User Story) ----- */
-export async function createWorkItem(client: AdoClient, input: { title: string; description: string; tags: string[]; iterationPath: string | null }): Promise<number> {
-  return (await client.create(ADO_WORK_ITEM_TYPE, buildWorkItemPatch(input))).id;
-}
-export async function resolveIterationPath(client: AdoClient, sprintNumber: number): Promise<string | null> {
-  const root = await client.iterations();
-  const match = matchIterationName((root.children ?? []).map((c) => c.name), sprintNumber);
-  return match ? `${ADO_PROJECT}\\${match}` : null;
-}
-export async function addPredecessorLink(client: AdoClient, blockedWorkItemId: number, blockerWorkItemId: number): Promise<void> {
-  await client.patch(blockedWorkItemId, [{ op: "add", path: "/relations/-", value: { rel: ADO_PREDECESSOR_REL, url: adoWorkItemApiUrl(blockerWorkItemId) } }]);
 }

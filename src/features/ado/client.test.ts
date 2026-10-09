@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { addPredecessorLink, AdoRequestError, createAdoClient, createWorkItem, resolveIterationPath } from "./client";
+import { AdoRequestError, createAdoClient } from "./client";
 
 const res = (status: number, body: unknown, text?: string) => ({ ok: status >= 200 && status < 300, status, text: async () => text ?? JSON.stringify(body) });
 const client = (fetchMock: ReturnType<typeof vi.fn>) => createAdoClient("Bearer t0k", fetchMock as unknown as typeof fetch);
@@ -48,26 +48,6 @@ describe("createAdoClient", () => {
     await expect(c.get(1)).rejects.toMatchObject({ name: "AdoRequestError", status: 401 });
     await expect(c.get(1)).rejects.toBeInstanceOf(AdoRequestError);
     await expect(c.get(1)).rejects.toMatchObject({ status: 400 });
-  });
-});
-
-describe("the board's create-in-ADO helpers", () => {
-  it("createWorkItem posts the card patch and returns the id", async () => {
-    const f = vi.fn().mockResolvedValue(res(200, { id: 99, fields: {} }));
-    expect(await createWorkItem(client(f), { title: "My card", description: "d", tags: ["Backend", "SkyTracker"], iterationPath: "Skytale\\Sprint 64" })).toBe(99);
-    const body = JSON.parse(f.mock.calls[0][1].body);
-    expect(body).toContainEqual({ op: "add", path: "/fields/System.IterationPath", value: "Skytale\\Sprint 64" });
-  });
-  it("resolveIterationPath matches the sprint among the iteration nodes", async () => {
-    const f = vi.fn().mockResolvedValue(res(200, { name: "Skytale", children: [{ name: "Sprint 63" }, { name: "Sprint 64" }] }));
-    expect(await resolveIterationPath(client(f), 64)).toBe("Skytale\\Sprint 64");
-    expect(await resolveIterationPath(client(f), 99)).toBeNull();
-  });
-  it("addPredecessorLink patches a relations/- add op pointing at the blocker", async () => {
-    const f = vi.fn().mockResolvedValue(res(200, { id: 10, fields: {} }));
-    await addPredecessorLink(client(f), 10, 20);
-    const body = JSON.parse(f.mock.calls[0][1].body);
-    expect(body[0]).toEqual({ op: "add", path: "/relations/-", value: { rel: "System.LinkTypes.Dependency-Reverse", url: "https://dev.azure.com/SkytaleAS/_apis/wit/workItems/20" } });
   });
 });
 
