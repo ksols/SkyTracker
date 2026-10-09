@@ -1,6 +1,6 @@
 # CLAUDE.md — SkyTracker
 
-Lightweight personal/team Kanban board. Next.js 16 (App Router) + React 19 + Prisma 7 + Postgres + Auth.js v5 (Microsoft Entra ID) + Tailwind v4.
+Skytale's planning system: the feature board (`/`), the timeline «Tidslinjen» (`/timeline`) and the intake «Inntak» (`/inntak`) over one shared plan, mirrored to Azure DevOps as Epics and Features. Next.js 16 (App Router) + Prisma 7 + Postgres + Auth.js v5 (Microsoft Entra ID); the three pages are plain HTML/JS served by route handlers. Design: `docs/superpowers/specs/2026-10-08-planning-system-design.md` and the R7–R9 amendment beside it.
 
 ## Stack & versions
 
@@ -18,61 +18,39 @@ Lightweight personal/team Kanban board. Next.js 16 (App Router) + React 19 + Pri
 
 ```
 src/
-├── app/                              # Next.js App Router
-│   ├── api/auth/[...nextauth]/       # Auth.js handlers
-│   ├── login/                        # Public sign-in page
-│   ├── page.tsx                      # Protected board view (= "/")
-│   ├── layout.tsx
-│   ├── globals.css
-│   └── icon.svg                      # Favicon (App Router convention)
-├── components/                       # Presentational React components
-│   ├── board/                        # Board UI: Board, Column, Card, Add*Form
-│   └── SignOutButton.tsx
-├── features/                         # Domain logic, grouped by feature
-│   └── board/
-│       ├── queries.ts                # Read-side: getOrCreateBoard, getBoardWithContents
-│       ├── actions.ts                # Server actions (mutations). Validation lives here via Zod.
-│       └── types.ts                  # Domain types (CardTag, parseTags, DEFAULT_TAGS)
-├── lib/                              # Cross-cutting wiring (one entity per file)
-│   ├── prisma.ts                     # PrismaClient singleton + pg adapter
-│   ├── auth.config.ts                # EDGE-safe Auth.js config (providers + pages only). Imported by middleware.
-│   └── auth.ts                       # Full NextAuth() config (adds Prisma adapter + DB sessions). Node runtime only.
-├── generated/prisma/                 # Prisma 7 generated client (DO NOT EDIT, committed)
-│   ├── client.ts                     # → `import { PrismaClient } from "@/generated/prisma/client"`
-│   └── models.ts                     # → `import type { CardModel } from "@/generated/prisma/models"`
-└── middleware.ts                     # Protects every route except /login + /api/auth + assets
-prisma/
-└── schema.prisma                     # Schema. No `url` here — see prisma.config.ts.
-prisma.config.ts                      # Datasource URL + migrations path (Prisma 7 lives here, not in schema)
-.env / .env.example                   # Local secrets; never commit .env
+├── app/
+│   ├── route.ts + board.html           # The feature board: the plan's features as a Kanban over the lifecycle (plain JS)
+│   ├── timeline/route.ts + timeline.html  # Tidslinjen: epics, features, the shelf, history, compare, ADO, investors (plain JS)
+│   ├── inntak/route.ts + inntak.html   # Inntak: PreSales' wishes and produktforum's decisions (plain JS)
+│   ├── timeline/epic-tools.js          # Shared plain-JS logic (normalisation, queue, classes, labels); also imported by vitest and the pages
+│   ├── api/timeline-*/                 # The plan (GET/PUT with merge), changes, snapshots, compare, digest, investor
+│   ├── api/ado-*/                      # ADO on the signed-in person's Entra token: push, refresh, sprints, import
+│   ├── api/board-import, api/specs-estimate
+│   ├── api/auth/[...nextauth]/, login/, layout.tsx, globals.css, icon.svg
+├── features/
+│   ├── timeline/                       # merge (field-group versioning), events, history, compare, report, investor, notify, plan-store
+│   ├── ado/                            # client (REST), token (Entra), plan-mappers (fields, conflicts, patches), push, import, config, http
+│   └── board/import.ts                 # The old cards → features, once
+├── lib/                                # prisma.ts, auth.config.ts (Edge-safe), auth.ts (Node, Prisma adapter, token storage)
+└── generated/prisma/                   # Prisma 7 generated client (DO NOT EDIT)
+prisma/schema.prisma                    # TimelinePlan + history tables; Card/Column/Dependency stay for the one-time import
 ```
 
 ## How to work in this code
 
-### Adding a new domain feature
-1. Add the model to `prisma/schema.prisma`.
-2. `npx prisma migrate dev --name <change>` (or `npx prisma db push` for throwaway iteration).
-3. Create `src/features/<feature>/{queries.ts,actions.ts,types.ts}`.
-4. Create `src/components/<feature>/` with presentational React components.
-5. Use the feature from `src/app/.../page.tsx`. Pages stay thin — fetch via `features/*/queries`, mutate via `features/*/actions`.
-
-### Conventions
-- **Server Components by default.** Only mark `"use client"` if you actually need state, effects, or browser-only APIs. The board is fully server-rendered.
-- **Mutations are Server Actions**, not API route handlers. They live in `src/features/<feature>/actions.ts`, marked with `"use server"` at the top of the file.
-- **Validation in Server Actions uses Zod.** `formData.get(...)` → `schema.parse(...)`. Never trust client input. Auth check first via `await auth()` (see `requireAuth()` helper pattern in `features/board/actions.ts`).
-- **Reads via `features/*/queries.ts`**, writes via `features/*/actions.ts`. Pages should not call Prisma directly except trivially — that's what the feature layer is for. (For a 1-call read, inline is fine. When it grows past that, extract.)
-- **Types from Prisma** import as `CardModel`, `ColumnModel`, etc. from `@/generated/prisma/models`. The bare names (`Card`, `Column`) are React components, not types.
-- **Auth helper:** `import { auth, signIn, signOut } from "@/lib/auth"` (server-component/action only — Node runtime). The route handler lives at `src/app/api/auth/[...nextauth]/route.ts` and just re-exports `handlers`. **Never import `@/lib/auth` from `middleware.ts`** — middleware runs in Edge runtime and `@/lib/auth` transitively pulls in Prisma (which uses `node:*` modules). Middleware imports `@/lib/auth.config` instead.
-- **`revalidatePath("/")`** after every mutation so the board reflects changes on next render.
-- **No client-side data fetching libraries** (no SWR/React Query). Server Components + Server Actions + `revalidatePath` is enough for v1.
-- **Path alias** `@/*` → `./src/*`. Always prefer the alias over relative imports across folders.
-
-### What v1 does NOT have (intentionally — YAGNI)
-- Drag-and-drop reordering. Cards/columns have `position: Int` but reordering UI isn't built yet. Add it via `dnd-kit` when needed; the schema is ready.
-- Real-time / multi-user live updates. Refresh to see other users' edits.
-- Multiple boards. There's exactly one `Board` row, created on first load (`getOrCreateBoard`).
-- Optimistic UI. Server Actions revalidate; the page re-fetches. Add `useOptimistic` if latency hurts.
-- A separate "User can own a card" relationship. Cards aren't owned. Add a `Card.assigneeId` later if needed.
+- **The plan is one JSON document** (`TimelinePlan.data`, id `epics`): lanes (epics), tasks (features), wishes (the intake),
+  sprints, capacity. Every page loads it with `GET /api/timeline-plan`, edits it in the browser and saves it with `PUT`;
+  the server merges by field group (`src/features/timeline/merge.ts`), bumps the version and records a changeset with
+  events (`events.ts`, `history.ts`). Read `plan-store.ts` and `merge.ts` before touching a page.
+- **The pages are plain HTML/JS** (`board.html`, `timeline.html`, `inntak.html`) served by route handlers behind the Entra
+  login. Shared rules live in `src/features/timeline/epic-tools.js`; its `module.exports` must equal `epic-tools.d.ts`, and
+  the page's `FV_FIELDS` must equal `TASK_FIELD_GROUPS`. No React on these pages.
+- **ADO runs as the signed-in person** (`src/features/ado/token.ts`, delegated `user_impersonation`); no PAT anywhere.
+  SkyTracker owns epics, features, estimates, dependencies and pushes them; ADO owns stories and sprints.
+- **Tests**: `npx vitest run` (pure modules, `src/**/*.test.ts`), `npx tsc --noEmit`, `npx eslint src`; the pages are
+  exercised by Playwright smokes kept in `~/Skytale/ClaudeReports/planning/roadmap-2.0/build/` (they run the real modules
+  behind a mock API: `npx tsx <smoke>.mjs` from this directory).
+- Norwegian in the UI and stored text, English in code and commits.
 
 ## Setup
 

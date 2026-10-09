@@ -10,7 +10,7 @@
 
 ## Global Constraints
 
-- Everything SkyTracker pushes to ADO is an Epic or a Feature (decision 1). No code path creates a User Story any more.
+- Everything the board pushes to ADO is an Epic or a Feature (decision 1); the discovery story (R3) stays a User Story.
 - The Prisma schema is untouched (no migration); `Card`, `Column`, `Dependency` are read by the import only.
 - Norwegian in UI, English in code; `epic-tools.js` exports = `.d.ts`; `TASK_FIELD_GROUPS` unchanged (the new props join `meta` and `tid`).
 

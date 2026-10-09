@@ -23,7 +23,7 @@ in the same PR; the stages run in the order R7a, R7b, R8, R9.
 
 | # | Decision |
 |---|---|
-| 1 | Everything SkyTracker pushes to ADO is an Epic or a Feature. The board's user-story push is retired (R9). |
+| 1 | Everything the board pushes to ADO is a Feature (never a User Story); the board's user-story push is retired (R9). The discovery story the timeline creates under a running discovery (R3) stays a User Story. |
 | 2 | The intake is its own page, `/inntak`, inside SkyTracker. PreSales registers there; the forum decides there. |
 | 3 | Size classes: S = 1 week, M = 2, L = 4, XL = 6 (*assumed* for XL: the deck says «over 4 uker»). The date stays editable. |
 | 4 | A discovery with an owner occupies that owner full-time from start to end (*assumed*). The pin overrides, as for features. |
