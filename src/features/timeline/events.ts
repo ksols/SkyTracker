@@ -123,6 +123,7 @@ export function diffPlans(before: Plan, after: Plan, opts: DiffOptions = {}): Pl
   const bt = new Map(before.tasks.map((t) => [t.id, t]));
   const at = new Map(after.tasks.map((t) => [t.id, t]));
   const label = (id: string) => at.get(id)?.label ?? bt.get(id)?.label ?? id;
+  const named = (id: string) => ((at.get(id) ?? bt.get(id))?.kind === "discovery" ? "utredning " : "") + q(label(id));   // R8: «i kø bak utredning «X»»
 
   // ----- epics -----
   const bKeys = laneKeysInOrder(before), aKeys = laneKeysInOrder(after);
@@ -186,7 +187,7 @@ export function diffPlans(before: Plan, after: Plan, opts: DiffOptions = {}): Pl
       if (blocker) ev.push({ ...base, code: "feature.flyttet", before: { start: b.start }, after: { start: t.start }, cause: "avhengighet", causeRef: blocker,
         summary: dw ? `Flyttet ${n(Math.abs(dw), "uke", "uker")} av avhengighet ${q(label(blocker))}` : `Flyttet av avhengighet ${q(label(blocker))}: ${where}` });
       else if (queued) ev.push({ ...base, code: "feature.flyttet", before: { start: b.start }, after: { start: t.start }, cause: "avhengighet", causeRef: queued,
-        summary: (dw ? `Flyttet ${n(Math.abs(dw), "uke", "uker")}: i kø bak ${q(label(queued))}` : `Flyttet: i kø bak ${q(label(queued))}: ${where}`) + (t.assignee ? ` (${t.assignee})` : "") });
+        summary: (dw ? `Flyttet ${n(Math.abs(dw), "uke", "uker")}: i kø bak ${named(queued)}` : `Flyttet: i kø bak ${named(queued)}: ${where}`) + (t.assignee ? ` (${t.assignee})` : "") });
       else ev.push({ ...base, code: "feature.flyttet", before: { start: b.start }, after: { start: t.start },
         summary: dw ? `Flyttet ${n(Math.abs(dw), "uke", "uker")} ${dw > 0 ? "senere" : "tidligere"}: ${where}` : `Flyttet: ${where}` });
     }

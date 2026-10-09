@@ -200,18 +200,29 @@ function queueOrder(plan) {   // active estimates in epics, in priority order; a
     .filter((t) => t.kind === "estimate" && t.lane !== BACKLOG && idx.has(t.lane) && t.state !== "levert")
     .sort((a, b) => idx.get(a.lane) - idx.get(b.lane) || (a.order || 0) - (b.order || 0));
 }
+// R8: a discovery with an owner occupies them from start to end (spec decision 4): the owner's features start when it ends
+function discoveryAnchors(plan) {
+  return plan.tasks.filter((t) => t.kind === "discovery" && t.state !== "levert" && t.assignee).sort((a, b) => a.start - b.start || (a.order || 0) - (b.order || 0));
+}
+const occupies = (d, t) => d.start < t.end - 1e-9 && d.end >= t.start - 1e-9;   // the discovery runs into the feature's window (touching counts: the feature starts when it ends)
 function floorOf(plan, t, earlier) {
   const byId = new Map(plan.tasks.map((v) => [v.id, v]));
   let floor = -Infinity, by = null, kind = null;
   (t.deps || []).forEach((d) => { const p = byId.get(d); if (p && p.end > floor + 1e-9) { floor = p.end; by = d; kind = "dep"; } });
   if (t.assignee) earlier.forEach((e) => { if (e.assignee === t.assignee && e.end >= floor - 1e-9) { floor = e.end; by = e.id; kind = "queue"; } });
+  if (t.assignee && t.kind === "estimate" && t.lane !== BACKLOG && t.state !== "levert") discoveryAnchors(plan).forEach((d) => { if (d.id !== t.id && d.assignee === t.assignee && occupies(d, t) && d.end > floor + 1e-9) { floor = d.end; by = d.id; kind = "queue"; } });
   return { floor: floor === -Infinity ? null : floor, by, kind };
+}
+/** What a task waits for: earlier discoveries of the owner for a discovery, the queue order for a feature. */
+function earlierFor(plan, t) {
+  if (t.kind === "discovery") { const discs = discoveryAnchors(plan), i = discs.findIndex((v) => v.id === t.id); return i < 0 ? [] : discs.slice(0, i); }
+  const order = queueOrder(plan), i = order.findIndex((v) => v.id === t.id);
+  return i < 0 ? [] : order.slice(0, i);
 }
 function queueFloor(plan, taskId) {
   const t = plan.tasks.find((v) => v.id === taskId);
   if (!t) return { floor: null, by: null, kind: null };
-  const order = queueOrder(plan), i = order.findIndex((v) => v.id === taskId);
-  return floorOf(plan, t, i < 0 ? [] : order.slice(0, i));
+  return floorOf(plan, t, earlierFor(plan, t));
 }
 function resolveQueue(plan) {
   const shifted = []; // [{ id, by, kind }]: what each shifted feature waits for
@@ -219,13 +230,19 @@ function resolveQueue(plan) {
   let changed = true, guard = 0;
   while (changed && guard++ < 200) {
     changed = false;
-    const order = queueOrder(plan), inQueue = new Set(order.map((t) => t.id));
+    const order = queueOrder(plan), discs = discoveryAnchors(plan), inQueue = new Set([...order, ...discs].map((t) => t.id));
+    // R8: an owner's discoveries run one after the other, by start; a discovery never waits for a feature
+    discs.forEach((t, i) => {
+      const f = floorOf(plan, t, discs.slice(0, i));
+      if (f.floor === null || t.pinned || f.floor <= t.start + 1e-9) return;
+      if (shiftTask(t, f.floor - t.start) !== 0) { note(t, f); changed = true; }
+    });
     order.forEach((t, i) => {
       const f = floorOf(plan, t, order.slice(0, i));
       if (f.floor === null || t.pinned || f.floor <= t.start + 1e-9) return;
       if (shiftTask(t, f.floor - t.start) !== 0) { note(t, f); changed = true; }
     });
-    // discoveries, the shelf and delivered features keep the plain rule: after a blocker's late end
+    // ownerless discoveries, the shelf and delivered features keep the plain rule: after a blocker's late end
     plan.tasks.filter((t) => !inQueue.has(t.id)).forEach((t) => {
       const f = floorOf(plan, t, []);
       if (f.floor === null || t.pinned || f.floor <= t.start + 1e-9) return;
@@ -253,10 +270,23 @@ function goalText(lane) {
 }
 
 /* ---------- lifecycle labels ---------- */
-function sizeClass(t) {
+/** What the dates say: S ≤ 1 week, M ≤ 2, L ≤ 4, XL above (the deck's thresholds). */
+function sizeClassDerived(t) {
   if (t.kind !== "discovery") return "";
   const w = (t.end - t.start) / WEEK;
   return w <= 1 + 1e-9 ? "S" : w <= 2 + 1e-9 ? "M" : w <= 4 + 1e-9 ? "L" : "XL";
+}
+/** The class the forum promised when it exists (R8), else the derived one. */
+function sizeClass(t) {
+  if (t.kind !== "discovery") return "";
+  return SIZE_CLASSES.includes(t.sizeClass) ? t.sizeClass : sizeClassDerived(t);
+}
+/** «M», or «M, nå L» when the dates have drifted from the promise. */
+function sizeClassText(t) {
+  const s = sizeClass(t);
+  if (!s) return "";
+  const d = sizeClassDerived(t);
+  return SIZE_CLASSES.includes(t.sizeClass) && d !== t.sizeClass ? t.sizeClass + ", nå " + d : s;
 }
 function bufferLabel(t) {
   const r = rangeWeeks(t);
@@ -438,7 +468,7 @@ if (typeof module !== "undefined") {
     dateToUnit, unitToDate, fmtDate, normalizePlan, epicStatus, shiftTask, resolveDeps,
     rangeWeeks, rangeLabel, goalText, exampleSeed,
     isoWeek, weekSpan, windowLabel, epicWindowText, discoveryOverdue,
-    shelfTasks, epicCounts, sizeClass, bufferLabel, rawLabel, previewPlacement,
+    shelfTasks, epicCounts, sizeClass, sizeClassDerived, sizeClassText, bufferLabel, rawLabel, previewPlacement,
     dayKey, currentSprint, sprintDay, sprintLabel,
     progressFraction, progressSignal, epicProgressSignal, progressText,
     MIX, MIX_LABEL, capacityFactor, elapsedWeeks, queueFloor, resolveQueue,

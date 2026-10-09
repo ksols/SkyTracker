@@ -276,3 +276,14 @@ describe("diffPlans: wishes (the intake)", () => {
     expect(diffPlans(b, a)).toEqual([]);
   });
 });
+
+describe("diffPlans: a queue push behind a discovery", () => {
+  it("reads «i kø bak utredning «D» (THM)»", () => {
+    const b = one([lane("x")], [est({ id: "f", start: 4, endLikely: 5, end: 5.5, assignee: "THM", state: "aktiv" }), disc({ id: "d", label: "D", assignee: "THM", start: 4.25, end: 4.75 })]);
+    const a = one([lane("x")], [est({ id: "f", start: 4.75, endLikely: 5.75, end: 6.25, assignee: "THM", state: "aktiv" }), disc({ id: "d", label: "D", assignee: "THM", start: 4.25, end: 4.75 })]);
+    const ev = diffPlans(b, a, { causes: { f: "queue:d" } });
+    expect(ev.length).toBe(1);
+    expect(ev[0].summary).toBe("Flyttet 3 uker: i kø bak utredning «D» (THM)");
+    expect(ev[0].causeRef).toBe("d");
+  });
+});

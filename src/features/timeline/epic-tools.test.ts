@@ -5,7 +5,7 @@ import {
   isoWeek, weekSpan, windowLabel, epicWindowText, discoveryOverdue,
   shelfTasks, epicCounts, sizeClass, bufferLabel, rawLabel, previewPlacement,
   currentSprint, sprintDay, sprintLabel, progressFraction, progressSignal, epicProgressSignal, progressText,
-  resolveQueue, queueFloor, capacityFactor, elapsedWeeks, wishesByStatus, WISH_STATUS_LABEL, WISH_SOURCE_LABEL,
+  resolveQueue, queueFloor, capacityFactor, elapsedWeeks, wishesByStatus, WISH_STATUS_LABEL, WISH_SOURCE_LABEL, sizeClassDerived, sizeClassText,
 } from "./epic-tools.js";
 import type { Plan, PlanTask } from "./merge";
 
@@ -373,9 +373,12 @@ describe("resolveQueue: blockers first, then the same developer's earlier work",
     expect(queueFloor(p, "b")).toEqual({ floor: S + 1.5, by: "a", kind: "queue" });
     expect(queueFloor(p, "a")).toEqual({ floor: null, by: null, kind: null });
   });
-  it("discoveries, shelf and delivered features are left alone; resolveDeps still reports only the blockers", () => {
-    const p = two([A(), disc({ id: "u", lane: "x", assignee: "THM", start: S, end: S + 0.5, order: 2 }), B({ lane: "_backlog" }), est({ id: "l", lane: "x", label: "L", start: S, endLikely: S + 1, end: S + 1.5, state: "levert", deliveredAt: "2026-11-01", assignee: "THM", order: 3 })]);
-    expect(resolveQueue(p)).toEqual([]);
+  it("a discovery of the same owner occupies them (R8); the shelf and delivered features are left alone; resolveDeps still reports only the blockers", () => {
+    const p = two([A(), disc({ id: "u", lane: "x", assignee: "THM", start: S, end: S + 0.5, order: 2 }), B({ lane: "_backlog" }), est({ id: "l", lane: "x", label: "L", start: S, endLikely: S + 1, end: S + 1.5, state: "levert", assignee: "THM", order: 3 })]);
+    expect(resolveQueue(p)).toEqual([{ id: "a", by: "u", kind: "queue" }]);
+    expect(startOf(p, "a")).toBeCloseTo(S + 0.5);
+    expect(startOf(p, "b")).toBeCloseTo(S);
+    expect(startOf(p, "l")).toBeCloseTo(S);
     expect(resolveDeps(two([A(), B(), C()]))).toEqual([{ id: "c", by: "a" }]);
   });
   it("capacityFactor from the sprint mix, elapsedWeeks, and the normaliser's pinned/capacity", () => {
@@ -433,5 +436,61 @@ describe("normalizePlan: wishes", () => {
     expect(g.nei.map((w) => w.id)).toEqual(["w4"]);
     expect(WISH_STATUS_LABEL.utred).toBe("Utred nå");
     expect(WISH_SOURCE_LABEL.kunde).toBe("Kunde");
+  });
+});
+
+describe("R8: size classes", () => {
+  const S = 4;
+  const d = (over: Partial<PlanTask> = {}) => disc({ id: "d", lane: "x", assignee: "THM", start: S, end: S + 0.5, ...over });
+  it("the stored class is the promise; the derived one is what the dates say; the text shows the drift", () => {
+    expect(sizeClass(d())).toBe("M");
+    expect(sizeClass(d({ sizeClass: "S" }))).toBe("S");
+    expect(sizeClassDerived(d({ sizeClass: "S" }))).toBe("M");
+    expect(sizeClassText(d({ sizeClass: "S" }))).toBe("S, nå M");
+    expect(sizeClassText(d({ sizeClass: "M" }))).toBe("M");
+    expect(sizeClassText(d())).toBe("M");
+    expect(sizeClassText(d({ end: S + 1.5, sizeClass: "L" }))).toBe("L, nå XL");
+    expect(sizeClassText(est({ sizeClass: "M" } as Partial<PlanTask>))).toBe("");
+    expect(normalizePlan({ lanes: [{ key: "x", name: "X" }], tasks: [d({ sizeClass: "XXL" as never })] }).tasks[0].sizeClass).toBeUndefined();
+  });
+});
+
+describe("R8: a discovery occupies its owner", () => {
+  const S = 4;
+  const lanes = [{ key: "x", name: "X", priority: 1 }, { key: "y", name: "Y", priority: 2 }];
+  const F = (over: Partial<PlanTask> = {}) => est({ id: "f", lane: "x", label: "F", start: S, endLikely: S + 1, end: S + 1.5, state: "aktiv", assignee: "THM", order: 1, ...over });
+  const D = (over: Partial<PlanTask> = {}) => disc({ id: "d", lane: "y", label: "D", assignee: "THM", start: S + 0.25, end: S + 0.75, order: 1, ...over });
+  const mk = (tasks: PlanTask[]) => normalizePlan({ lanes, tasks });
+  const startOf = (p: Plan, id: string) => p.tasks.find((t) => t.id === id)!.start;
+  it("a feature that overlaps the owner's discovery starts when the discovery ends; the discovery stays", () => {
+    const p = mk([F(), D()]);
+    expect(resolveQueue(p)).toEqual([{ id: "f", by: "d", kind: "queue" }]);
+    expect(startOf(p, "f")).toBeCloseTo(S + 0.75);
+    expect(startOf(p, "d")).toBeCloseTo(S + 0.25);
+    expect(queueFloor(p, "f")).toEqual({ floor: S + 0.75, by: "d", kind: "queue" });
+  });
+  it("a discovery far ahead leaves today's feature alone; a discovery without an owner occupies no one", () => {
+    expect(resolveQueue(mk([F(), D({ start: S + 6, end: S + 6.5 })]))).toEqual([]);
+    expect(resolveQueue(mk([F(), D({ assignee: undefined })]))).toEqual([]);
+    expect(resolveQueue(mk([F({ assignee: "KSO" }), D()]))).toEqual([]);
+  });
+  it("two overlapping discoveries of one owner run one after the other, by start", () => {
+    const p = mk([D({ id: "d1", start: S, end: S + 0.5 }), D({ id: "d2", start: S + 0.25, end: S + 1 })]);
+    expect(resolveQueue(p)).toEqual([{ id: "d2", by: "d1", kind: "queue" }]);
+    expect(startOf(p, "d2")).toBeCloseTo(S + 0.5);
+    expect(p.tasks.find((t) => t.id === "d2")!.end).toBeCloseTo(S + 1.25);
+  });
+  it("a feature pushed past one discovery lands after the next one too; the pin keeps it where it was dragged", () => {
+    const p = mk([F(), D({ id: "d1" }), D({ id: "d2", start: S + 0.75, end: S + 1.25 })]);
+    resolveQueue(p);
+    expect(startOf(p, "f")).toBeCloseTo(S + 1.25);
+    const q = mk([F({ pinned: true }), D()]);
+    expect(resolveQueue(q)).toEqual([]);
+    expect(startOf(q, "f")).toBeCloseTo(S);
+  });
+  it("blockers still come first for a discovery", () => {
+    const p = mk([F({ assignee: "KSO" }), D({ deps: ["f"], assignee: undefined })]);
+    expect(resolveQueue(p)).toEqual([{ id: "d", by: "f", kind: "dep" }]);
+    expect(startOf(p, "d")).toBeCloseTo(S + 1.5);
   });
 });

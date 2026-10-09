@@ -41,6 +41,8 @@ export declare function wishesByStatus(plan: Plan): Record<WishStatus, Wish[]>;
 export declare function shelfTasks(plan: Plan): PlanTask[];
 export declare function epicCounts(plan: Plan): { forslag: number; aktiv: number; avsluttet: number };
 export declare function sizeClass(task: PlanTask): "S" | "M" | "L" | "XL" | "";
+export declare function sizeClassDerived(task: PlanTask): "S" | "M" | "L" | "XL" | "";
+export declare function sizeClassText(task: PlanTask): string;
 export declare function bufferLabel(task: PlanTask): string;
 export declare function rawLabel(task: PlanTask): string;
 export declare function previewPlacement(plan: Plan, taskId: string, laneKey: string): {
