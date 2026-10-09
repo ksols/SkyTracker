@@ -8,17 +8,18 @@
 // tombstones (`deleted[taskId] = version`, `deletedLanes[key] = version`):
 // a tombstone wins over an item whose version hasn't been bumped past it.
 
-export type TaskFieldGroup = "tid" | "label" | "deps" | "meta" | "state" | "est";
-export const TASK_FIELD_GROUPS: TaskFieldGroup[] = ["tid", "label", "deps", "meta", "state", "est"];
+export type TaskFieldGroup = "tid" | "label" | "deps" | "meta" | "state" | "est" | "ado";
+export const TASK_FIELD_GROUPS: TaskFieldGroup[] = ["tid", "label", "deps", "meta", "state", "est", "ado"];
 
-// Which task properties belong to which field group.
+// Which task properties belong to which field group. `ado` is written by the server (push/refresh), never by the page.
 export const GROUP_PROPS: Record<TaskFieldGroup, string[]> = {
   tid: ["start", "end", "endLikely"],
   label: ["label"],
   deps: ["deps"],
-  meta: ["lane", "kind", "adoId", "order", "assignee"],
+  meta: ["lane", "kind", "adoId", "order", "assignee", "specPath"],
   state: ["state", "committedRange", "activatedAt", "deliveredAt"],
   est: ["raw", "bufferWeeks"],
+  ado: ["ado"],
 };
 
 export type Sprint = { name: string; path: string; start: string; finish: string };
@@ -154,5 +155,15 @@ export function mergePlans(stored: Plan, incoming: Plan): Plan {
     tasks.push(candidate);
   }
 
-  return { ...stored, ...incoming, lanes: liveLanes, tasks, deleted, deletedLanes };
+  // plan-level caches: the sprint list and each sprint's goal carry an `at`; the newer one wins (incoming on ties)
+  const newer = <T extends { at: string }>(a?: T, b?: T) => (!a ? b : !b ? a : b.at >= a.at ? b : a);
+  const sprints = newer(stored.sprints, incoming.sprints);
+  const sprintGoals: Record<string, { text: string; at: string }> = {};
+  for (const src of [stored.sprintGoals, incoming.sprintGoals]) for (const [k, g] of Object.entries(src ?? {})) sprintGoals[k] = newer(sprintGoals[k], g)!;
+  const out: Plan = { ...stored, ...incoming, lanes: liveLanes, tasks, deleted, deletedLanes };
+  delete out.sprints;
+  delete out.sprintGoals;
+  if (sprints) out.sprints = sprints;
+  if (Object.keys(sprintGoals).length) out.sprintGoals = sprintGoals;
+  return out;
 }

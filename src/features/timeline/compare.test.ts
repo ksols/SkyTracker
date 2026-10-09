@@ -78,3 +78,15 @@ describe("snapshotForDay", () => {
     expect(snapshotForDay([], "2026-11-01")).toBeNull();
   });
 });
+
+describe("sprint snapshots and the ADO sections", () => {
+  it("sinceLabel names a sprint snapshot by its label and the export has ADO and Sprintmål sections", () => {
+    expect(sinceLabel({ kind: "sprint", label: "Sprintstart Sprint 71", at: "2026-10-05T06:00:00.000Z", day: "2026-10-05" })).toBe("sprintstart Sprint 71");
+    const md = exportMarkdown("Siden sprintstart Sprint 71", "x", [
+      path({ code: "ado.push", targetLabel: "Kapasitet", summary: "Pushet til ADO #4791 (Feature opprettet)", cause: "ado" }),
+      path({ code: "plan.sprintmaal", targetType: "plan", targetLabel: "Sprint 71", summary: "Sprintmål Sprint 71: «Tråder i beta»" }),
+    ], (k) => k);
+    expect(md).toContain("## ADO\n- x › Kapasitet: Pushet til ADO #4791 (Feature opprettet) — ADO (GO, 6. nov)");
+    expect(md).toContain("## Sprintmål\n- Sprint 71: Sprintmål Sprint 71: «Tråder i beta» (GO, 6. nov)");
+  });
+});

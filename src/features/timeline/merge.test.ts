@@ -97,3 +97,24 @@ describe("mergePlans - root flags", () => {
     expect(kept.example).toBe(true);
   });
 });
+
+describe("the ado group and the sprint keys", () => {
+  it("the ado block is its own field group: a higher fv.ado wins, and a page that never saw the block cannot drop it", () => {
+    const stored = plan([task({ fv: { tid: 1, ado: 1 }, ado: { pushedAt: "x", snapshot: { title: "A" } } })]);
+    const fresher = plan([task({ fv: { tid: 1, ado: 2 }, ado: { pushedAt: "y", snapshot: { title: "B" } } })]);
+    expect(mergePlans(stored, fresher).tasks[0].ado).toEqual({ pushedAt: "y", snapshot: { title: "B" } });
+    const unaware = plan([task({ fv: { tid: 2 } })]);
+    const m = mergePlans(stored, unaware);
+    expect(m.tasks[0].ado).toEqual({ pushedAt: "x", snapshot: { title: "A" } });
+    expect(m.tasks[0].fv).toMatchObject({ tid: 2, ado: 1 });
+  });
+  it("sprints: the newer `at` wins either way; sprintGoals merge per sprint by `at`", () => {
+    const old = { at: "2026-10-01T00:00:00.000Z", items: [] }, fresh = { at: "2026-10-09T00:00:00.000Z", items: [{ name: "Sprint 71", path: "p", start: "2026-10-05", finish: "2026-10-16" }] };
+    expect(mergePlans(plan([], { sprints: fresh }), plan([], { sprints: old })).sprints).toEqual(fresh);
+    expect(mergePlans(plan([], { sprints: old }), plan([], { sprints: fresh })).sprints).toEqual(fresh);
+    expect(mergePlans(plan([]), plan([], { sprints: fresh })).sprints).toEqual(fresh);
+    const g = mergePlans(plan([], { sprintGoals: { "Sprint 71": { text: "a", at: "2026-10-09T10:00:00.000Z" }, "Sprint 70": { text: "x", at: "2026-09-21T00:00:00.000Z" } } }),
+      plan([], { sprintGoals: { "Sprint 71": { text: "b", at: "2026-10-09T09:00:00.000Z" } } })).sprintGoals;
+    expect(g).toEqual({ "Sprint 71": { text: "a", at: "2026-10-09T10:00:00.000Z" }, "Sprint 70": { text: "x", at: "2026-09-21T00:00:00.000Z" } });
+  });
+});

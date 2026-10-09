@@ -11,6 +11,7 @@ export const EVENT_CODES = [
   "feature.estimert", "feature.utredning", "feature.epic", "feature.prioritet", "feature.avhengighet", "feature.ado",
   "feature.tilstand", "feature.eier", "feature.buffer", "feature.raw", "epic.tilstand",
   "plan.seed", "plan.begrunnelse", "plan.baseline",
+  "feature.estimat-hentet", "plan.sprintmaal", "ado.push", "ado.konflikt", "ado.lest",
 ] as const;
 export type EventCode = (typeof EVENT_CODES)[number];
 export type Cause = "bruker" | "avhengighet" | "ado" | "system";
@@ -112,6 +113,7 @@ export function diffPlans(before: Plan, after: Plan, opts: DiffOptions = {}): Pl
       summary: `Eksempel-epics lastet inn (${after.lanes.length} epics, ${after.tasks.length} features)` }];
   }
   const ev: PlanEvent[] = [];
+  const dc: Cause = opts.source === "ado" ? "ado" : "bruker";   // a sync's writes are ADO's, not the editor's
   const bl = new Map(before.lanes.map((l) => [l.key, l]));
   const al = new Map(after.lanes.map((l) => [l.key, l]));
   const laneName = (key: string) => (key === BACKLOG ? "Klar for veikart" : al.get(key)?.name ?? bl.get(key)?.name ?? key);
@@ -124,7 +126,7 @@ export function diffPlans(before: Plan, after: Plan, opts: DiffOptions = {}): Pl
   const movedLanes = new Set(movedKeys(bKeys, aKeys));
   for (const l of after.lanes) {
     const b = bl.get(l.key);
-    const base = { targetType: "epic" as const, targetId: l.key, targetLabel: l.name, laneKey: l.key, cause: "bruker" as const };
+    const base = { targetType: "epic" as const, targetId: l.key, targetLabel: l.name, laneKey: l.key, cause: dc };
     if (!b) { ev.push({ ...base, code: "epic.ny", after: pickLane(l), summary: "Ny epic" + (typeof l.goalDate === "number" ? " · " + goalSummary({ key: l.key, name: l.name }, l).replace(" satt", "") : "") }); continue; }
     if (b.name !== l.name) ev.push({ ...base, code: "epic.navn", before: b.name, after: l.name, summary: "Navn: " + q(b.name) + " → " + q(l.name) });
     if ((b.metric ?? "") !== (l.metric ?? "")) ev.push({ ...base, code: "epic.maltall", before: b.metric ?? null, after: l.metric ?? null, summary: textChange("Måltall", b.metric, l.metric) });
@@ -143,7 +145,7 @@ export function diffPlans(before: Plan, after: Plan, opts: DiffOptions = {}): Pl
   }
   for (const b of before.lanes) if (!al.has(b.key)) {
     const count = before.tasks.filter((t) => t.lane === b.key).length;
-    ev.push({ targetType: "epic", targetId: b.key, targetLabel: b.name, laneKey: b.key, code: "epic.slettet", before: pickLane(b), cause: "bruker",
+    ev.push({ targetType: "epic", targetId: b.key, targetLabel: b.name, laneKey: b.key, code: "epic.slettet", before: pickLane(b), cause: dc,
       summary: "Epic slettet" + (count ? ` (med ${n(count, "feature", "features")})` : "") });
   }
 
@@ -156,7 +158,7 @@ export function diffPlans(before: Plan, after: Plan, opts: DiffOptions = {}): Pl
   }
   for (const t of after.tasks) {
     const b = bt.get(t.id);
-    const base = { targetType: "feature" as const, targetId: t.id, targetLabel: t.label, laneKey: t.lane, cause: "bruker" as const };
+    const base = { targetType: "feature" as const, targetId: t.id, targetLabel: t.label, laneKey: t.lane, cause: dc };
     if (!b) {
       ev.push({ ...base, code: "feature.ny", after: pickTask(t), summary: t.kind === "discovery" ? `Ny utredning (til ${date(t.end)})` : `Ny feature (${rangeWords(t)})` });
       continue;
@@ -199,15 +201,31 @@ export function diffPlans(before: Plan, after: Plan, opts: DiffOptions = {}): Pl
     if (bs !== as) ev.push({ ...base, code: "feature.tilstand", before: bs, after: as, summary: stateSummary(b, t) });
     if ((b.assignee ?? "") !== (t.assignee ?? "")) ev.push({ ...base, code: "feature.eier", before: b.assignee ?? null, after: t.assignee ?? null, summary: t.assignee ? "Eier: " + t.assignee : "Eier fjernet" });
     if ((b.bufferWeeks ?? 0) !== (t.bufferWeeks ?? 0)) ev.push({ ...base, code: "feature.buffer", before: b.bufferWeeks ?? 0, after: t.bufferWeeks ?? 0, summary: "Buffer: " + (b.bufferWeeks ? wk(b.bufferWeeks) : "0") + " → " + (t.bufferWeeks ? wk(t.bufferWeeks) : "0") });
-    if (JSON.stringify(rawOf(b)) !== JSON.stringify(rawOf(t)) && t.raw) ev.push({ ...base, code: "feature.raw", before: rawOf(b), after: rawOf(t), summary: "Utredningen sa " + span(t.raw) + " uker" });
+    const rawChanged = JSON.stringify(rawOf(b)) !== JSON.stringify(rawOf(t));
+    if (t.raw && t.raw.source === "specs" && (rawChanged || b.raw?.pulledAt !== t.raw.pulledAt)) {
+      const sameBuf = (b.bufferWeeks ?? 0) === (t.bufferWeeks ?? 0);
+      ev.push({ ...base, code: "feature.estimat-hentet", before: rawOf(b), after: rawOf(t), summary: "Estimat hentet fra utredningen: " + span(t.raw) + (sameBuf && t.bufferWeeks ? " (uendret buffer " + wk(t.bufferWeeks) + ")" : "") });
+    } else if (rawChanged && t.raw) ev.push({ ...base, code: "feature.raw", before: rawOf(b), after: rawOf(t), summary: "Utredningen sa " + span(t.raw) + " uker" });
     const bd = b.deps ?? [], ad = t.deps ?? [];
     for (const id of ad) if (!bd.includes(id)) ev.push({ ...base, code: "feature.avhengighet", after: id, summary: `Blokkeres nå av ${q(label(id))}` });
     for (const id of bd) if (!ad.includes(id)) ev.push({ ...base, code: "feature.avhengighet", before: id, summary: `Avhengighet til ${q(label(id))} fjernet` });
     if ((b.adoId ?? null) !== (t.adoId ?? null)) ev.push({ ...base, code: "feature.ado", before: b.adoId ?? null, after: t.adoId ?? null, summary: t.adoId ? "ADO-id: #" + t.adoId : "ADO-id fjernet" });
   }
   for (const b of before.tasks) if (!at.has(b.id) && al.has(b.lane)) // features of a deleted epic are covered by epic.slettet
-    ev.push({ targetType: "feature", targetId: b.id, targetLabel: b.label, laneKey: b.lane, code: "feature.slettet", before: pickTask(b), cause: "bruker", summary: b.kind === "discovery" ? "Utredning slettet" : "Feature slettet" });
+    ev.push({ targetType: "feature", targetId: b.id, targetLabel: b.label, laneKey: b.lane, code: "feature.slettet", before: pickTask(b), cause: dc, summary: b.kind === "discovery" ? "Utredning slettet" : "Feature slettet" });
+
+  // ----- the sprint goal (plan level) -----
+  for (const [name, g] of Object.entries(after.sprintGoals ?? {})) {
+    const prev = before.sprintGoals?.[name]?.text ?? "";
+    if (g.text !== prev) ev.push({ targetType: "plan", targetId: "sprint:" + name, targetLabel: name, laneKey: null, code: "plan.sprintmaal", before: prev || null, after: g.text || null, cause: dc,
+      summary: g.text ? "Sprintmål " + name + ": " + q(g.text) : "Sprintmål " + name + " fjernet" });
+  }
   return ev;
+}
+
+/** A system event from the ADO mirror (push, conflict, read-back), logged in the same changeset as the diff's events. */
+export function adoEvent(code: "ado.push" | "ado.konflikt" | "ado.lest", target: Pick<PlanEvent, "targetType" | "targetId" | "targetLabel" | "laneKey">, summary: string, extra: { before?: unknown; after?: unknown; causeRef?: string } = {}): PlanEvent {
+  return { ...target, code, cause: "ado", summary, ...extra };
 }
 
 /** The server-side rule for "this change deserves a reason"; the page mirrors it in ASK_REASON_FOR. */

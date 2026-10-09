@@ -52,23 +52,26 @@ export function dayText(iso: string | Date): string {
   return day + ". " + MND[m - 1];
 }
 export function sinceLabel(b: { kind: string; label: string | null; at: string | Date; day: string | null }): string {
-  if (b.kind === "baseline" && b.label) return b.label.charAt(0).toLowerCase() + b.label.slice(1);
+  if ((b.kind === "baseline" || b.kind === "sprint") && b.label) return b.label.charAt(0).toLowerCase() + b.label.slice(1);
   return dayText(b.at);
 }
 
 const SECTIONS: [string, PlanEvent["code"][]][] = [
   ["Måldatoer", ["epic.maldato"]],
-  ["Spenn", ["feature.spenn", "feature.estimert", "feature.buffer", "feature.raw"]],
+  ["Spenn", ["feature.spenn", "feature.estimert", "feature.buffer", "feature.raw", "feature.estimat-hentet"]],
   ["Flyttet", ["feature.flyttet", "feature.utredning-slutt"]],
   ["Prioritet", ["epic.prioritet", "feature.prioritet", "feature.epic"]],
   ["Tilstand", ["epic.tilstand", "feature.tilstand", "feature.eier"]],
   ["Nye og fjernet", ["epic.ny", "epic.slettet", "feature.ny", "feature.slettet", "feature.utredning"]],
+  ["ADO", ["ado.push", "ado.konflikt", "ado.lest", "feature.ado", "epic.ado"]],
+  ["Sprintmål", ["plan.sprintmaal"]],
 ];
 const SHELF_NAME = "Klar for veikart";   // the reserved lane key never leaks into a text people read
 export function exportMarkdown(title: string, strip: string, path: PathEvent[], laneName: (key: string) => string): string {
   const where = (e: PathEvent) => (e.targetType === "feature" && e.laneKey ? (e.laneKey === "_backlog" ? SHELF_NAME : laneName(e.laneKey)) + " › " : "") + e.targetLabel;
   const why = (e: PathEvent) => {
     if (e.cause === "avhengighet") return "avhengighet";
+    if (e.cause === "ado") return "ADO";
     const c = e.changeset?.reasonCode;
     if (!c || c === "ingen") return "begrunnelse mangler";
     return REASON_LABEL[c as ReasonCode] + (e.changeset.reason ? ": " + e.changeset.reason : "");
@@ -78,7 +81,8 @@ export function exportMarkdown(title: string, strip: string, path: PathEvent[], 
   for (const [heading, codes] of SECTIONS) {
     const rows = path.filter((e) => codes.includes(e.code));
     if (!rows.length) continue;
-    md += "\n## " + heading + "\n" + rows.map((e) => "- " + where(e) + ": " + e.summary + " — " + why(e) + stamp(e)).join("\n") + "\n";
+    // plan-level lines (a sprint goal, a baseline) carry no reason: there is nothing to justify
+    md += "\n## " + heading + "\n" + rows.map((e) => "- " + where(e) + ": " + e.summary + (e.targetType === "plan" ? "" : " — " + why(e)) + stamp(e)).join("\n") + "\n";
   }
   const missing = new Map<string, PathEvent[]>();
   for (const e of path) {

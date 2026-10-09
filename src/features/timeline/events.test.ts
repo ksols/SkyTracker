@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { diffPlans, movedKeys, needsReason, REASON_LABEL } from "./events";
+import { adoEvent, diffPlans, movedKeys, needsReason, REASON_LABEL } from "./events";
 import { dateToUnit, normalizePlan } from "./epic-tools.js";
 import type { Plan, PlanLane, PlanTask } from "./merge";
 
@@ -176,5 +176,30 @@ describe("diffPlans: lifecycle", () => {
     expect(diffPlans(act, prop)[0].summary).toBe("Tilbake til forslag");
     expect(needsReason(diffPlans(act, closed)[0])).toBe(true);
     expect(needsReason(diffPlans(prop, act)[0])).toBe(true);
+  });
+});
+
+describe("the mirror's events", () => {
+  it("a changeset from ADO carries cause ado on every diff event and never asks for a reason", () => {
+    const b = one([lane("x")], [est({ state: "aktiv" })]);
+    const a = one([lane("x")], [est({ state: "levert", deliveredAt: "2026-12-03" })]);
+    const ev = diffPlans(b, a, { source: "ado" });
+    expect(ev.map((e) => [e.code, e.cause, e.summary])).toEqual([["feature.tilstand", "ado", "Levert 3. des"]]);
+    expect(ev.some(needsReason)).toBe(false);
+  });
+  it("an estimate pulled from Skytale.Specs is «Estimat hentet fra utredningen», with the buffer named when it stayed", () => {
+    const b = one([lane("x")], [est({ bufferWeeks: 1, raw: { likely: 4, late: 6 } })]);
+    const a = one([lane("x")], [est({ bufferWeeks: 1, raw: { likely: 5, late: 8, source: "specs", pulledAt: "2026-10-09T08:00:00.000Z" } })]);
+    const ev = diffPlans(b, a);
+    expect(ev.filter((e) => e.code === "feature.estimat-hentet").map((e) => e.summary)).toEqual(["Estimat hentet fra utredningen: 5–8 (uendret buffer 1 uke)"]);
+    expect(ev.some((e) => e.code === "feature.raw")).toBe(false);
+  });
+  it("a sprint goal set or changed is plan.sprintmaal", () => {
+    const b = one([lane("x")]), a = { ...one([lane("x")]), sprintGoals: { "Sprint 71": { text: "Tråder i beta", at: "2026-10-09T08:00:00.000Z" } } };
+    expect(diffPlans(b, a).map((e) => [e.code, e.targetLabel, e.summary])).toEqual([["plan.sprintmaal", "Sprint 71", "Sprintmål Sprint 71: «Tråder i beta»"]]);
+  });
+  it("adoEvent builds a system event with cause ado", () => {
+    expect(adoEvent("ado.push", { targetType: "feature", targetId: "k", targetLabel: "Kapasitet", laneKey: "l" }, "Pushet til ADO #4791 (Feature opprettet)", { after: { adoId: 4791 } }))
+      .toEqual({ targetType: "feature", targetId: "k", targetLabel: "Kapasitet", laneKey: "l", code: "ado.push", cause: "ado", summary: "Pushet til ADO #4791 (Feature opprettet)", after: { adoId: 4791 } });
   });
 });

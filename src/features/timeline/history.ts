@@ -5,6 +5,7 @@
 import type { Prisma, PrismaClient } from "@/generated/prisma/client";
 import type { Plan } from "./merge";
 import { diffPlans, needsReason, REASON_CODES, type PlanEvent } from "./events";
+import { currentSprint } from "./epic-tools.js";
 
 export type SaveNote = { reason?: string; reasonCode?: string; causes?: Record<string, string>; source?: string };
 const SOURCES = ["bruker", "seed", "import", "ado", "system"];
@@ -33,16 +34,27 @@ const json = (v: unknown): Prisma.InputJsonValue | undefined => (v === undefined
 
 export async function recordChangeset(
   db: PrismaClient,
-  args: { before: Plan; after: Plan; beforeVersion: number; afterVersion: number; editor: string | null; note: SaveNote },
+  args: { before: Plan; after: Plan; beforeVersion: number; afterVersion: number; editor: string | null; note: SaveNote; extraEvents?: PlanEvent[] },
 ): Promise<string | null> {
-  const events: PlanEvent[] = diffPlans(args.before, args.after, { causes: args.note.causes, source: args.note.source });
+  const events: PlanEvent[] = [...diffPlans(args.before, args.after, { causes: args.note.causes, source: args.note.source }), ...(args.extraEvents ?? [])];
   if (!events.length) return null;
-  const day = osloDay(new Date());
+  const now = new Date();
+  const day = osloDay(now);
   const hasDaily = await db.timelineSnapshot.findFirst({ where: { kind: "dag", day }, select: { id: true } });
   if (!hasDaily) {
     try {
       await db.timelineSnapshot.create({ data: { kind: "dag", day, planVersion: args.beforeVersion, data: args.before as unknown as Prisma.InputJsonValue } });
     } catch { /* a concurrent save won the unique (kind, day) race: fine */ }
+  }
+  // the sprint baseline: the plan as it was when the current sprint started = the plan before the sprint's first save
+  const sprint = currentSprint(args.before.sprints?.items, now);
+  if (sprint) {
+    const hasSprint = await db.timelineSnapshot.findFirst({ where: { kind: "sprint", day: sprint.start }, select: { id: true } });
+    if (!hasSprint) {
+      try {
+        await db.timelineSnapshot.create({ data: { kind: "sprint", day: sprint.start, label: "Sprintstart " + sprint.name, planVersion: args.beforeVersion, data: args.before as unknown as Prisma.InputJsonValue } });
+      } catch { /* raced: fine */ }
+    }
   }
   const reasonCode = args.note.reasonCode ?? (events.some(needsReason) ? "ingen" : null);
   const cs = await db.timelineChangeset.create({
