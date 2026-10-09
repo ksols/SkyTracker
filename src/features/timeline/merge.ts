@@ -16,7 +16,7 @@ export const GROUP_PROPS: Record<TaskFieldGroup, string[]> = {
   tid: ["start", "end", "endLikely"],
   label: ["label"],
   deps: ["deps"],
-  meta: ["lane", "kind", "adoId", "order", "assignee", "specPath"],
+  meta: ["lane", "kind", "adoId", "order", "assignee", "specPath", "pinned"],
   state: ["state", "committedRange", "activatedAt", "deliveredAt"],
   est: ["raw", "bufferWeeks"],
   ado: ["ado"],
@@ -49,6 +49,8 @@ export type PlanTask = {
   activatedAt?: string;
   deliveredAt?: string;
   specPath?: string;
+  /** The planner dragged it below the queue's floor: it keeps its place and still counts for the ones after it. */
+  pinned?: boolean;
   ado?: TaskAdo;
   /** Typed on day 10 (`manuell`) or read from ADO's stories (`ado`): points, or a percent when no points exist. */
   progress?: { pointsDone?: number; pointsTotal?: number; pct?: number; sprint?: string | null; at: string; source: "manuell" | "ado" };
@@ -82,6 +84,8 @@ export type Plan = {
   deletedLanes?: Record<string, number>;
   sprints?: { at: string; items: Sprint[] };
   sprintGoals?: Record<string, { text: string; at: string }>;
+  /** The sprint mix: the share of a sprint that goes to planned features (R5); the factor from raw weeks to elapsed time. */
+  capacity?: { mode: "transition" | "normal"; at: string };
   [key: string]: unknown;
 };
 
@@ -161,12 +165,15 @@ export function mergePlans(stored: Plan, incoming: Plan): Plan {
   // plan-level caches: the sprint list and each sprint's goal carry an `at`; the newer one wins (incoming on ties)
   const newer = <T extends { at: string }>(a?: T, b?: T) => (!a ? b : !b ? a : b.at >= a.at ? b : a);
   const sprints = newer(stored.sprints, incoming.sprints);
+  const capacity = newer(stored.capacity, incoming.capacity);
   const sprintGoals: Record<string, { text: string; at: string }> = {};
   for (const src of [stored.sprintGoals, incoming.sprintGoals]) for (const [k, g] of Object.entries(src ?? {})) sprintGoals[k] = newer(sprintGoals[k], g)!;
   const out: Plan = { ...stored, ...incoming, lanes: liveLanes, tasks, deleted, deletedLanes };
   delete out.sprints;
   delete out.sprintGoals;
+  delete out.capacity;
   if (sprints) out.sprints = sprints;
+  if (capacity) out.capacity = capacity;
   if (Object.keys(sprintGoals).length) out.sprintGoals = sprintGoals;
   return out;
 }

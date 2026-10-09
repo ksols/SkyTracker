@@ -216,3 +216,18 @@ describe("feature.fremdrift", () => {
     expect(diffPlans(pts, ado).map((e) => [e.code, e.cause])).toEqual([["feature.fremdrift", "ado"]]);
   });
 });
+
+describe("the queue's events (stage 6)", () => {
+  it("a queue push is cause avhengighet with the earlier feature named; pins and the mix are logged", () => {
+    const b = one([lane("x")], [est({ id: "a", label: "A", assignee: "THM" }), est({ id: "b", label: "B", start: 4, endLikely: 5, end: 6, assignee: "THM" })]);
+    const a = one([lane("x")], [est({ id: "a", label: "A", assignee: "THM" }), est({ id: "b", label: "B", start: 6, endLikely: 7, end: 8, assignee: "THM" })]);
+    const ev = diffPlans(b, a, { causes: { b: "queue:a" } });
+    expect(ev.map((e) => [e.code, e.cause, e.causeRef, e.summary])).toEqual([["feature.flyttet", "avhengighet", "a", "Flyttet 8 uker: i kø bak «A» (THM)"]]);
+    expect(ev.some(needsReason)).toBe(false);
+    const pinned = one([lane("x")], [est({ id: "a", label: "A", pinned: true })]);
+    expect(diffPlans(one([lane("x")], [est({ id: "a", label: "A" })]), pinned).map((e) => [e.code, e.summary])).toEqual([["feature.ko", "Overstyrer køen"]]);
+    expect(diffPlans(pinned, one([lane("x")], [est({ id: "a", label: "A" })])).map((e) => e.summary)).toEqual(["Følger køen igjen"]);
+    const mixed = { ...one([lane("x")]), capacity: { mode: "normal" as const, at: "t" } };
+    expect(diffPlans(one([lane("x")]), mixed).map((e) => [e.code, e.summary])).toEqual([["plan.kapasitet", "Sprintmiks: overgang (55 % til features) → normal (60 %)"]]);
+  });
+});

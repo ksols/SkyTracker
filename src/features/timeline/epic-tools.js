@@ -50,6 +50,8 @@ function normalizePlan(plan) {
   const okSprint = (s) => !!s && typeof s === "object" && typeof s.name === "string" && isDay(s.start) && isDay(s.finish);
   if (p.sprints && typeof p.sprints === "object" && typeof p.sprints.at === "string" && Array.isArray(p.sprints.items)) p.sprints.items = p.sprints.items.filter(okSprint);
   else delete p.sprints;
+  if (p.capacity && typeof p.capacity === "object" && MIX[p.capacity.mode] && typeof p.capacity.at === "string") p.capacity = { mode: p.capacity.mode, at: p.capacity.at };
+  else delete p.capacity;
   if (p.sprintGoals && typeof p.sprintGoals === "object" && !Array.isArray(p.sprintGoals)) {
     Object.keys(p.sprintGoals).forEach((k) => { const g = p.sprintGoals[k]; if (!g || typeof g !== "object" || typeof g.text !== "string" || typeof g.at !== "string") delete p.sprintGoals[k]; });
   } else delete p.sprintGoals;
@@ -85,6 +87,7 @@ function normalizePlan(plan) {
     }
     if (num(t.adoId, null) === null) delete t.adoId;
     if (typeof t.specPath !== "string" || !/^[A-Za-z0-9._-]+$/.test(t.specPath)) delete t.specPath;   // a folder under spec/ in Skytale.Specs
+    if (t.pinned) t.pinned = true; else delete t.pinned;   // the planner's override of the queue
     // progress: points (ADO or typed) or a percent; the source says who wrote it
     if (t.progress && typeof t.progress === "object") {
       const pr = t.progress, out = {};
@@ -158,28 +161,55 @@ function shiftTask(t, d) {
   return d;
 }
 
-function resolveDeps(plan) {
-  const byId = new Map(plan.tasks.map((t) => [t.id, t]));
-  const shifted = []; // [{ id, by }]: by = the blocker whose late end forced the shift
-  let changed = true;
-  let guard = 0;
+/* ---------- the queue (R5): blockers first, then the same developer's earlier work, in priority order ---------- */
+const MIX = { transition: 0.55, normal: 0.6 };   // the share of a sprint that goes to planned features (transition 55/35/10, normal 60/15/15/10)
+const MIX_LABEL = { transition: "overgang (55 % til features)", normal: "normal (60 %)" };
+function capacityFactor(plan) {
+  const mode = plan && plan.capacity && MIX[plan.capacity.mode] ? plan.capacity.mode : "transition";
+  return Math.round(100 / MIX[mode]) / 100;
+}
+function elapsedWeeks(rawWeeks, factor) { return Math.ceil(rawWeeks * factor - 1e-9); }
+function queueOrder(plan) {   // active estimates in epics, in priority order; a pinned one stays put but still counts for the ones after it
+  const idx = new Map(plan.lanes.map((l, i) => [l.key, i]));
+  return plan.tasks
+    .filter((t) => t.kind === "estimate" && t.lane !== BACKLOG && idx.has(t.lane) && t.state !== "levert")
+    .sort((a, b) => idx.get(a.lane) - idx.get(b.lane) || (a.order || 0) - (b.order || 0));
+}
+function floorOf(plan, t, earlier) {
+  const byId = new Map(plan.tasks.map((v) => [v.id, v]));
+  let floor = -Infinity, by = null, kind = null;
+  (t.deps || []).forEach((d) => { const p = byId.get(d); if (p && p.end > floor + 1e-9) { floor = p.end; by = d; kind = "dep"; } });
+  if (t.assignee) earlier.forEach((e) => { if (e.assignee === t.assignee && e.end >= floor - 1e-9) { floor = e.end; by = e.id; kind = "queue"; } });
+  return { floor: floor === -Infinity ? null : floor, by, kind };
+}
+function queueFloor(plan, taskId) {
+  const t = plan.tasks.find((v) => v.id === taskId);
+  if (!t) return { floor: null, by: null, kind: null };
+  const order = queueOrder(plan), i = order.findIndex((v) => v.id === taskId);
+  return floorOf(plan, t, i < 0 ? [] : order.slice(0, i));
+}
+function resolveQueue(plan) {
+  const shifted = []; // [{ id, by, kind }]: what each shifted feature waits for
+  const note = (t, f) => { const prev = shifted.find((s) => s.id === t.id); if (prev) { prev.by = f.by; prev.kind = f.kind; } else shifted.push({ id: t.id, by: f.by, kind: f.kind }); };
+  let changed = true, guard = 0;
   while (changed && guard++ < 200) {
     changed = false;
-    for (const t of plan.tasks) {
-      let req = -Infinity, by = null;
-      t.deps.forEach((d) => {
-        const p = byId.get(d);
-        if (p && p.end > req) { req = p.end; by = d; }
-      });
-      if (req > t.start + 1e-9 && shiftTask(t, req - t.start) !== 0) {
-        const prev = shifted.find((s) => s.id === t.id);
-        if (prev) prev.by = by; else shifted.push({ id: t.id, by });
-        changed = true;
-      }
-    }
+    const order = queueOrder(plan), inQueue = new Set(order.map((t) => t.id));
+    order.forEach((t, i) => {
+      const f = floorOf(plan, t, order.slice(0, i));
+      if (f.floor === null || t.pinned || f.floor <= t.start + 1e-9) return;
+      if (shiftTask(t, f.floor - t.start) !== 0) { note(t, f); changed = true; }
+    });
+    // discoveries, the shelf and delivered features keep the plain rule: after a blocker's late end
+    plan.tasks.filter((t) => !inQueue.has(t.id)).forEach((t) => {
+      const f = floorOf(plan, t, []);
+      if (f.floor === null || t.pinned || f.floor <= t.start + 1e-9) return;
+      if (shiftTask(t, f.floor - t.start) !== 0) { note(t, f); changed = true; }
+    });
   }
   return shifted;
 }
+function resolveDeps(plan) { return resolveQueue(plan).filter((s) => s.kind === "dep").map(({ id, by }) => ({ id, by })); }
 
 /* ---------- labels ---------- */
 const weeks = (u) => Math.round(u / WEEK);
@@ -363,5 +393,6 @@ if (typeof module !== "undefined") {
     shelfTasks, epicCounts, sizeClass, bufferLabel, rawLabel, previewPlacement,
     dayKey, currentSprint, sprintDay, sprintLabel,
     progressFraction, progressSignal, epicProgressSignal, progressText,
+    MIX, MIX_LABEL, capacityFactor, elapsedWeeks, queueFloor, resolveQueue,
   };
 }

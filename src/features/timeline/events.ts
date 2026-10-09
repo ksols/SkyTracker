@@ -3,7 +3,7 @@
 // summary rendered once. The PUT handler logs these on every save; later the
 // compare mode (R1b) reuses the same function for "since the baseline".
 import type { Plan, PlanLane, PlanTask } from "./merge";
-import { WEEK, BACKLOG, unitToDate, fmtDate, rangeWeeks } from "./epic-tools.js";
+import { WEEK, BACKLOG, MIX_LABEL, unitToDate, fmtDate, rangeWeeks } from "./epic-tools.js";
 
 export const EVENT_CODES = [
   "epic.ny", "epic.slettet", "epic.navn", "epic.maltall", "epic.eier", "epic.maldato", "epic.ekstern", "epic.prioritet", "epic.ado",
@@ -12,7 +12,7 @@ export const EVENT_CODES = [
   "feature.tilstand", "feature.eier", "feature.buffer", "feature.raw", "epic.tilstand",
   "plan.seed", "plan.begrunnelse", "plan.baseline",
   "feature.estimat-hentet", "plan.sprintmaal", "ado.push", "ado.konflikt", "ado.lest",
-  "feature.fremdrift",
+  "feature.fremdrift", "feature.ko", "plan.kapasitet",
 ] as const;
 export type EventCode = (typeof EVENT_CODES)[number];
 export type Cause = "bruker" | "avhengighet" | "ado" | "system";
@@ -179,9 +179,12 @@ export function diffPlans(before: Plan, after: Plan, opts: DiffOptions = {}): Pl
       const dw = Math.round((t.start - b.start) / WEEK);
       const cause = opts.causes?.[t.id];
       const blocker = cause && cause.startsWith("dep:") ? cause.slice(4) : null;
+      const queued = cause && cause.startsWith("queue:") ? cause.slice(6) : null;   // R5: the same developer's earlier work
       const where = `start ${date(b.start)} → ${date(t.start)}`;
       if (blocker) ev.push({ ...base, code: "feature.flyttet", before: { start: b.start }, after: { start: t.start }, cause: "avhengighet", causeRef: blocker,
         summary: dw ? `Flyttet ${n(Math.abs(dw), "uke", "uker")} av avhengighet ${q(label(blocker))}` : `Flyttet av avhengighet ${q(label(blocker))}: ${where}` });
+      else if (queued) ev.push({ ...base, code: "feature.flyttet", before: { start: b.start }, after: { start: t.start }, cause: "avhengighet", causeRef: queued,
+        summary: (dw ? `Flyttet ${n(Math.abs(dw), "uke", "uker")}: i kø bak ${q(label(queued))}` : `Flyttet: i kø bak ${q(label(queued))}: ${where}`) + (t.assignee ? ` (${t.assignee})` : "") });
       else ev.push({ ...base, code: "feature.flyttet", before: { start: b.start }, after: { start: t.start },
         summary: dw ? `Flyttet ${n(Math.abs(dw), "uke", "uker")} ${dw > 0 ? "senere" : "tidligere"}: ${where}` : `Flyttet: ${where}` });
     }
@@ -212,6 +215,7 @@ export function diffPlans(before: Plan, after: Plan, opts: DiffOptions = {}): Pl
     const pval = (p: NonNullable<PlanTask["progress"]>) => ({ pointsDone: p.pointsDone ?? null, pointsTotal: p.pointsTotal ?? null, pct: p.pct ?? null });
     if (pkey(pb) !== pkey(pa) && pa) ev.push({ ...base, code: "feature.fremdrift", before: pb ? pval(pb) : null, after: pval(pa), cause: pa.source === "ado" ? "ado" : dc,
       summary: (pa.pointsTotal ?? 0) > 0 ? `Fremdrift: ${pa.pointsDone ?? 0} av ${pa.pointsTotal} poeng` : `Fremdrift: ${pa.pct ?? 0} %` });
+    if (!!b.pinned !== !!t.pinned) ev.push({ ...base, code: "feature.ko", before: !!b.pinned, after: !!t.pinned, summary: t.pinned ? "Overstyrer køen" : "Følger køen igjen" });
     const bd = b.deps ?? [], ad = t.deps ?? [];
     for (const id of ad) if (!bd.includes(id)) ev.push({ ...base, code: "feature.avhengighet", after: id, summary: `Blokkeres nå av ${q(label(id))}` });
     for (const id of bd) if (!ad.includes(id)) ev.push({ ...base, code: "feature.avhengighet", before: id, summary: `Avhengighet til ${q(label(id))} fjernet` });
@@ -219,6 +223,11 @@ export function diffPlans(before: Plan, after: Plan, opts: DiffOptions = {}): Pl
   }
   for (const b of before.tasks) if (!at.has(b.id) && al.has(b.lane)) // features of a deleted epic are covered by epic.slettet
     ev.push({ targetType: "feature", targetId: b.id, targetLabel: b.label, laneKey: b.lane, code: "feature.slettet", before: pickTask(b), cause: dc, summary: b.kind === "discovery" ? "Utredning slettet" : "Feature slettet" });
+
+  // ----- the sprint mix (plan level) -----
+  const mb = before.capacity?.mode ?? "transition", ma = after.capacity?.mode ?? "transition";
+  if (mb !== ma) ev.push({ targetType: "plan", targetId: "capacity", targetLabel: "Sprintmiks", laneKey: null, code: "plan.kapasitet", before: mb, after: ma, cause: dc,
+    summary: "Sprintmiks: " + MIX_LABEL[mb as keyof typeof MIX_LABEL] + " → " + MIX_LABEL[ma as keyof typeof MIX_LABEL] });
 
   // ----- the sprint goal (plan level) -----
   for (const [name, g] of Object.entries(after.sprintGoals ?? {})) {

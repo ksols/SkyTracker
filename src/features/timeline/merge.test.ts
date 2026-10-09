@@ -128,3 +128,13 @@ describe("the progress group", () => {
     expect(mergePlans(stored, unaware).tasks[0].progress).toEqual({ pointsDone: 3, pointsTotal: 8, at: "a", source: "ado" });
   });
 });
+
+describe("pinned and capacity (stage 6)", () => {
+  it("pinned travels in meta; capacity: the newer at wins", () => {
+    expect(mergePlans(plan([task({ fv: { meta: 1 }, pinned: true })]), plan([task({ fv: { meta: 2 } })])).tasks[0].pinned).toBeUndefined();
+    expect(mergePlans(plan([task({ fv: { meta: 1 } })]), plan([task({ fv: { meta: 2 }, pinned: true })])).tasks[0].pinned).toBe(true);
+    const old = { mode: "transition" as const, at: "2026-10-01T00:00:00.000Z" }, fresh = { mode: "normal" as const, at: "2026-10-09T00:00:00.000Z" };
+    expect(mergePlans(plan([], { capacity: fresh }), plan([], { capacity: old })).capacity).toEqual(fresh);
+    expect(mergePlans(plan([], { capacity: old }), plan([], { capacity: fresh })).capacity).toEqual(fresh);
+  });
+});

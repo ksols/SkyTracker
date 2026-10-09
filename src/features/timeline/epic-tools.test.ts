@@ -5,6 +5,7 @@ import {
   isoWeek, weekSpan, windowLabel, epicWindowText, discoveryOverdue,
   shelfTasks, epicCounts, sizeClass, bufferLabel, rawLabel, previewPlacement,
   currentSprint, sprintDay, sprintLabel, progressFraction, progressSignal, epicProgressSignal, progressText,
+  resolveQueue, queueFloor, capacityFactor, elapsedWeeks,
 } from "./epic-tools.js";
 import type { Plan, PlanTask } from "./merge";
 
@@ -337,5 +338,55 @@ describe("progress: the second signal", () => {
     expect(p.tasks.find((t) => t.id === "ok")!.progress!.source).toBe("ado");
     expect(p.tasks.find((t) => t.id === "bad")!.progress).toBeUndefined();
     expect(p.tasks.find((t) => t.id === "src")!.progress!.source).toBe("manuell");
+  });
+});
+
+describe("resolveQueue: blockers first, then the same developer's earlier work", () => {
+  const S = 4;
+  const A = (over: Partial<PlanTask> = {}) => est({ id: "a", lane: "x", label: "A", start: S, endLikely: S + 1, end: S + 1.5, state: "aktiv", assignee: "THM", order: 1, ...over });
+  const B = (over: Partial<PlanTask> = {}) => est({ id: "b", lane: "x", label: "B", start: S, endLikely: S + 1, end: S + 1.5, state: "aktiv", assignee: "THM", order: 2, ...over });
+  const C = (over: Partial<PlanTask> = {}) => est({ id: "c", lane: "y", label: "C", start: S, endLikely: S + 0.5, end: S + 1, state: "aktiv", assignee: "KSO", deps: ["a"], order: 1, ...over });
+  const two = (tasks: PlanTask[]) => normalizePlan({ lanes: [{ key: "x", name: "X", priority: 1 }, { key: "y", name: "Y", priority: 2 }], tasks });
+  const startOf = (p: Plan, id: string) => p.tasks.find((t) => t.id === id)!.start;
+  it("B waits for A (same developer, earlier in the order); C waits for its blocker A; the causes name them", () => {
+    const p = two([A(), B(), C()]);
+    expect(resolveQueue(p)).toEqual([{ id: "b", by: "a", kind: "queue" }, { id: "c", by: "a", kind: "dep" }]);
+    expect(startOf(p, "b")).toBeCloseTo(S + 1.5);
+    expect(startOf(p, "c")).toBeCloseTo(S + 1.5);
+    expect(resolveQueue(p)).toEqual([]);
+  });
+  it("priority decides who is earlier: the higher-priority epic's feature keeps its start even if it was drawn later", () => {
+    const p = two([A({ lane: "y", order: 1, start: S + 2, endLikely: S + 3, end: S + 3.5 }), B({ lane: "x" })]);
+    resolveQueue(p);
+    expect(startOf(p, "b")).toBeCloseTo(S);
+    expect(startOf(p, "a")).toBeCloseTo(S + 2);
+    const q = two([A({ lane: "y", order: 1 }), B({ lane: "x" })]);
+    resolveQueue(q);
+    expect(startOf(q, "a")).toBeCloseTo(S + 1.5);
+  });
+  it("a pinned feature stays below its floor and still delays the developer's later features; no assignee → only blockers count", () => {
+    const p = two([A(), B({ pinned: true }), est({ id: "d", lane: "x", label: "D", start: S, endLikely: S + 1, end: S + 1.5, state: "aktiv", assignee: "THM", order: 3 })]);
+    expect(resolveQueue(p).map((m) => [m.id, m.by])).toEqual([["d", "b"]]);
+    expect(startOf(p, "b")).toBeCloseTo(S);
+    expect(startOf(p, "d")).toBeCloseTo(S + 1.5);
+    expect(resolveQueue(two([A(), B({ assignee: undefined })]))).toEqual([]);
+    expect(queueFloor(p, "b")).toEqual({ floor: S + 1.5, by: "a", kind: "queue" });
+    expect(queueFloor(p, "a")).toEqual({ floor: null, by: null, kind: null });
+  });
+  it("discoveries, shelf and delivered features are left alone; resolveDeps still reports only the blockers", () => {
+    const p = two([A(), disc({ id: "u", lane: "x", assignee: "THM", start: S, end: S + 0.5, order: 2 }), B({ lane: "_backlog" }), est({ id: "l", lane: "x", label: "L", start: S, endLikely: S + 1, end: S + 1.5, state: "levert", deliveredAt: "2026-11-01", assignee: "THM", order: 3 })]);
+    expect(resolveQueue(p)).toEqual([]);
+    expect(resolveDeps(two([A(), B(), C()]))).toEqual([{ id: "c", by: "a" }]);
+  });
+  it("capacityFactor from the sprint mix, elapsedWeeks, and the normaliser's pinned/capacity", () => {
+    expect(capacityFactor({ lanes: [], tasks: [] })).toBe(1.82);
+    expect(capacityFactor({ lanes: [], tasks: [], capacity: { mode: "normal", at: "x" } })).toBe(1.67);
+    expect(elapsedWeeks(4, 1.82)).toBe(8);
+    expect(elapsedWeeks(6, 1.67)).toBe(11);
+    expect(normalizePlan({ lanes: [], tasks: [], capacity: { mode: "nope", at: "x" } }).capacity).toBeUndefined();
+    expect(normalizePlan({ lanes: [], tasks: [], capacity: { mode: "normal", at: "x" } }).capacity).toEqual({ mode: "normal", at: "x" });
+    const t = normalizePlan({ lanes: [{ key: "x", name: "X" }], tasks: [est({ pinned: 1 as never }), est({ id: "f", pinned: false })] }).tasks;
+    expect(t[0].pinned).toBe(true);
+    expect(t[1].pinned).toBeUndefined();
   });
 });

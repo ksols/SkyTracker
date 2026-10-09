@@ -4,6 +4,13 @@ export declare function progressFraction(p: PlanTask["progress"] | undefined | n
 export declare function progressSignal(task: PlanTask, todayUnit: number): { code: "gronn" | "gul" | "rod"; done: number; elapsed: number } | null;
 export declare function epicProgressSignal(plan: Plan, laneKey: string, todayUnit: number): "gronn" | "gul" | "rod" | null;
 export declare function progressText(task: PlanTask, signal: { done: number; elapsed: number }): string;
+export type CapacityMode = "transition" | "normal";
+export declare const MIX: Record<CapacityMode, number>;
+export declare const MIX_LABEL: Record<CapacityMode, string>;
+export declare function capacityFactor(plan: Partial<Plan> | null | undefined): number;
+export declare function elapsedWeeks(rawWeeks: number, factor: number): number;
+export declare function queueFloor(plan: Plan, taskId: string): { floor: number | null; by: string | null; kind: "dep" | "queue" | null };
+export declare function resolveQueue(plan: Plan): { id: string; by: string | null; kind: "dep" | "queue" }[];
 export declare function dayKey(d: Date): string;
 export declare function currentSprint(sprints: Sprint[] | undefined | null, date: Date): Sprint | null;
 export declare function sprintDay(sprint: Sprint, date: Date): number;
