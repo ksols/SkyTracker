@@ -14,7 +14,9 @@ export default {
       clientId: process.env.AUTH_MICROSOFT_ENTRA_ID_ID,
       clientSecret: process.env.AUTH_MICROSOFT_ENTRA_ID_SECRET,
       issuer: process.env.AUTH_MICROSOFT_ENTRA_ID_ISSUER,
-      authorization: { params: { scope: "openid profile email offline_access " + ADO_SCOPE } },
+      // SKYTRACKER_ADO_SCOPE=off keeps the old Graph scope: for a tenant where the ADO permission is not on the app registration
+      // yet («Need admin approval» at sign-in); ADO then needs ADO_DEV_TOKEN (local) until the permission is added.
+      authorization: { params: { scope: process.env.SKYTRACKER_ADO_SCOPE === "off" ? "openid profile email User.Read" : "openid profile email offline_access " + ADO_SCOPE } },
     }),
   ],
   session: { strategy: "jwt" },
