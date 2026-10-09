@@ -198,6 +198,7 @@
   .chip.st-gronn{background:var(--ok-bg);color:var(--ok-fg)}
   .chip.st-gul{background:var(--warn-bg);color:var(--warn-fg)}
   .chip.st-rod{background:var(--bad-bg);color:var(--bad-fg)}
+  .chip.sig{outline:1px dashed currentColor;outline-offset:-1px}
   .lane-label .add-feature{
     position:absolute;right:10px;top:50%;transform:translateY(-50%);
     width:22px;height:22px;padding:0;font-size:14px;line-height:1;
@@ -262,6 +263,8 @@
   .bar .seg{position:absolute;top:0;bottom:0;pointer-events:none;box-shadow:0 1px 2px rgba(13,18,62,.15)}
   .bar .seg.likely{left:0;background:var(--likely);border-radius:4px 0 0 4px}
   .bar .seg.late{right:0;background:var(--late);border-radius:0 4px 4px 0}
+  .bar .seg.likely .prog{position:absolute;left:0;top:0;bottom:0;background:rgba(255,255,255,.3);border-right:2px solid rgba(255,255,255,.95);border-radius:4px 0 0 4px}
+  .bar.levert{opacity:.55}
   .bar .bl{position:relative;z-index:1;padding:0 10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;pointer-events:none}
   .bar .h{position:absolute;top:0;bottom:0;width:9px;cursor:ew-resize;opacity:0;transition:opacity .12s ease;z-index:2}
   .bar .h::after{content:"";position:absolute;top:7px;bottom:7px;width:3px;border-radius:2px;background:rgba(255,255,255,.85)}
@@ -520,6 +523,12 @@
         mens featuren utredes. <b>Oppdater fra ADO</b> leser tilbake stories, poeng, sprint og det som er lukket («Levert»). Endres et felt i ADO
         etter siste push, listes det som <b>konflikt</b> øverst og overskrives aldri uten at du ber om det. Sprintene på aksen kommer fra ADO;
         «Sprint 71 · dag 4» står på dagens strek, og sprintmålet ved tegnforklaringen. Mangler tilgangen, ber siden deg logge inn på nytt.</p></div>
+      <div class="help-card"><h4>Fremdrift og sprintrapport</h4>
+        <p><b>Fremdrift</b> skrives inn i redigeringen på dag 10 (poeng gjort av totalt, eller prosent) og tegnes som en fylling i den mørke
+        delen av spennet; har featuren stories med poeng i ADO, tar ADO over ved «Oppdater fra ADO». Chippen <i>fremdrift 60 % · tid 75 %</i> er
+        et <b>andre signal</b> (fremdrift mot tid i det sannsynlige vinduet, 10 % slingringsmonn): grønn, gul eller rød. Det endrer ikke epicens
+        farge. «Levert» kommer fra ADO. Velg sprintens baseline under <b>Sammenlign med</b> og trykk <b>Sprintrapport</b> for dag 10-rapporten:
+        levert, fremdrift per feature, utredninger som kom videre og spenn som endret seg.</p></div>
     </div>
   </div>
 
@@ -532,6 +541,7 @@
     <span id="cmpStrip"></span><span class="sp"></span>
     <button id="cmpSince">Siden sist</button>
     <button id="cmpExport" title="Kopier listen som tekst (markdown)">Eksporter</button>
+    <button id="cmpReport" hidden title="Sprintrapporten for denne sprinten: levert, fremdrift, utredninger og det som flyttet seg (markdown)">Sprintrapport</button>
     <button class="text" id="cmpClose">Avslutt sammenligning</button>
   </div>
   <div class="cmp-list" id="cmpList" hidden></div>
@@ -621,6 +631,12 @@
           <button class="text" type="button" id="edPushDry" title="Viser hva som ville blitt skrevet til ADO, uten å sende">Lagre og tørrkjør</button>
           <span class="md" id="edAdoNote"></span>
         </div>
+        <div class="ed-row" id="edProgRow">
+          <label class="ed-field"><span>Fremdrift: poeng gjort</span><input id="edDone" type="number" min="0" step="1"></label>
+          <label class="ed-field"><span>poeng totalt</span><input id="edTotal" type="number" min="0" step="1"></label>
+          <label class="ed-field"><span>eller prosent</span><input id="edPct" type="number" min="0" max="100" step="1"></label>
+        </div>
+        <div class="md" id="edProgNote"></div>
         <div class="ed-field"><span>Venter på (blokkere)</span><div class="ed-deps" id="edDeps"></div></div>
         <div class="ed-row"><button class="ghost" type="button" id="edLink">Koble avhengighet …</button></div>
       </div>
@@ -739,7 +755,7 @@ window.__bootTimeline = function(){
   const ADO_URL = id => 'https://dev.azure.com/SkytaleAS/Skytale/_workitems/edit/' + id;
   const MND_UP = ['JAN','FEB','MAR','APR','MAI','JUN','JUL','AUG','SEP','OKT','NOV','DES'];
   const MND_S = ['jan','feb','mar','apr','mai','jun','jul','aug','sep','okt','nov','des'];
-  const FV_FIELDS = ['tid','label','deps','meta','state','est','ado'];
+  const FV_FIELDS = ['tid','label','deps','meta','state','est','ado','progress'];
   const REASON_CODES = [
     ['utredning', 'Utredningen viste mer/mindre arbeid'], ['avhengighet', 'En avhengighet flyttet seg'],
     ['kapasitet', 'Kapasitet: annet gikk foran'], ['prioritering', 'Prioritert om i produktforum'],
@@ -990,10 +1006,11 @@ window.__bootTimeline = function(){
       const lm = el('div', 'lm');
       const overdue = laneTasks(lane.key).filter(t => discoveryOverdue(t, todayUnit())).length;
       const win = epicWindowText(state, lane.key);
+      const esig = epicProgressSignal(state, lane.key, todayUnit());
       const stateChip = lane.state === 'avsluttet'
         ? '<span class="chip" title="Epicen er avsluttet">Avsluttet: ' + esc(lane.outcome || 'uten utfall') + '</span>'
         : (lane.state === 'forslag' ? '<span class="chip st-forslag" title="Ikke valgt i produktforum ennå">Forslag</span>' : '') + '<span class="chip st-' + st.code + '">' + esc(STATUS_LABEL[st.code]) + '</span>';
-      lm.innerHTML = stateChip + (lane.ado && lane.ado.conflicts && lane.ado.conflicts.length ? '<span class="chip st-rod" title="Et felt er endret i ADO etter siste push – se øverst på siden">ADO-konflikt</span>' : '') +
+      lm.innerHTML = stateChip + (esig ? '<span class="chip sig st-' + esig + '" title="Fremdrift mot tid, det dårligste av featurene (andre signal; teller ikke i fargen)">fremdrift</span>' : '') + (lane.ado && lane.ado.conflicts && lane.ado.conflicts.length ? '<span class="chip st-rod" title="Et felt er endret i ADO etter siste push – se øverst på siden">ADO-konflikt</span>' : '') +
         (lane.externalDate ? '<span class="chip ext-chip" title="Datoen er satt utenfra">Ekstern dato</span>' : '') +
         (overdue ? '<span class="chip st-gul">' + overdue + ' utredning' + (overdue > 1 ? 'er' : '') + ' forsinket</span>' : '') +
         '<span class="goal">' + esc((win ? win + ' · ' : '') + goalText(lane)) + '</span>' +
@@ -1104,9 +1121,9 @@ window.__bootTimeline = function(){
         const row = el('div', 'row');
         row.style.width = CHART_W + 'px';
         if(hasGoal){ const gl = el('div', 'goal-line'); gl.style.left = x(lane.goalDate) + 'px'; row.appendChild(gl); }
-        const bar = el('div', 'bar ' + t.kind);
+        const bar = el('div', 'bar ' + t.kind + (t.state === 'levert' ? ' levert' : ''));
         bar.dataset.id = t.id;
-        bar.innerHTML = (t.kind === 'estimate' ? '<div class="seg likely"></div><div class="seg late"></div>' : '') +
+        bar.innerHTML = (t.kind === 'estimate' ? '<div class="seg likely"><div class="prog" hidden></div></div><div class="seg late"></div>' : '') +
           '<div class="h l"></div><span class="bl">' + esc(t.label) + '</span>' +
           (t.kind === 'estimate' ? '<div class="h m"></div>' : '') + '<div class="h r"></div>';
         if(cmp){
@@ -1167,6 +1184,8 @@ window.__bootTimeline = function(){
       bar.querySelector('.seg.late').style.width = Math.max(0, width - lw) + 'px';
       bar.querySelector('.h.m').style.left = lw + 'px';
       bar.querySelector('.bl').style.maxWidth = lw + 'px';   // hvit tekst holder seg på den mørke delen
+      const pf = progressFraction(t.progress), prog = bar.querySelector('.prog');
+      if(prog){ prog.hidden = pf === null; prog.style.width = (pf === null ? 0 : lw * pf) + 'px'; }
     }
     const rl = rangeRefs[t.id];
     rl.style.left = (left + width) + 'px';
@@ -1178,6 +1197,9 @@ window.__bootTimeline = function(){
       chips.push('<a class="chip ado' + (conflict ? ' conflict' : stale ? ' stale' : '') + '" target="_blank" rel="noopener" href="' + ADO_URL(t.adoId) + '" title="' +
         (conflict ? 'Konflikt med ADO – se øverst på siden' : stale ? 'Endret etter siste push – push på nytt fra redigeringen' : 'Åpne i Azure DevOps') + '">#' + t.adoId + '</a>');
     }
+    if(t.state === 'levert') chips.push('<span class="chip st-gronn levert" title="Lukket i ADO">Levert' + (t.deliveredAt ? ' ' + esc(fmtDate(new Date(t.deliveredAt))) : '') + '</span>');
+    const psig = progressSignal(t, todayUnit());
+    if(psig) chips.push('<span class="chip sig st-' + psig.code + '" title="Andre signal: fremdrift mot tid i det sannsynlige vinduet (teller ikke i epicens farge)">' + esc(progressText(t, psig)) + '</span>');
     if(t.deps.length) chips.push('<span class="chip" title="Venter på ' + t.deps.length + ' feature(s)">⇠ ' + t.deps.length + '</span>');
     if(discoveryOverdue(t, todayUnit())) chips.push('<span class="chip st-gul" title="Sluttdatoen er passert: sett en ny før den passerer">Utredning forsinket</span>');
     if(t.editedBy){
@@ -1572,7 +1594,7 @@ window.__bootTimeline = function(){
     try{
       const r = await fetch('api/timeline-snapshots', {cache:'no-store'});
       if(!r.ok) return;
-      const list = (await r.json()).snapshots.filter(s => s.kind === 'baseline');
+      const list = (await r.json()).snapshots.filter(s => s.kind === 'baseline' || s.kind === 'sprint');   // sprintstart-baselinene (etappe 4) kan også sammenlignes med
       const cur = cmp ? cmp.id : '';
       cmpSelect.innerHTML = '<option value="">Sammenlign med …</option>' +
         list.map(s => '<option value="' + esc(s.id) + '">' + esc(s.label) + ' · ' + esc(fmtDate(new Date(s.at))) + '</option>').join('') +
@@ -1599,7 +1621,7 @@ window.__bootTimeline = function(){
       if(!r.ok){ endCompare(); askDialog('Ingen sammenligning', j.message || 'Fant ingen plan å sammenligne med.', {confirmText:'OK', noCancel:true}); return; }
       const base = normalizePlan(JSON.parse(JSON.stringify(j.baseline.data)));
       cmp = {
-        id: j.baseline.id, at: j.baseline.at, label: j.baseline.label || fmtDate(new Date(j.baseline.at)),
+        id: j.baseline.id, at: j.baseline.at, kind: j.baseline.kind, label: j.baseline.label || fmtDate(new Date(j.baseline.at)),
         lanes: Object.fromEntries(base.lanes.map(l => [l.key, l])), tasks: Object.fromEntries(base.tasks.map(t => [t.id, t])),
         strip: j.strip, path: j.path, exportText: j.exportText,
       };
@@ -1616,6 +1638,7 @@ window.__bootTimeline = function(){
   }
   function renderCompareBar(){
     cmpBar.hidden = false;
+    $('cmpReport').hidden = cmp.kind !== 'sprint';   // dag 10-rapporten hører til sprintens baseline
     cmpStrip.innerHTML = '<b>' + esc(cmp.strip) + '</b>';
     if(!cmpList.hidden) renderCompareList();
   }
@@ -1651,6 +1674,15 @@ window.__bootTimeline = function(){
   cmpDate.addEventListener('change', () => { if(cmpDate.value) startCompare(cmpDate.value); });
   $('cmpSince').addEventListener('click', () => { cmpList.hidden = !cmpList.hidden; if(!cmpList.hidden) renderCompareList(); });
   $('cmpClose').addEventListener('click', endCompare);
+  $('cmpReport').addEventListener('click', async () => {   // sprintrapporten: eksporten pluss levert, fremdrift og utredninger
+    if(!cmp) return;
+    try{
+      const r = await fetch('api/timeline-compare?from=' + encodeURIComponent(cmp.id) + '&report=1', {cache:'no-store'});
+      const j = await r.json();
+      if(!r.ok) throw new Error(j.message || 'HTTP ' + r.status);
+      downloadFile('sprintrapport-' + cmp.label.replace(/[^\wæøåÆØÅ-]+/g, '-').toLowerCase() + '.md', j.exportText, 'text/markdown');
+    }catch(e){ askDialog('Sprintrapport', 'Fikk ikke laget rapporten: ' + e.message, {confirmText:'OK', noCancel:true}); }
+  });
   $('cmpExport').addEventListener('click', async () => {
     if(!cmp) return;
     try{
@@ -1804,6 +1836,12 @@ window.__bootTimeline = function(){
     $('edLate').value = r.late;
     $('edAdo').value = t.adoId || '';
     $('edSpec').value = t.specPath || '';
+    $('edProgRow').hidden = t.kind !== 'estimate';
+    const pr = t.progress || {};
+    $('edDone').value = pr.pointsTotal ? pr.pointsDone || 0 : ''; $('edTotal').value = pr.pointsTotal || ''; $('edPct').value = pr.pointsTotal ? '' : (pr.pct !== undefined ? pr.pct : '');
+    $('edProgNote').textContent = t.kind !== 'estimate' ? '' : pr.source === 'ado'
+      ? 'Fremdrift fra ADO ' + whenText(pr.at) + (pr.sprint ? ' · ' + pr.sprint : '') + ' – ADO tar over igjen ved neste «Oppdater fra ADO».'
+      : 'Skrives inn på dag 10; har featuren stories med poeng i ADO, tar ADO over ved «Oppdater fra ADO».';
     $('edPullNote').textContent = '';
     edPulled = null;
     $('edPushRow').hidden = !HOSTED || !canWrite || t.lane === BACKLOG;
@@ -1884,6 +1922,15 @@ window.__bootTimeline = function(){
         touch(t, 'est');
         // bufferen legges på begge ender av spennet; det rå estimatet (raw) står urørt
         t.endLikely = t.start + (r0.likely - oldBuf + buf) * WEEK; t.end = t.start + (r0.late - oldBuf + buf) * WEEK; touch(t, 'tid');
+      }
+    }
+    if(t.kind === 'estimate'){   // fremdrift: poeng foran prosent; tomme felt = ingen fremdrift
+      const done = parseInt($('edDone').value, 10), total = parseInt($('edTotal').value, 10), pct = parseInt($('edPct').value, 10);
+      const next = total > 0 ? { pointsDone: Math.max(0, Math.min(total, isFinite(done) ? done : 0)), pointsTotal: total } : (isFinite(pct) && pct >= 0 && pct <= 100 ? { pct } : null);
+      const cur = t.progress ? (t.progress.pointsTotal ? { pointsDone: t.progress.pointsDone || 0, pointsTotal: t.progress.pointsTotal } : { pct: t.progress.pct }) : null;
+      if(JSON.stringify(next) !== JSON.stringify(cur)){
+        if(next) t.progress = Object.assign(next, { at: new Date().toISOString(), source: 'manuell' }); else delete t.progress;
+        touch(t, 'progress');
       }
     }
     if(t.kind === 'estimate' && edPulled){   // feltene står slik hentingen satte dem: det rå estimatet lagres med kilde
