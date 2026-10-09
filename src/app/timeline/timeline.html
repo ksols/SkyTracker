@@ -460,6 +460,7 @@
 <header class="topbar">
   <div class="tb-left">
     <a class="btn" id="backLink" href="/" title="Tilbake til tavlen">← SkyTracker</a>
+    <a class="btn" id="intakeLink" href="/inntak" title="Ønskene PreSales har registrert, og forumets beslutninger">Inntak</a>
     <h1>Tidslinjen <span class="sub">– epics</span></h1>
     <span class="badge warn" id="exampleBadge" hidden>Eksempel, ikke en plan</span>
   </div>
@@ -855,6 +856,7 @@ window.__bootTimeline = function(){
   const roBanner = $('roBanner'), dirtyNote = $('dirtyNote'), tlSummary = $('tlSummary');
   const whoami = $('whoami'), roTag = $('roTag');
   $('backLink').hidden = !HOSTED;   // åpnet fra disk: ingen tavle å gå tilbake til
+  $('intakeLink').hidden = !HOSTED;
   const editorBack = $('editorBack'), epicBack = $('epicBack'), dlgBack = $('dlgBack');
   const helpPanel = $('helpPanel'), linkText = $('linkText');
 

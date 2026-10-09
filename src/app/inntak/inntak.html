@@ -1,0 +1,348 @@
+<!doctype html>
+<html lang="nb">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Inntak – SkyTracker</title>
+<style>
+  /* Same palette and controls as the timeline (timeline.html), kept in step by hand. */
+  :root{
+    color-scheme:light;
+    --bg:#f8fafc; --surface:#ffffff; --raised:#f1f5f9; --input-bg:#ffffff;
+    --line:#cbd5e1; --line-soft:#e2e8f0;
+    --text:#0d123e; --text-hover:#0d123e; --text-2:#475569; --text-3:#64748b; --text-4:#94a3b8;
+    --accent:#3b76b0; --accent-hover:#4e94c4; --accent-text:#3b76b0; --accent-soft:rgba(59,118,176,.2);
+    --danger:#ef4444; --danger-hover:#b91c1c; --warn:#f59e0b;
+    --ok-bg:#dcfce7; --ok-fg:#15803d; --warn-bg:#fef3c7; --warn-fg:#b45309; --bad-bg:#fee2e2; --bad-fg:#b91c1c;
+    --badge-bg:#f1f5f9; --badge-fg:#475569;
+    --backdrop:rgba(0,0,0,.4);
+    --shadow:0 20px 25px -5px rgba(0,0,0,.1),0 8px 10px -6px rgba(0,0,0,.1);
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      color-scheme:dark;
+      --bg:#0d123e; --surface:#1e2455; --raised:#212d63; --input-bg:#212d63;
+      --line:#294285; --line-soft:#294285;
+      --text:#ffffff; --text-hover:#71c4df; --text-2:#a5d6e6; --text-3:#a5d6e6; --text-4:#4e94c4;
+      --accent-text:#71c4df; --accent-soft:rgba(59,118,176,.35);
+      --danger:#f87171; --danger-hover:#fca5a5; --warn:#fbbf24;
+      --ok-bg:rgba(34,197,94,.2); --ok-fg:#86efac; --warn-bg:rgba(245,158,11,.2); --warn-fg:#fcd34d; --bad-bg:rgba(239,68,68,.2); --bad-fg:#fca5a5;
+      --badge-bg:#294285; --badge-fg:#cbd5e1;
+      --backdrop:rgba(0,0,0,.6);
+    }
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{background:var(--bg);color:var(--text);font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased}
+  .topbar{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;padding:12px 24px;background:var(--surface);border-bottom:1px solid var(--line-soft)}
+  .tb-left,.tb-right{display:flex;align-items:center;gap:12px;flex-wrap:wrap;min-width:0}
+  .topbar h1{font-size:18px;font-weight:600;letter-spacing:-.01em;color:var(--text);white-space:nowrap}
+  .topbar h1 .sub{color:var(--text-3);font-weight:400}
+  .whoami{font-size:12px;color:var(--text-3)}
+  .ro-tag{font-size:12px;font-weight:500;color:var(--warn)}
+  .save-note{font-size:11px;color:var(--text-4);min-width:120px;text-align:right}
+  .wrap{padding:16px 24px 40px;max-width:1100px}
+  .hint{font-size:12px;color:var(--text-3);max-width:90ch}
+  .hint b{color:var(--text);font-weight:600}
+  button,.btn{font:inherit;font-size:12px;font-weight:500;line-height:1.3;padding:5px 9px;border:1px solid var(--line);border-radius:4px;background:var(--surface);color:var(--text-3);cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;justify-content:center;gap:4px;white-space:nowrap;transition:color .15s ease,background-color .15s ease,border-color .15s ease}
+  button:hover,.btn:hover{color:var(--text-hover);border-color:var(--text-4)}
+  button:disabled{opacity:.5;cursor:default;pointer-events:none}
+  button.primary,#dlgYes{background:var(--accent);border-color:var(--accent);color:#fff}
+  button.primary:hover,#dlgYes:hover{background:var(--accent-hover);border-color:var(--accent-hover);color:#fff}
+  button.text{border-color:transparent;background:transparent}
+  button.text:hover{border-color:transparent;background:var(--raised)}
+  button.x{border:none;background:none;padding:0 2px;font-size:16px;line-height:1;color:var(--text-4)}
+  button.x:hover{color:var(--text-2);background:none}
+  #dlgYes.danger{background:var(--danger);border-color:var(--danger)}
+  .modal-foot button{font-size:13px;padding:6px 12px}
+  .modal-back{display:none;position:fixed;inset:0;z-index:60;background:var(--backdrop);align-items:center;justify-content:center;padding:24px}
+  .modal-back.open{display:flex}
+  #dlgBack{z-index:80}
+  .modal{background:var(--surface);border:1px solid var(--line);border-radius:8px;width:min(620px,100%);max-height:90vh;display:flex;flex-direction:column;box-shadow:var(--shadow)}
+  .modal-head{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;padding:16px 20px 12px}
+  .modal-head h2{font-size:16px;font-weight:600;color:var(--text)}
+  .modal-head .md{font-size:12px;color:var(--text-3);margin-top:2px}
+  .modal-body{overflow:auto;padding:0}
+  .modal-foot{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:12px 20px;border-top:1px solid var(--line-soft);flex-wrap:wrap}
+  .modal-foot .btns{display:flex;gap:8px;align-items:center}
+  .ed-body{padding:4px 20px 16px;display:grid;gap:14px}
+  .ed-field > span{display:block;font-size:12px;font-weight:500;color:var(--text-2);margin-bottom:4px}
+  .ed-field input[type=text],.ed-field input[type=date],.ed-field select,.ed-field textarea,.dlg-body input,#forumLabel{width:100%;font:inherit;font-size:14px;padding:6px 12px;border:1px solid var(--line);border-radius:4px;background:var(--input-bg);color:var(--text)}
+  .ed-field textarea{min-height:72px;resize:vertical}
+  .ed-field input:focus,.ed-field select:focus,.ed-field textarea:focus,.dlg-body input:focus,#forumLabel:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)}
+  .ed-field[hidden],[hidden]{display:none !important}
+  .ed-row{display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end}
+  .ed-row .ed-field{flex:1;min-width:140px}
+  .cls{display:flex;gap:6px;flex-wrap:wrap}
+  .cls button{padding:6px 10px}
+  .cls button.on{background:var(--accent);border-color:var(--accent);color:#fff}
+  .dlg-body{padding:4px 20px 16px;display:grid;gap:12px;font-size:14px;color:var(--text-2)}
+  /* the intake */
+  .forum{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:14px 0 6px;font-size:13px}
+  .forum label{font-weight:600;color:var(--text-2)}
+  #forumLabel{width:260px}
+  .tabs{display:flex;gap:6px;flex-wrap:wrap;margin:12px 0}
+  .tabs button.on{background:var(--accent);border-color:var(--accent);color:#fff}
+  .wish{display:grid;grid-template-columns:1fr auto;gap:6px 16px;padding:12px 14px;border:1px solid var(--line);border-radius:6px;background:var(--surface);margin-bottom:8px}
+  .wish .ttl{font-weight:600;font-size:14px;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+  .wish .meta,.wish .decision{font-size:12px;color:var(--text-3)}
+  .wish .decision{color:var(--text-2);margin-top:2px}
+  .wish .note{font-size:13px;color:var(--text-2);white-space:pre-wrap;margin-top:4px}
+  .wish .acts{display:flex;gap:6px;flex-wrap:wrap;align-items:center;justify-content:flex-end;align-self:start}
+  .chip{font-size:10px;font-weight:500;line-height:1.5;padding:1px 6px;border-radius:4px;background:var(--badge-bg);color:var(--badge-fg);white-space:nowrap}
+  .chip.st-utred{background:var(--ok-bg);color:var(--ok-fg)}
+  .chip.st-senere{background:var(--warn-bg);color:var(--warn-fg)}
+  .chip.st-nei{background:var(--bad-bg);color:var(--bad-fg)}
+  .empty{padding:24px;text-align:center;color:var(--text-4);font-size:13px;border:1px dashed var(--line);border-radius:6px}
+</style>
+</head>
+<body>
+<header class="topbar">
+  <div class="tb-left">
+    <a class="btn" href="/" title="Tilbake til tavlen">← SkyTracker</a>
+    <a class="btn" href="/timeline" title="Planen: epics, features og hylla">Tidslinjen</a>
+    <h1>Inntak <span class="sub">– ønsker til produktforum</span></h1>
+  </div>
+  <div class="tb-right">
+    <span class="save-note" id="dirtyNote"></span>
+    <span class="whoami" id="whoami"></span>
+    <span class="ro-tag" id="roTag" hidden>Lesetilgang</span>
+    <button class="primary" id="newBtn" hidden>＋ Nytt ønske</button>
+  </div>
+</header>
+<div class="wrap">
+  <p class="hint">PreSales skriver ned hvert ønske her: hva, hvem som spurte og når. I produktforum får hvert ønske én av tre beslutninger. <b>Utred nå</b> gir en utredning med eier og størrelse, <b>Senere</b> et registrert ønske, begge på hylla i Tidslinjen. <b>Nei</b> blir liggende her med begrunnelsen. Ingenting går til ADO før Tidslinjen pusher.</p>
+  <div class="forum" id="forumRow" hidden>
+    <label for="forumLabel">Forum i dag</label>
+    <input id="forumLabel" type="text" placeholder="Produktforum 5. nov">
+    <span class="hint">Settes på hver beslutning du tar nå.</span>
+  </div>
+  <div class="tabs" id="tabs"></div>
+  <div id="list"></div>
+</div>
+
+<div class="modal-back" id="newBack"><div class="modal">
+  <div class="modal-head"><div><h2>Nytt ønske</h2><div class="md">Hva, hvem spurte og når. Ikke i ADO ennå.</div></div></div>
+  <div class="modal-body"><div class="ed-body">
+    <label class="ed-field"><span>Ønske</span><input id="nwTitle" type="text" placeholder="Kontaktkort for bedrifter"></label>
+    <div class="ed-row">
+      <label class="ed-field"><span>Kilde</span><select id="nwSource"></select></label>
+      <label class="ed-field"><span>Hvem spurte</span><input id="nwAskedBy" type="text" placeholder="Telenor, Kari i support …"></label>
+      <label class="ed-field"><span>Når</span><input id="nwAskedOn" type="date"></label>
+    </div>
+    <label class="ed-field"><span>Notat</span><textarea id="nwNote" placeholder="Det som ble sagt, gjerne med ett eksempel"></textarea></label>
+  </div></div>
+  <div class="modal-foot"><span></span><span class="btns"><button class="text" id="nwCancel">Avbryt</button><button class="primary" id="nwSave">Registrer</button></span></div>
+</div></div>
+
+<div class="modal-back" id="decBack"><div class="modal">
+  <div class="modal-head"><div><h2 id="decTitle"></h2><div class="md" id="decSub"></div></div></div>
+  <div class="modal-body"><div class="ed-body">
+    <div id="decUtred" class="ed-row">
+      <label class="ed-field"><span>Eier (initialer)</span><input id="decOwner" type="text" placeholder="THM"></label>
+      <div class="ed-field"><span>Størrelse</span><div class="cls" id="decClass"><button data-c="S">S · 1 uke</button><button data-c="M" class="on">M · 2 uker</button><button data-c="L">L · 4 uker</button><button data-c="XL">XL · 6 uker</button></div></div>
+      <label class="ed-field"><span>Utredning ferdig</span><input id="decEnd" type="date"></label>
+    </div>
+    <label class="ed-field" id="decReasonField"><span>Begrunnelse</span><textarea id="decReason" placeholder="Kort, slik vi svarer tilbake"></textarea></label>
+  </div></div>
+  <div class="modal-foot"><span class="hint" id="decForum"></span><span class="btns"><button class="text" id="decCancel">Avbryt</button><button class="primary" id="decSave">Bekreft</button></span></div>
+</div></div>
+
+<div class="modal-back" id="dlgBack"><div class="modal" style="width:min(460px,100%)">
+  <div class="modal-head"><div><h2 id="dlgTitle"></h2></div></div>
+  <div class="modal-body"><div class="dlg-body"><span id="dlgMsg"></span></div></div>
+  <div class="modal-foot"><span></span><span class="btns"><button class="text" id="dlgNo">Avbryt</button><button id="dlgYes"></button></span></div>
+</div></div>
+
+<script>
+window.__bootInntak = function(){
+  const $ = id => document.getElementById(id);
+  const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+  const uid = p => p + Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
+  const CLASS_WEEKS = { S: 1, M: 2, L: 4, XL: 6 };   // spec R7–R9 decision 3
+  const POLL_MS = 10000;
+  let state = emptyPlan(), serverVersion = null, canWrite = false, myName = null, serverReady = false;
+  let pendingSave = false, pushing = false, saveTimer = null, dlgResolve = null;
+  let filter = 'ubehandlet', decideId = null, decideKind = null, decClass = 'M';
+
+  function emptyPlan(){ return normalizePlan({ schema: SCHEMA, lanes: [], tasks: [], wishes: [], deleted: {}, deletedLanes: {}, deletedWishes: {} }); }
+  const anyModalOpen = () => ['newBack', 'decBack', 'dlgBack'].some(id => $(id).classList.contains('open'));
+  const setNote = m => { $('dirtyNote').textContent = m ? '☁ ' + m : ''; };
+  const todayUnit = () => Math.round(dateToUnit(new Date()) / WEEK) * WEEK;
+  const toDateInput = u => { const d = unitToDate(u); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); };
+  const fromDateInput = v => { if(!v) return null; const p = v.split('-').map(Number); if(p.length !== 3 || p.some(isNaN)) return null; return dateToUnit(new Date(p[0], p[1] - 1, p[2])); };
+  const fmtDay = iso => { const d = new Date(iso); return isNaN(d) ? '' : d.toLocaleDateString('nb-NO', {day:'numeric', month:'short', year:'numeric'}); };
+  const forumLabel = () => $('forumLabel').value.trim();
+  const getWish = id => (state.wishes || []).find(w => w.id === id);
+  const bump = w => { w.v = (w.v || 0) + 1; };
+  try{ $('forumLabel').value = sessionStorage.getItem('skytracker-inntak-forum') || ''; }catch(e){}
+  $('forumLabel').addEventListener('input', () => { try{ sessionStorage.setItem('skytracker-inntak-forum', $('forumLabel').value); }catch(e){} });
+
+  /* ---------- the list ---------- */
+  function render(){
+    const g = wishesByStatus(state);
+    const counts = { ubehandlet: g.ubehandlet.length, utred: g.utred.length, senere: g.senere.length, nei: g.nei.length };
+    $('tabs').innerHTML = ['ubehandlet', 'utred', 'senere', 'nei', 'alle'].map(k =>
+      '<button data-f="' + k + '"' + (filter === k ? ' class="on"' : '') + '>' + (k === 'alle' ? 'Alle' : WISH_STATUS_LABEL[k] + ' (' + counts[k] + ')') + '</button>').join('');
+    const items = filter === 'alle' ? [...g.ubehandlet, ...g.utred, ...g.senere, ...g.nei] : g[filter];
+    const list = $('list');
+    if(!items.length){
+      list.innerHTML = '<div class="empty">' + (filter === 'ubehandlet' ? 'Ingen ubehandlede ønsker.' + (canWrite ? ' Registrer det neste med «＋ Nytt ønske».' : '') : 'Ingenting her ennå.') + '</div>';
+      return;
+    }
+    list.innerHTML = items.map(w => {
+      const st = w.status || 'ubehandlet';
+      const meta = [WISH_SOURCE_LABEL[w.source || 'annet'], w.askedBy ? 'spurt av ' + esc(w.askedBy) : '', w.askedOn ? fmtDay(w.askedOn) : '',
+        w.registeredBy ? 'registrert av ' + esc(w.registeredBy) + (w.registeredAt ? ' ' + fmtDay(w.registeredAt) : '') : ''].filter(Boolean).join(' · ');
+      const dec = st === 'ubehandlet' ? '' : [WISH_STATUS_LABEL[st], w.owner || w.sizeClass ? [w.owner, w.sizeClass].filter(Boolean).join(', ') : '',
+        w.reason ? '«' + esc(w.reason) + '»' : '', w.forum ? esc(w.forum) : '', w.decidedBy ? 'av ' + esc(w.decidedBy) + (w.decidedAt ? ' ' + fmtDay(w.decidedAt) : '') : ''].filter(Boolean).join(' · ');
+      const acts = !canWrite ? '' : st === 'ubehandlet'
+        ? '<button class="primary" data-act="utred">Utred nå</button><button data-act="senere">Senere</button><button data-act="nei">Nei</button><button class="x" data-act="slett" title="Slett ønsket">×</button>'
+        : (w.featureId ? '<a class="btn" href="/timeline" title="Featuren ligger på hylla i Tidslinjen">Se på hylla</a>' : '<button class="text" data-act="angre">Tilbake til ubehandlet</button>');
+      return '<div class="wish" data-id="' + esc(w.id) + '"><div><div class="ttl">' + esc(w.title) + '<span class="chip st-' + st + '">' + WISH_STATUS_LABEL[st] + '</span></div>' +
+        '<div class="meta">' + meta + '</div>' + (w.note ? '<div class="note">' + esc(w.note) + '</div>' : '') + (dec ? '<div class="decision">' + dec + '</div>' : '') + '</div>' +
+        '<div class="acts">' + acts + '</div></div>';
+    }).join('');
+  }
+  $('tabs').addEventListener('click', e => { const b = e.target.closest('button[data-f]'); if(!b) return; filter = b.dataset.f; render(); });
+  $('list').addEventListener('click', e => {
+    const b = e.target.closest('button[data-act]'); if(!b) return;
+    const id = b.closest('.wish').dataset.id, act = b.dataset.act;
+    if(act === 'utred' || act === 'nei') openDecide(id, act);
+    else if(act === 'senere') decide(id, 'senere', {});
+    else if(act === 'angre'){ const w = getWish(id); if(w && !w.featureId){ w.status = 'ubehandlet'; ['decidedAt', 'decidedBy', 'forum', 'reason', 'owner', 'sizeClass'].forEach(k => delete w[k]); bump(w); save(); render(); } }
+    else if(act === 'slett') removeWish(id);
+  });
+
+  /* ---------- new wish ---------- */
+  $('nwSource').innerHTML = WISH_SOURCES.map(s => '<option value="' + s + '">' + WISH_SOURCE_LABEL[s] + '</option>').join('');
+  $('newBtn').addEventListener('click', () => {
+    $('nwTitle').value = ''; $('nwAskedBy').value = ''; $('nwNote').value = ''; $('nwSource').value = 'kunde';
+    $('nwAskedOn').value = toDateInput(dateToUnit(new Date()));
+    $('newBack').classList.add('open'); setTimeout(() => $('nwTitle').focus(), 0);
+  });
+  $('nwCancel').addEventListener('click', () => $('newBack').classList.remove('open'));
+  $('nwSave').addEventListener('click', () => {
+    const title = $('nwTitle').value.trim(); if(!title){ $('nwTitle').focus(); return; }
+    const w = { id: uid('w'), v: 1, title, source: $('nwSource').value, status: 'ubehandlet', registeredAt: new Date().toISOString() };
+    const askedBy = $('nwAskedBy').value.trim(); if(askedBy) w.askedBy = askedBy;
+    if($('nwAskedOn').value) w.askedOn = $('nwAskedOn').value;
+    const note = $('nwNote').value.trim(); if(note) w.note = note;
+    if(myName) w.registeredBy = myName;
+    state.wishes.push(w);
+    $('newBack').classList.remove('open');
+    filter = 'ubehandlet'; save(); render();
+  });
+
+  /* ---------- the forum's decision ---------- */
+  function openDecide(id, kind){
+    const w = getWish(id); if(!w) return;
+    decideId = id; decideKind = kind;
+    $('decTitle').textContent = (kind === 'utred' ? 'Utred nå: ' : 'Nei: ') + w.title;
+    $('decSub').textContent = kind === 'utred' ? 'Én eier og en størrelse. Sluttdatoen regnes ut og kan justeres. Utredningen legges på hylla i Tidslinjen.' : 'Begrunnelsen skrives ned her og svares tilbake. Ingenting i ADO.';
+    $('decUtred').hidden = kind !== 'utred'; $('decReasonField').hidden = kind !== 'nei';
+    $('decForum').textContent = forumLabel() ? 'Beslutning i ' + forumLabel() : 'Skriv forumets navn øverst, så står det på beslutningen';
+    if(kind === 'utred'){ $('decOwner').value = ''; setClass('M'); } else $('decReason').value = '';
+    $('decBack').classList.add('open');
+    setTimeout(() => (kind === 'utred' ? $('decOwner') : $('decReason')).focus(), 0);
+  }
+  function setClass(c){ decClass = c; [...$('decClass').querySelectorAll('button')].forEach(b => b.classList.toggle('on', b.dataset.c === c)); $('decEnd').value = toDateInput(todayUnit() + CLASS_WEEKS[c] * WEEK); }
+  $('decClass').addEventListener('click', e => { const b = e.target.closest('button[data-c]'); if(b) setClass(b.dataset.c); });
+  $('decCancel').addEventListener('click', () => $('decBack').classList.remove('open'));
+  $('decSave').addEventListener('click', () => {
+    if(decideKind === 'nei'){ const reason = $('decReason').value.trim(); if(!reason){ $('decReason').focus(); return; } decide(decideId, 'nei', { reason }); }
+    else { const end = fromDateInput($('decEnd').value); if(end === null){ $('decEnd').focus(); return; } decide(decideId, 'utred', { owner: $('decOwner').value.trim().toUpperCase(), sizeClass: decClass, end }); }
+    $('decBack').classList.remove('open');
+  });
+  function decide(id, status, o){
+    const w = getWish(id); if(!w || w.featureId) return;   // once: a second click never makes a second feature
+    w.status = status; w.decidedAt = new Date().toISOString(); if(myName) w.decidedBy = myName; else delete w.decidedBy;
+    ['forum', 'reason', 'owner', 'sizeClass'].forEach(k => delete w[k]);
+    if(forumLabel()) w.forum = forumLabel();
+    if(status === 'nei') w.reason = o.reason;
+    else {
+      const start = todayUnit();
+      const t = { id: uid('f'), lane: BACKLOG, label: w.title, kind: 'discovery', state: status === 'utred' ? 'utredes' : 'ny', start, end: status === 'utred' ? Math.max(start + WEEK, o.end) : start + WEEK, deps: [], fv: { state: 1, tid: 1, meta: 1 } };
+      if(status === 'utred'){ if(o.owner){ t.assignee = o.owner; w.owner = o.owner; } t.sizeClass = o.sizeClass; w.sizeClass = o.sizeClass; }
+      if(w.note) t.description = w.note;
+      if(myName){ t.editedBy = myName; t.editedAt = new Date().toISOString(); }
+      state.tasks.push(t); w.featureId = t.id; state.example = false;
+    }
+    bump(w); state = normalizePlan(state); save(); render();
+  }
+  async function removeWish(id){
+    const w = getWish(id); if(!w) return;
+    if(!(await confirmDialog('Slette ønske', 'Slette «' + w.title + '»? Det forsvinner fra listen og logges.', {danger:true, confirmText:'Slett'}))) return;
+    state.deletedWishes[id] = (w.v || 0) + 1;
+    state.wishes = state.wishes.filter(x => x.id !== id);
+    save(); render();
+  }
+
+  /* ---------- confirm dialog ---------- */
+  function confirmDialog(title, msg, opts){
+    opts = opts || {};
+    return new Promise(res => {
+      dlgResolve = res;
+      $('dlgTitle').textContent = title; $('dlgMsg').textContent = msg;
+      $('dlgYes').textContent = opts.confirmText || 'OK'; $('dlgYes').classList.toggle('danger', !!opts.danger);
+      $('dlgBack').classList.add('open');
+    });
+  }
+  const dlgClose = v => { $('dlgBack').classList.remove('open'); const r = dlgResolve; dlgResolve = null; if(r) r(v); };
+  $('dlgYes').addEventListener('click', () => dlgClose(true));
+  $('dlgNo').addEventListener('click', () => dlgClose(false));
+  document.addEventListener('keydown', e => { if(e.key === 'Escape'){ ['newBack', 'decBack'].forEach(id => $(id).classList.remove('open')); if($('dlgBack').classList.contains('open')) dlgClose(false); } });
+
+  /* ---------- the shared plan: same API as the timeline, merged on the server ---------- */
+  function applyRemote(data, version){ serverVersion = version; state = normalizePlan(data); render(); }
+  async function init(){
+    setNote('henter…');
+    try{
+      const r = await fetch('api/timeline-plan', {cache:'no-store'});
+      if(!r.ok) throw new Error('HTTP ' + r.status);
+      const j = await r.json();
+      canWrite = j.role === 'writer'; myName = j.user || null; serverReady = true;
+      $('roTag').hidden = canWrite; $('newBtn').hidden = !canWrite; $('forumRow').hidden = !canWrite; $('whoami').textContent = myName || '';
+      if(j.plan) applyRemote(j.plan.data, j.plan.version); else { state = emptyPlan(); render(); }
+      setNote(canWrite ? '' : 'kun lesetilgang');
+    }catch(e){ setNote('frakoblet – kunne ikke hente planen'); render(); }
+  }
+  function save(){ if(!serverReady || !canWrite) return; pendingSave = true; setNote('lagrer…'); clearTimeout(saveTimer); saveTimer = setTimeout(push, 600); }
+  async function push(){
+    pendingSave = false; pushing = true;
+    try{
+      const r = await fetch('api/timeline-plan', { method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ data: state, note: { source: 'bruker' } }) });
+      if(r.status === 403){ canWrite = false; $('roTag').hidden = false; $('newBtn').hidden = true; $('forumRow').hidden = true; setNote('kun lesetilgang – endringene ble ikke lagret'); render(); return; }
+      if(r.status === 409){ setNote('travelt – prøver igjen'); save(); return; }
+      if(!r.ok) throw new Error('HTTP ' + r.status);
+      const j = await r.json();
+      if(!pendingSave) applyRemote(j.data, j.version);
+      setNote('lagret ' + new Date().toLocaleTimeString('nb-NO', {hour:'2-digit', minute:'2-digit'}));
+    }catch(e){ setNote('lagring feilet – prøver igjen'); clearTimeout(saveTimer); saveTimer = setTimeout(push, 5000); pendingSave = true; }
+    finally{ pushing = false; }
+  }
+  async function poll(){
+    if(!serverReady || pendingSave || pushing || anyModalOpen()) return;
+    try{
+      const r = await fetch('api/timeline-plan', {cache:'no-store'});
+      if(!r.ok) return;
+      const j = await r.json();
+      if(pendingSave || pushing || anyModalOpen()) return;
+      if(j.plan && j.plan.version !== serverVersion) applyRemote(j.plan.data, j.plan.version);
+    }catch(e){ /* frakoblet – prøver igjen neste runde */ }
+  }
+  setInterval(poll, POLL_MS);
+  render();
+  init();
+};
+</script>
+<script>
+(function(){
+  var s = document.createElement('script');
+  s.src = 'timeline/epic-tools.js';
+  s.onload = function(){ window.__bootInntak(); };
+  s.onerror = function(){ document.getElementById('list').textContent = 'Kunne ikke laste epic-tools.js.'; };
+  document.head.appendChild(s);
+})();
+</script>
+</body>
+</html>
