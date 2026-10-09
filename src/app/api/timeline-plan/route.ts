@@ -2,6 +2,7 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { mergePlans, type Plan } from "@/features/timeline/merge";
 import { parseNote, recordChangeset } from "@/features/timeline/history";
+import { notifyTurns } from "@/features/timeline/notify";
 import type { Prisma } from "@/generated/prisma/client";
 
 // Shared state for the /timeline tool (epic roadmap). One row (id "epics");
@@ -85,6 +86,8 @@ export async function PUT(req: Request) {
 
 // The history is best-effort: a failed log write must never fail the save.
 async function logHistory(before: Plan, after: Plan, beforeVersion: number, afterVersion: number, editor: string | null, note: ReturnType<typeof parseNote>) {
+  // the same-week notice rides on the save, never on its result (features/timeline/notify.ts)
+  void notifyTurns(before, after, { editor, reason: note.reason, reasonCode: note.reasonCode });
   try {
     return await recordChangeset(prisma, { before, after, beforeVersion, afterVersion, editor, note });
   } catch {

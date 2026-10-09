@@ -4,6 +4,7 @@ import type { Prisma, PrismaClient } from "@/generated/prisma/client";
 import type { Plan } from "./merge";
 import { recordChangeset, type SaveNote } from "./history";
 import type { PlanEvent } from "./events";
+import { notifyTurns } from "./notify";
 
 export const PLAN_ID = "epics";
 export type StoredPlan = { data: Plan; version: number };
@@ -27,5 +28,6 @@ export async function commitPlan(
   try {
     changesetId = await recordChangeset(db, { before: args.stored.data, after: args.after, beforeVersion: args.stored.version, afterVersion: args.stored.version + 1, editor: args.editor, note: args.note, extraEvents: args.extraEvents });
   } catch { /* best effort: tables missing or a transient DB error never fails the write */ }
+  void notifyTurns(args.stored.data, args.after, { editor: args.editor, reason: args.note.reason, reasonCode: args.note.reasonCode });
   return { version: args.stored.version + 1, changesetId };
 }
