@@ -231,3 +231,23 @@ describe("the queue's events (stage 6)", () => {
     expect(diffPlans(one([lane("x")]), mixed).map((e) => [e.code, e.summary])).toEqual([["plan.kapasitet", "Sprintmiks: overgang (55 % til features) → normal (60 %)"]]);
   });
 });
+
+describe("diffPlans: an import from ADO", () => {
+  it("marks the new items as ADO's and says where they came from", () => {
+    const b = one([lane("x")], []);
+    const a = one([lane("x"), lane("ado4802", { name: "Bedre samhandling i chats", adoId: 4802 })], [disc({ id: "ado4566", lane: "ado4802", label: "Message threading and replies", adoId: 4566 })]);
+    const ev = diffPlans(b, a, { source: "import" });
+    expect(codes(ev)).toEqual(["epic.ny", "feature.ny"]);
+    expect(ev.map((e) => e.cause)).toEqual(["ado", "ado"]);
+    expect(ev[0].summary.startsWith("Hentet fra ADO #4802 · ")).toBe(true);
+    expect(ev[1].summary.startsWith("Hentet fra ADO #4566 · ")).toBe(true);
+    expect(ev[1].summary).toContain("Ny utredning");
+  });
+  it("a plain save of a new feature with an ADO id typed by hand reads as the user's", () => {
+    const b = one([lane("x")], []);
+    const a = one([lane("x")], [disc({ id: "t", adoId: 4566 })]);
+    const ev = diffPlans(b, a);
+    expect(ev[0].cause).toBe("bruker");
+    expect(ev[0].summary.startsWith("Hentet")).toBe(false);
+  });
+});

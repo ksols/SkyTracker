@@ -114,7 +114,8 @@ export function diffPlans(before: Plan, after: Plan, opts: DiffOptions = {}): Pl
       summary: `Eksempel-epics lastet inn (${after.lanes.length} epics, ${after.tasks.length} features)` }];
   }
   const ev: PlanEvent[] = [];
-  const dc: Cause = opts.source === "ado" ? "ado" : "bruker";   // a sync's writes are ADO's, not the editor's
+  const dc: Cause = opts.source === "ado" || opts.source === "import" ? "ado" : "bruker";   // a sync's or an import's writes are ADO's, not the editor's
+  const from = (adoId: number | undefined) => (opts.source === "import" && adoId ? "Hentet fra ADO #" + adoId + " · " : "");   // «Hent fra ADO» says where an item came from
   const bl = new Map(before.lanes.map((l) => [l.key, l]));
   const al = new Map(after.lanes.map((l) => [l.key, l]));
   const laneName = (key: string) => (key === BACKLOG ? "Klar for veikart" : al.get(key)?.name ?? bl.get(key)?.name ?? key);
@@ -128,7 +129,7 @@ export function diffPlans(before: Plan, after: Plan, opts: DiffOptions = {}): Pl
   for (const l of after.lanes) {
     const b = bl.get(l.key);
     const base = { targetType: "epic" as const, targetId: l.key, targetLabel: l.name, laneKey: l.key, cause: dc };
-    if (!b) { ev.push({ ...base, code: "epic.ny", after: pickLane(l), summary: "Ny epic" + (typeof l.goalDate === "number" ? " · " + goalSummary({ key: l.key, name: l.name }, l).replace(" satt", "") : "") }); continue; }
+    if (!b) { ev.push({ ...base, code: "epic.ny", after: pickLane(l), summary: from(l.adoId) + "Ny epic" + (typeof l.goalDate === "number" ? " · " + goalSummary({ key: l.key, name: l.name }, l).replace(" satt", "") : "") }); continue; }
     if (b.name !== l.name) ev.push({ ...base, code: "epic.navn", before: b.name, after: l.name, summary: "Navn: " + q(b.name) + " → " + q(l.name) });
     if ((b.metric ?? "") !== (l.metric ?? "")) ev.push({ ...base, code: "epic.maltall", before: b.metric ?? null, after: l.metric ?? null, summary: textChange("Måltall", b.metric, l.metric) });
     if ((b.owner ?? "") !== (l.owner ?? "")) ev.push({ ...base, code: "epic.eier", before: b.owner ?? null, after: l.owner ?? null, summary: textChange("Eier", b.owner, l.owner) });
@@ -161,7 +162,7 @@ export function diffPlans(before: Plan, after: Plan, opts: DiffOptions = {}): Pl
     const b = bt.get(t.id);
     const base = { targetType: "feature" as const, targetId: t.id, targetLabel: t.label, laneKey: t.lane, cause: dc };
     if (!b) {
-      ev.push({ ...base, code: "feature.ny", after: pickTask(t), summary: t.kind === "discovery" ? `Ny utredning (til ${date(t.end)})` : `Ny feature (${rangeWords(t)})` });
+      ev.push({ ...base, code: "feature.ny", after: pickTask(t), summary: from(t.adoId) + (t.kind === "discovery" ? `Ny utredning (til ${date(t.end)})` : `Ny feature (${rangeWords(t)})`) });
       continue;
     }
     if (b.label !== t.label) ev.push({ ...base, code: "feature.navn", before: b.label, after: t.label, summary: "Navn: " + q(b.label) + " → " + q(t.label) });
