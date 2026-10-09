@@ -179,3 +179,27 @@ describe("review: a failure after the feature was created", () => {
     expect(iam.ado?.storyId).toBeUndefined();
   });
 });
+
+describe("progress from the stories (stage 5)", () => {
+  it("writes progress from the stories' points on refresh, bumps once, leaves a typed progress alone when the stories carry no points", async () => {
+    const ado = fakeAdo();
+    const pushed = await pushItem(plan(), { kind: "feature", id: "kap" }, ado.client, OPTS);
+    pushed.plan.tasks.find((t) => t.id === "kap")!.progress = { pct: 20, at: "typed", source: "manuell" };
+    const feature = ado.items.get(5001)!;
+    ado.items.set(7001, { id: 7001, fields: { "System.WorkItemType": "User Story", "System.State": "Closed", "Microsoft.VSTS.Scheduling.StoryPoints": 3, "System.IterationPath": "Skytale\\Sprint 70" } });
+    ado.items.set(7002, { id: 7002, fields: { "System.WorkItemType": "User Story", "System.State": "Active", "Microsoft.VSTS.Scheduling.StoryPoints": 5, "System.IterationPath": "Skytale\\Sprint 71" } });
+    feature.relations!.push({ rel: "System.LinkTypes.Hierarchy-Forward", url: "https://dev.azure.com/SkytaleAS/_apis/wit/workItems/7001" }, { rel: "System.LinkTypes.Hierarchy-Forward", url: "https://dev.azure.com/SkytaleAS/_apis/wit/workItems/7002" });
+    const r = await refreshPlan(pushed.plan, ado.client, NOW);
+    const kap = r.plan.tasks.find((t) => t.id === "kap")!;
+    expect(kap.progress).toEqual({ pointsDone: 3, pointsTotal: 8, sprint: "Sprint 71", at: NOW.toISOString(), source: "ado" });
+    expect(kap.fv!.progress).toBe(1);
+    const r2 = await refreshPlan(r.plan, ado.client, new Date(NOW.getTime() + 1000));
+    expect(r2.plan.tasks.find((t) => t.id === "kap")!.fv!.progress).toBe(1);
+    // no points on the stories: the typed value stays
+    ado.items.get(7001)!.fields["Microsoft.VSTS.Scheduling.StoryPoints"] = 0;
+    ado.items.get(7002)!.fields["Microsoft.VSTS.Scheduling.StoryPoints"] = undefined;
+    const typed = JSON.parse(JSON.stringify(pushed.plan));
+    const r3 = await refreshPlan(typed, ado.client, NOW);
+    expect(r3.plan.tasks.find((t) => t.id === "kap")!.progress).toEqual({ pct: 20, at: "typed", source: "manuell" });
+  });
+});

@@ -21,7 +21,7 @@ export class PushFailed extends Error {
   }
 }
 const clone = <T>(v: T): T => JSON.parse(JSON.stringify(v));
-const bump = (t: PlanTask, g: "meta" | "ado" | "state") => { t.fv = t.fv ?? {}; t.fv[g] = (t.fv[g] ?? 0) + 1; };
+const bump = (t: PlanTask, g: "meta" | "ado" | "state" | "progress") => { t.fv = t.fv ?? {}; t.fv[g] = (t.fv[g] ?? 0) + 1; };
 const bumpLane = (l: PlanLane) => { l.v = (l.v ?? 0) + 1; };
 const n = (c: number, one: string, many: string) => c + " " + (c === 1 ? one : many);
 const conflictLine = (c: AdoConflict) => FIELD_LABEL[c.field as OwnedField] + " er «" + (c.theirs ?? "") + "» i ADO, «" + (c.ours ?? "") + "» her";
@@ -143,6 +143,11 @@ export async function refreshPlan(plan: Plan, client: AdoClient, now: Date): Pro
     const next = withConflicts(t.ado, check({ kind: "feature", targetType: "feature", targetId: t.id, targetLabel: t.label, laneKey: t.lane }, featureFields(p, t), t.ado, w));
     const stories = readStories(w, byId, t.ado?.storyId);
     read.stories += stories.count;
+    if (stories.pointsTotal > 0) { // ADO's points replace a typed progress (spec R4); without points the typed value stays
+      const prog = { pointsDone: stories.pointsDone, pointsTotal: stories.pointsTotal, sprint: stories.iteration, at: now.toISOString(), source: "ado" as const };
+      const same = t.progress?.source === "ado" && t.progress.pointsDone === prog.pointsDone && t.progress.pointsTotal === prog.pointsTotal && t.progress.sprint === prog.sprint;
+      if (!same) { t.progress = prog; bump(t, "progress"); }
+    }
     const strip = (a?: TaskAdo) => JSON.stringify({ ...(a ?? {}), stories: a?.stories ? { ...a.stories, at: "" } : undefined });
     next.stories = { ...stories, at: now.toISOString() };
     if (strip(next) !== strip(t.ado)) { t.ado = next; bump(t, "ado"); }
