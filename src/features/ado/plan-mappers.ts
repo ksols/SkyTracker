@@ -22,7 +22,8 @@ export type Fields = Snapshot & { parentAdoId?: number | null; assignedTo?: stri
 export type Conflict = { field: OwnedField; ours: string | null; theirs: string | null };
 
 // ADO's Agile process in the Skytale project (checked 09.10.2026): New · Active · Resolved · Discovery · Closed · Removed.
-export const FEATURE_STATE_TO_ADO: Record<string, string> = { ny: "New", utredes: "Discovery", klar: "New", aktiv: "Active", levert: "Closed" };
+// `levert` is only ever read from ADO (Resolved/Closed): the push never writes a state for it.
+export const FEATURE_STATE_TO_ADO: Record<string, string | null> = { ny: "New", utredes: "Discovery", klar: "New", aktiv: "Active", levert: null };
 export const EPIC_STATE_TO_ADO: Record<string, string> = { forslag: "New", aktiv: "Active", avsluttet: "Closed" };
 
 /** ADO stores dates as UTC midnight of the calendar day. */
@@ -68,7 +69,7 @@ export function featureFields(plan: Plan, task: PlanTask): Fields {
   return {
     title: task.label,
     description: featureDescription(plan, task),
-    state: FEATURE_STATE_TO_ADO[task.state ?? "aktiv"],
+    state: FEATURE_STATE_TO_ADO[task.state ?? "aktiv"] ?? null,
     targetDate: unitToAdoDate(task.end),
     startDate: unitToAdoDate(task.start),
     parentAdoId: lane?.adoId ?? null,
