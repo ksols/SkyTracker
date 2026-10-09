@@ -200,6 +200,7 @@
   .chip.st-rod{background:var(--bad-bg);color:var(--bad-fg)}
   .chip.sig{outline:1px dashed currentColor;outline-offset:-1px}
   .chip.pinned{background:var(--text);color:var(--surface)}
+  .task-label .chip.queue{background:transparent;border:1px dashed var(--text-3);color:var(--text-2)}
   .inv-list{margin:0 0 14px;padding-left:18px;font-size:12px}.inv-list li{margin:3px 0}.inv-list ul{padding-left:16px;margin:2px 0}
   .inv-big{font-size:34px;font-weight:700;margin:4px 0;color:var(--text)}
   #invBody h3{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--text-3);margin:14px 0 6px}
@@ -427,6 +428,7 @@
   .shelf-row .acts{display:flex;gap:4px;opacity:0}
   .shelf-row:hover .acts{opacity:1}
   .shelf-row .grip{opacity:1}
+  .shelf-group{font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--text-3);padding:8px 8px 2px}
   .shelf-empty{padding:0 14px 12px;font-size:12px;color:var(--text-4)}
   .preview{font-size:13px;padding:10px 12px;border-radius:6px;background:var(--bg);border:1px solid var(--line-soft);margin:0 20px 16px}
   .preview b.st-gronn{color:var(--ok-fg)} .preview b.st-gul{color:var(--warn-fg)} .preview b.st-rod{color:var(--bad-fg)}
@@ -769,9 +771,8 @@ window.__bootTimeline = function(){
 
   /* ================== konstanter ================== */
   const MONTH_W = cssNum('--month-w'), ROW_H = cssNum('--row-h'), LANE_H = cssNum('--lane-h');
-  const VIEW_FROM = 2;                        // aksen starter okt 2026 (enhet 2)
-  const VIEW_MONTHS = N_MONTHS - VIEW_FROM;   // 15 måneder til des 2027
-  const CHART_W = VIEW_MONTHS * MONTH_W;
+  let VIEW_FROM = 2, VIEW_MONTHS = N_MONTHS - VIEW_FROM, CHART_W = VIEW_MONTHS * MONTH_W;   // regnes ut i viewWindow() ved hver tegning
+  let scrolledToToday = false;
   const SNAP = WEEK, MIN_DUR = WEEK;
   const STORE = 'skytale-veikart-v1';
   const LABELW_KEY = 'skytale-veikart-labelw';
@@ -798,7 +799,12 @@ window.__bootTimeline = function(){
 
   function cssNum(v){ return parseFloat(getComputedStyle(document.documentElement).getPropertyValue(v)); }
   const x = u => (u - VIEW_FROM) * MONTH_W;                       // enhet → px i diagrammet
-  const monthInfo = i => ({ m: (BASE_M + i) % 12, y: BASE_Y + Math.floor((BASE_M + i) / 12) });
+  const monthInfo = i => ({ m: (((BASE_M + i) % 12) + 12) % 12, y: BASE_Y + Math.floor((BASE_M + i) / 12) });
+  function viewWindow(){   // aksen starter tre måneder før i dag, eller tidligere når planen har eldre features eller måldatoer
+    const starts = state.tasks.map(t => Math.floor(t.start)).concat(state.lanes.map(l => typeof l.goalDate === 'number' ? Math.floor(l.goalDate) : Infinity));
+    VIEW_FROM = Math.min(Math.floor(dateToUnit(new Date())) - 3, ...starts);
+    VIEW_MONTHS = N_MONTHS - VIEW_FROM; CHART_W = VIEW_MONTHS * MONTH_W;
+  }
   function todayUnit(){ return Math.max(VIEW_FROM, Math.min(N_MONTHS, dateToUnit(new Date()))); }
   function rangeText(t){   // årstall står på aksen; kolonnen holder seg kort
     if(t.kind === 'discovery') return 'Utredning ' + fmtDate(unitToDate(t.start)) + ' – ' + fmtDate(unitToDate(t.end));
@@ -964,6 +970,7 @@ window.__bootTimeline = function(){
   function render(){
     showEmpty();
     exampleBadge.hidden = !state.example;
+    viewWindow();
     const sx = chartScroll.scrollLeft;
     labels.innerHTML = '';
     chart.innerHTML = '';
@@ -1189,7 +1196,8 @@ window.__bootTimeline = function(){
 
     positionAll();
     if(linkSource) markLinkSource();
-    chartScroll.scrollLeft = sx;
+    if(!scrolledToToday){ scrolledToToday = true; chartScroll.scrollLeft = Math.max(0, x(todayUnit()) - MONTH_W); }   // åpner med i dag i fokus
+    else chartScroll.scrollLeft = sx;
     renderShelf();
   }
 
@@ -1226,6 +1234,11 @@ window.__bootTimeline = function(){
     const psig = progressSignal(t, todayUnit());
     if(psig) chips.push('<span class="chip sig st-' + psig.code + '" title="Andre signal: fremdrift mot tid i det sannsynlige vinduet (teller ikke i epicens farge)">' + esc(progressText(t, psig)) + '</span>');
     if(t.pinned){ const fl = queueFloor(state, t.id).floor; chips.push('<span class="chip pinned" title="Dratt foran køen med vilje' + (fl !== null ? ' (køen sier start ' + esc(fmtDate(unitToDate(fl))) + ')' : '') + '. Slå på «Følger køen» i redigeringen for å slippe den.">overstyrt</span>'); }
+    if(!t.pinned && t.kind === 'estimate' && t.lane !== BACKLOG && t.state !== 'levert'){   // køen: hvem den venter på, synlig uten Historikk
+      const q = queueFloor(state, t.id), qb = q.by ? getTask(q.by) : null;
+      if(q.kind === 'queue' && qb && q.floor !== null && Math.abs(q.floor - t.start) < 1e-6)
+        chips.push('<span class="chip queue" title="Starter når ' + esc(t.assignee || 'eieren') + ' er ferdig med «' + esc(qb.label) + '». Dra den foran for å overstyre.">i kø bak «' + esc(qb.label) + '» (' + esc(t.assignee || '') + ')</span>');
+    }
     if(t.deps.length) chips.push('<span class="chip" title="Venter på ' + t.deps.length + ' feature(s)">⇠ ' + t.deps.length + '</span>');
     if(discoveryOverdue(t, todayUnit())) chips.push('<span class="chip st-gul" title="Sluttdatoen er passert: sett en ny før den passerer">Utredning forsinket</span>');
     if(t.editedBy){
@@ -1353,6 +1366,7 @@ window.__bootTimeline = function(){
   }
 
   /* ================== features: legg til / fjern ================== */
+  const newIds = new Set(), newLaneKeys = new Set();   // opprettet nå, ikke lagret ennå: lagres først når redigeringen lukkes, forsvinner ved avbryt
   function addFeature(laneKey, kind){
     const start = snapTo(Math.max(todayUnit(), VIEW_FROM), SNAP);
     const order = Math.max(0, ...laneTasks(laneKey).map(v => v.order || 0)) + 1;
@@ -1360,9 +1374,9 @@ window.__bootTimeline = function(){
       ? {id: uid(), lane: laneKey, label: 'Ny utredning', kind: 'discovery', start, end: start + 2 * WEEK, deps: [], fv: {}, order}
       : {id: uid(), lane: laneKey, label: 'Ny feature', kind: 'estimate', start, endLikely: start + 4 * WEEK, end: start + 6 * WEEK, deps: [], fv: {}, order};
     if(myName){ t.editedBy = myName; t.editedAt = new Date().toISOString(); }
-    state.tasks.push(t);
+    state.tasks.push(t); newIds.add(t.id);
     normalizePlan(state);
-    save(); render();
+    render();
     openEditor(t.id);
   }
   async function removeTask(id){
@@ -1740,7 +1754,12 @@ window.__bootTimeline = function(){
     shelfCount.textContent = items.length ? '(' + items.length + ')' : '';
     $('registerBtn').hidden = !(HOSTED && canWrite);
     shelfList.innerHTML = items.length ? '' : '<div class="shelf-empty">Ingen features venter på plass i en epic. Registrer et ønske produktforum har sagt ja til.</div>';
-    items.forEach(t => {
+    const groups = [['ny', 'Registrert'], ['utredes', 'Utredes'], ['klar', 'Klar for veikart']];
+    groups.forEach(([st, title]) => {
+    const rows = items.filter(t => (t.state === 'ny' || t.state === 'utredes') ? t.state === st : st === 'klar');
+    if(!rows.length) return;
+    shelfList.appendChild(el('div', 'shelf-group', title + ' (' + rows.length + ')'));
+    rows.forEach(t => {
       const r = el('div', 'shelf-row');
       r.dataset.id = t.id;
       const g = el('span', 'grip', '⋮⋮'); g.title = 'Dra inn i en epic'; g.draggable = canWrite;
@@ -1761,6 +1780,7 @@ window.__bootTimeline = function(){
       }
       r.append(g, nm, st, acts);
       shelfList.appendChild(r);
+    });
     });
   }
   async function registerWish(){
@@ -1909,7 +1929,10 @@ window.__bootTimeline = function(){
     editorBack.classList.add('open');
     setTimeout(() => $('edName').focus(), 0);
   }
-  function closeEditor(){ editorTaskId = null; editorBack.classList.remove('open'); }
+  function closeEditor(){
+    const id = editorTaskId; editorTaskId = null; editorBack.classList.remove('open');
+    if(id && newIds.has(id)){ newIds.delete(id); state.tasks = state.tasks.filter(v => v.id !== id); normalizePlan(state); render(); }   // aldri lagret: ingen spor
+  }
   $('edKind').addEventListener('click', e => {
     const b = e.target.closest('button[data-k]');
     if(!b) return;
@@ -1997,7 +2020,8 @@ window.__bootTimeline = function(){
     const newLane = $('edLane').value;
     if(newLane && newLane !== t.lane && (getLane(newLane) || newLane === BACKLOG)) moveTask(t.id, newLane, laneTasks(newLane).length);
     normalizePlan(state);
-    const lines = editReasonLines(before, t);   // brukerens egen endring; det køen flytter etterpå logges med årsak, ikke spørres om
+    const isNew = newIds.delete(t.id);   // ny i denne økten: lagres nå for første gang, og ingenting har «endret seg»
+    const lines = isNew ? [] : editReasonLines(before, t);   // brukerens egen endring; det køen flytter etterpå logges med årsak, ikke spørres om
     pushQueue();
     if(lines.length) askReason(lines);
     save(); render();
@@ -2036,6 +2060,7 @@ window.__bootTimeline = function(){
     if(!t) return;
     if(!(await confirmDialog('Slette feature', 'Slette «' + t.label + '»? Avhengigheter til den fjernes også.', {danger:true, confirmText:'Slett'}))) return;
     const id = editorTaskId;
+    if(newIds.has(id)){ closeEditor(); return; }   // aldri lagret: bare lukk
     if(t.kind === 'estimate' && ASK_REASON_FOR.estimateDeleted) askReason([t.label + ': slettet']);
     closeEditor();
     doRemoveTaskSilent(id);
@@ -2047,8 +2072,8 @@ window.__bootTimeline = function(){
   function addEpic(){
     const key = 'e' + Date.now().toString(36) + Math.random().toString(36).slice(2, 4);
     state.lanes.push({ key, name: 'Ny epic', owner: OWNER_DEFAULT, v: 1, state: 'forslag' });   // et forslag til forumet velger det
-    state.example = false;   // eksplisitt false: en slettet nøkkel overlever flettingen på serveren
-    save(); render();
+    newLaneKeys.add(key);
+    render();
     openEpicEditor(key);
   }
   function openEpicEditor(key){
@@ -2073,7 +2098,10 @@ window.__bootTimeline = function(){
     epicBack.classList.add('open');
     setTimeout(() => $('epName').focus(), 0);
   }
-  function closeEpicEditor(){ epicKey = null; epicBack.classList.remove('open'); }
+  function closeEpicEditor(){
+    const key = epicKey; epicKey = null; epicBack.classList.remove('open');
+    if(key && newLaneKeys.has(key)){ newLaneKeys.delete(key); state.lanes = state.lanes.filter(v => v.key !== key); render(); }   // aldri lagret: ingen spor
+  }
   function paintEpState(){ const closed = $('epState').value === 'avsluttet'; $('epOutcomeField').hidden = !closed; $('epClosedField').hidden = !closed; }
   $('epState').addEventListener('change', paintEpState);
   $('epPush').addEventListener('click', () => pushAfterSave('epic', epicKey, {}, 'epSave'));
@@ -2081,7 +2109,8 @@ window.__bootTimeline = function(){
   $('epSave').addEventListener('click', () => {
     const l = getLane(epicKey);
     if(!l){ closeEpicEditor(); return; }
-    let changed = false;
+    const isNew = newLaneKeys.delete(epicKey);   // ny i denne økten: første lagring, ingen begrunnelse
+    let changed = isNew;
     const lines = [];
     const before = { goalDate: l.goalDate, goalProvisional: !!l.goalProvisional };
     const name = $('epName').value.trim();
@@ -2127,7 +2156,7 @@ window.__bootTimeline = function(){
       else if(Math.abs(l.goalDate - before.goalDate) > 1e-9) lines.push(l.name + ': måldato ' + fmtDate(unitToDate(before.goalDate)) + ' → ' + fmtDate(unitToDate(l.goalDate)));
       else if(before.goalProvisional && !l.goalProvisional) lines.push(l.name + ': foreløpig mål → endelig måldato');
     }
-    if(changed){ bumpLane(l); if(lines.length) askReason(lines); save(); }
+    if(changed){ if(isNew) state.example = false; bumpLane(l); if(lines.length && !isNew) askReason(lines); save(); }   // example: eksplisitt false, en slettet nøkkel overlever flettingen på serveren
     render();
     closeEpicEditor();
   });
@@ -2137,6 +2166,7 @@ window.__bootTimeline = function(){
   $('epDelete').addEventListener('click', async () => {
     const l = getLane(epicKey);
     if(!l) return;
+    if(newLaneKeys.has(epicKey)){ closeEpicEditor(); return; }   // aldri lagret: bare lukk
     const n = laneTasks(epicKey).length;
     if(!(await confirmDialog('Slette epic', 'Slette «' + l.name + '»' + (n ? ' og ' + n + ' feature(s) under den' : '') + '?', {danger:true, confirmText:'Slett'}))) return;
     const key = epicKey;

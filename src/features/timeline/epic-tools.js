@@ -6,7 +6,7 @@
 /* ---------- time: unit = months since 1 Aug 2026 ---------- */
 const BASE_Y = 2026;
 const BASE_M = 7; // august, 0-indexed
-const N_MONTHS = 17; // axis ends Dec 2027
+const N_MONTHS = 29; // the model ends Dec 2028; the page draws from a few months before today
 const WEEK = 0.25; // one week in month units, also the drag snap
 const MND = ["jan", "feb", "mar", "apr", "mai", "jun", "jul", "aug", "sep", "okt", "nov", "des"];
 
@@ -15,9 +15,9 @@ function dateToUnit(d) {
   return (d.getFullYear() - BASE_Y) * 12 + (d.getMonth() - BASE_M) + (d.getDate() - 1) / dim;
 }
 function unitToDate(u) {
-  u = Math.max(0, Math.min(N_MONTHS, u));
+  u = Math.min(N_MONTHS, u);   // units before the base month are negative: the axis reaches back in time
   const i = Math.min(N_MONTHS - 1, Math.floor(u));
-  const m = (BASE_M + i) % 12;
+  const m = (((BASE_M + i) % 12) + 12) % 12;
   const y = BASE_Y + Math.floor((BASE_M + i) / 12);
   const dim = new Date(y, m + 1, 0).getDate();
   return new Date(y, m, Math.min(dim, 1 + Math.round((u - i) * dim)));
