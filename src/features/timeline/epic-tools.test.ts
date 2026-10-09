@@ -261,7 +261,7 @@ describe("lifecycle: shelf, states, sizes, buffer, preview", () => {
       tasks: [est({ id: "a", lane: "x", start: 4, endLikely: 5, end: 5.75 }), est({ id: "s", lane: "_backlog", start: 4.5, endLikely: 6.5, end: 7 })],
     });
     const pv = previewPlacement(p, "s", "x");
-    expect(pv).toEqual({ before: "gronn", after: "rod", window: expect.stringMatching(/^Leveres uke \d+–\d+$/) });
+    expect(pv).toMatchObject({ before: "gronn", after: "rod", window: expect.stringMatching(/^Leveres uke \d+–\d+$/) });
     expect(p.tasks.find((t) => t.id === "s")!.lane).toBe("_backlog");   // the plan itself is untouched
     expect(previewPlacement(p, "nope", "x")).toBeNull();
   });
@@ -388,5 +388,29 @@ describe("resolveQueue: blockers first, then the same developer's earlier work",
     const t = normalizePlan({ lanes: [{ key: "x", name: "X" }], tasks: [est({ pinned: 1 as never }), est({ id: "f", pinned: false })] }).tasks;
     expect(t[0].pinned).toBe(true);
     expect(t[1].pinned).toBeUndefined();
+  });
+});
+
+describe("previewPlacement with the queue (stage 6)", () => {
+  it("places after the developer's queued work with the factor applied, lists what it pushes and the epics that change colour", () => {
+    const S = 4;
+    const p = normalizePlan({
+      lanes: [{ key: "x", name: "X", priority: 1, goalDate: S + 2.6 }, { key: "y", name: "Y", priority: 2, goalDate: S + 2.6 }],
+      tasks: [
+        est({ id: "busy", lane: "x", label: "Busy", start: S, endLikely: S + 1.5, end: S + 2, state: "aktiv", assignee: "THM", order: 1 }),
+        est({ id: "later", lane: "y", label: "Later", start: S + 2, endLikely: S + 2.25, end: S + 2.5, state: "aktiv", assignee: "THM", order: 1 }),
+        est({ id: "wish", lane: "_backlog", label: "Wish", start: S, endLikely: S + 1, end: S + 1.5, state: "klar", assignee: "THM", raw: { likely: 4, late: 6 } }),
+      ],
+    });
+    const pv = previewPlacement(p, "wish", "x")!;
+    expect(pv.after).toBe("rod");                                   // 8–11 elapsed weeks after Busy's late end run past the goal
+    expect(pv.featureWindow).toMatch(/^uke \d+–\d+$/);
+    expect(pv.featureStart).toBeCloseTo(S + 2);                    // after Busy (same developer, earlier in the order)
+    expect(pv.featureWeeks).toEqual({ likely: 8, late: 11 });      // 4–6 raw weeks × 1.82, rounded up, no buffer
+    expect(pv.pushed).toEqual([{ id: "later", label: "Later", laneKey: "y", weeks: 11 }]);   // Later waits for Wish's late end: 2.75 units = 11 weeks
+    expect(pv.epics).toEqual([{ key: "y", name: "Y", before: "gronn", after: "rod" }]);
+    const quiet = previewPlacement(p, "wish", "y")!;               // dropped last in Y: still after Busy, pushes nothing
+    expect(quiet.pushed).toEqual([]);
+    expect(quiet.epics).toEqual([]);
   });
 });

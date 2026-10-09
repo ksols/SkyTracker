@@ -37,7 +37,12 @@ export declare function epicCounts(plan: Plan): { forslag: number; aktiv: number
 export declare function sizeClass(task: PlanTask): "S" | "M" | "L" | "XL" | "";
 export declare function bufferLabel(task: PlanTask): string;
 export declare function rawLabel(task: PlanTask): string;
-export declare function previewPlacement(plan: Plan, taskId: string, laneKey: string): { before: EpicStatusCode; after: EpicStatusCode; window: string } | null;
+export declare function previewPlacement(plan: Plan, taskId: string, laneKey: string): {
+  before: EpicStatusCode; after: EpicStatusCode; window: string;
+  featureStart: number; featureWeeks: { likely: number; late: number } | null; featureWindow: string;
+  pushed: { id: string; label: string; laneKey: string; weeks: number }[];
+  epics: { key: string; name: string; before: EpicStatusCode; after: EpicStatusCode }[];
+} | null;
 export declare function dateToUnit(d: Date): number;
 export declare function unitToDate(u: number): Date;
 export declare function fmtDate(d: Date): string;

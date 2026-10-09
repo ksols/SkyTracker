@@ -249,15 +249,37 @@ function rawLabel(t) {
   return "utredning sa " + (t.raw.likely === t.raw.late ? t.raw.late : t.raw.likely + "–" + t.raw.late);
 }
 /* ---------- the price before a decision: the epic's colour if this feature lands there ---------- */
-function previewPlacement(plan, taskId, laneKey) {
+function previewPlacement(plan, taskId, laneKey) {   // the price before the decision: the colour, the feature's computed window, and what it pushes (R5)
   if (!plan.tasks.some((t) => t.id === taskId) || !plan.lanes.some((l) => l.key === laneKey)) return null;
   const before = epicStatus(plan, laneKey).code;
+  const coloursBefore = new Map(plan.lanes.map((l) => [l.key, epicStatus(plan, l.key).code]));
   const copy = normalizePlan(JSON.parse(JSON.stringify(plan)));
   const t = copy.tasks.find((v) => v.id === taskId);
   t.lane = laneKey;
   delete t.order;
   normalizePlan(copy);
-  return { before, after: epicStatus(copy, laneKey).code, window: epicWindowText(copy, laneKey) };
+  // raw weeks become elapsed time through the sprint mix while the range still is the raw one (plus buffer)
+  if (t.kind === "estimate" && t.raw) {
+    const r = rangeWeeks(t), b = t.bufferWeeks || 0;
+    if (r && r.likely - b === t.raw.likely && r.late - b === t.raw.late) {
+      const f = capacityFactor(copy);
+      t.endLikely = t.start + (elapsedWeeks(t.raw.likely, f) + b) * WEEK;
+      t.end = t.start + (elapsedWeeks(t.raw.late, f) + b) * WEEK;
+    }
+  }
+  const startsBefore = new Map(copy.tasks.map((v) => [v.id, v.start]));
+  resolveQueue(copy);
+  const pushed = copy.tasks
+    .filter((v) => v.id !== taskId && v.start > startsBefore.get(v.id) + 1e-9)
+    .map((v) => ({ id: v.id, label: v.label, laneKey: v.lane, weeks: Math.round((v.start - startsBefore.get(v.id)) / WEEK) }));
+  const epics = copy.lanes
+    .filter((l) => l.key !== laneKey)
+    .map((l) => ({ key: l.key, name: l.name, before: coloursBefore.get(l.key), after: epicStatus(copy, l.key).code }))
+    .filter((e) => e.before !== e.after);
+  return {
+    before, after: epicStatus(copy, laneKey).code, window: epicWindowText(copy, laneKey),
+    featureStart: t.start, featureWeeks: rangeWeeks(t), featureWindow: windowLabel(t), pushed, epics,
+  };
 }
 
 /* ---------- delivery window in ISO weeks, overdue discoveries ---------- */
