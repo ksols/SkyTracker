@@ -199,6 +199,9 @@
   .chip.st-gul{background:var(--warn-bg);color:var(--warn-fg)}
   .chip.st-rod{background:var(--bad-bg);color:var(--bad-fg)}
   .chip.sig{outline:1px dashed currentColor;outline-offset:-1px}
+  .chip.pinned{background:var(--text);color:var(--surface)}
+  .legend .mix label{display:inline-flex;gap:6px;align-items:center;font-size:11px;color:var(--text-3)}
+  .legend .mix select{font-size:11px;padding:1px 4px}
   .lane-label .add-feature{
     position:absolute;right:10px;top:50%;transform:translateY(-50%);
     width:22px;height:22px;padding:0;font-size:14px;line-height:1;
@@ -529,6 +532,12 @@
         et <b>andre signal</b> (fremdrift mot tid i det sannsynlige vinduet, 10 % slingringsmonn): grønn, gul eller rød. Det endrer ikke epicens
         farge. «Levert» kommer fra ADO. Velg sprintens baseline under <b>Sammenlign med</b> og trykk <b>Sprintrapport</b> for dag 10-rapporten:
         levert, fremdrift per feature, utredninger som kom videre og spenn som endret seg.</p></div>
+      <div class="help-card"><h4>Kø og kapasitet</h4>
+        <p>En aktiv feature <b>starter når den kan</b>: etter blokkerne sine og etter eierens tidligere arbeid, i prioritert rekkefølge
+        (epic-rekkefølgen, så rekkefølgen i epicen). Drar du en feature foran køen, blir den <b>overstyrt</b> (merket, logget) og står
+        til du slår på «Følger køen» igjen. <b>Sprintmiksen</b> ved tegnforklaringen sier hvor stor del av en sprint som går til features
+        (overgang 55 %, normal 60 %): rå uker fra utredningen ganges med 1,82 eller 1,67 når featuren settes på tidslinjen.
+        Prisen i «Legg i epic» viser vinduet featuren får og hva den dytter. Antall aktive epics er fortsatt bare et tall.</p></div>
     </div>
   </div>
 
@@ -553,6 +562,7 @@
     <span><i class="sw goal"></i>Måldato</span>
     <span><i class="sw today"></i>I dag</span>
     <span><i class="sw depsw"></i>Avhengighet</span>
+    <span class="mix" id="mixField" hidden title="Hvor stor del av en sprint som går til planlagte features: faktoren fra rå uker til uker på tidslinjen"><label>Sprintmiks <select id="mixSelect"><option value="transition">overgang (55 % til features)</option><option value="normal">normal (60 %)</option></select></label></span>
     <span class="sprint-goal" id="sprintGoal" hidden></span>
     <span class="tl-summary" id="tlSummary" title="Status per epic"></span>
   </div>
@@ -625,6 +635,7 @@
           <label class="ed-field"><span>Eier (initialer)</span><input id="edOwner" type="text" placeholder="THM"></label>
           <label class="ed-field" id="edBufferField"><span>Buffer (uker)</span><input id="edBuffer" type="number" min="0" step="1"></label>
         </div>
+        <label class="ed-check" id="edQueueField"><input type="checkbox" id="edQueue"> Følger køen – starter automatisk etter blokkere og eierens tidligere arbeid (av = dratt foran køen med vilje)</label>
         <div class="ed-row" id="edPullRow"><button class="ghost" type="button" id="edPull" title="Henter likely/late fra estimate.yaml i spec-mappen (Skytale.Specs)">Hent estimat fra utredningen</button><span class="md" id="edPullNote"></span></div>
         <div class="ed-row" id="edPushRow" hidden>
           <button class="ghost" type="button" id="edPush" title="Lagrer, og oppretter eller oppdaterer featuren i ADO som deg">Lagre og push til ADO</button>
@@ -717,7 +728,7 @@
   <div class="modal-body"><div class="ed-body"><div class="ed-row">
     <label class="ed-field"><span>Sannsynlig (uker)</span><input id="readyLikely" type="number" min="1" step="1"></label>
     <label class="ed-field"><span>Senest (uker)</span><input id="readyLate" type="number" min="1" step="1"></label>
-  </div></div></div>
+  </div><div class="md" id="readyNote"></div></div></div>
   <div class="modal-foot"><span></span><span class="btns"><button class="text" id="readyCancel">Avbryt</button><button class="primary" id="readySave">Klar</button></span></div>
 </div></div>
 <div class="modal-back" id="placeBack"><div class="modal" style="width:min(500px,100%)">
@@ -862,12 +873,12 @@ window.__bootTimeline = function(){
     if(HOSTED){ scheduleServerSave(); }
     else { try{ localStorage.setItem(STORE, JSON.stringify(state)); }catch(e){} }
   }
-  function pushDeps(recordCauses){
-    resolveDeps(state).forEach(({id, by}) => {
+  function pushQueue(recordCauses){   // køen (R5): blokkere først, så eierens tidligere arbeid, i prioritert rekkefølge
+    resolveQueue(state).forEach(({id, by, kind}) => {
       const t = getTask(id);
       if(!t) return;
       touch(t, 'tid');
-      if(recordCauses !== false && by) pendingNote.causes[id] = 'dep:' + by;   // historikken: «flyttet av avhengighet …»
+      if(recordCauses !== false && by) pendingNote.causes[id] = kind + ':' + by;   // historikken: «flyttet av avhengighet …» / «i kø bak …»
     });
   }
 
@@ -901,7 +912,7 @@ window.__bootTimeline = function(){
     if(fromLane !== laneKey) renumberLane(fromLane);
     state.example = false;
     normalizePlan(state);
-    pushDeps();
+    pushQueue();
   }
 
   /* ================== hovedvisning ================== */
@@ -1200,6 +1211,7 @@ window.__bootTimeline = function(){
     if(t.state === 'levert') chips.push('<span class="chip st-gronn levert" title="Lukket i ADO">Levert' + (t.deliveredAt ? ' ' + esc(fmtDate(new Date(t.deliveredAt))) : '') + '</span>');
     const psig = progressSignal(t, todayUnit());
     if(psig) chips.push('<span class="chip sig st-' + psig.code + '" title="Andre signal: fremdrift mot tid i det sannsynlige vinduet (teller ikke i epicens farge)">' + esc(progressText(t, psig)) + '</span>');
+    if(t.pinned){ const fl = queueFloor(state, t.id).floor; chips.push('<span class="chip pinned" title="Dratt foran køen med vilje' + (fl !== null ? ' (køen sier start ' + esc(fmtDate(unitToDate(fl))) + ')' : '') + '. Slå på «Følger køen» i redigeringen for å slippe den.">overstyrt</span>'); }
     if(t.deps.length) chips.push('<span class="chip" title="Venter på ' + t.deps.length + ' feature(s)">⇠ ' + t.deps.length + '</span>');
     if(discoveryOverdue(t, todayUnit())) chips.push('<span class="chip st-gul" title="Sluttdatoen er passert: sett en ny før den passerer">Utredning forsinket</span>');
     if(t.editedBy){
@@ -1253,6 +1265,7 @@ window.__bootTimeline = function(){
         '<span><i class="st-rod"></i>' + n.rod + '</span><span><i></i>' + (n.venter + n.other) + ' venter</span>' +
         '<span title="Epics etter tilstand">' + c.aktiv + ' aktive · ' + c.forslag + ' forslag · ' + c.avsluttet + ' avsluttet</span>'
       : '';
+    $('mixSelect').value = (state.capacity && state.capacity.mode) || 'transition';
     renderSprintGoal();
   }
 
@@ -1294,7 +1307,12 @@ window.__bootTimeline = function(){
       en = Math.min(N_MONTHS, Math.max(floor, en));
       if(en !== t.end){ t.end = en; touch(t, 'tid'); drag.moved = true; }
     }
-    pushDeps();
+    if(t.kind === 'estimate' && t.lane !== BACKLOG && t.state !== 'levert'){   // dratt foran køen = overstyrt med vilje (logget); tilbake bak gulvet slipper igjen
+      if(drag.floor === undefined) drag.floor = queueFloor(state, t.id).floor;
+      if(drag.floor !== null && t.start < drag.floor - 1e-9){ if(!t.pinned){ t.pinned = true; drag.pinnedByDrag = true; } }
+      else if(drag.pinnedByDrag){ delete t.pinned; drag.pinnedByDrag = false; }
+    }
+    pushQueue();
     positionAll();
     showTip(e, t);
   });
@@ -1304,6 +1322,7 @@ window.__bootTimeline = function(){
     tip.style.display = 'none';
     const d = drag;
     drag = null;
+    if(d.pinnedByDrag && d.t.pinned) touch(d.t, 'meta');
     if(d.moved){
       const lines = dragReasonLines(d);
       if(lines.length) askReason(lines);   // dialogen holder lagringen til den er lukket
@@ -1391,7 +1410,7 @@ window.__bootTimeline = function(){
       }
       target.deps.push(src);
       touch(target, 'deps');
-      pushDeps();
+      pushQueue();
     }
     cancelLink();
     save(); render();
@@ -1755,24 +1774,33 @@ window.__bootTimeline = function(){
     if(owner) t.assignee = owner; else delete t.assignee;
     touch(t, 'tid'); touch(t, 'meta'); touch(t, 'state');
     $('startBack').classList.remove('open'); lifecycleId = null;
-    normalizePlan(state); pushDeps(); save(); render();
+    normalizePlan(state); pushQueue(); save(); render();
   });
   $('startCancel').addEventListener('click', () => { $('startBack').classList.remove('open'); lifecycleId = null; });
   function markReady(id){
     const t = getTask(id); if(!t) return;
     lifecycleId = id;
     $('readyLikely').value = t.raw ? t.raw.likely : 4; $('readyLate').value = t.raw ? t.raw.late : 6;
+    $('readyNote').textContent = readyNoteText();
     $('readyBack').classList.add('open'); setTimeout(() => $('readyLikely').focus(), 0);
   }
+  const mixWord = () => MIX_LABEL[(state.capacity && state.capacity.mode) || 'transition'];
+  const factorWord = () => String(capacityFactor(state)).replace('.', ',');
+  function readyNoteText(){
+    const lw = Math.max(1, parseInt($('readyLikely').value, 10) || 1), hw = Math.max(lw, parseInt($('readyLate').value, 10) || lw);
+    const f = capacityFactor(state);
+    return 'Utredningen sa rått ' + lw + '–' + hw + ' → ' + elapsedWeeks(lw, f) + '–' + elapsedWeeks(hw, f) + ' uker på tidslinjen (sprintmiks ' + mixWord() + ', × ' + factorWord() + ').';
+  }
+  ['readyLikely', 'readyLate'].forEach(id => $(id).addEventListener('input', () => { $('readyNote').textContent = readyNoteText(); }));
   $('readySave').addEventListener('click', () => {
     const t = getTask(lifecycleId); if(!t){ $('readyBack').classList.remove('open'); return; }
     const lw = Math.max(1, parseInt($('readyLikely').value, 10) || 1), hw = Math.max(lw, parseInt($('readyLate').value, 10) || lw);
     t.kind = 'estimate'; t.raw = { likely: lw, late: hw, source: 'utredning', pulledAt: new Date().toISOString().slice(0, 10) };
-    const b = t.bufferWeeks || 0;
-    t.endLikely = t.start + (lw + b) * WEEK; t.end = t.start + (hw + b) * WEEK;
+    const b = t.bufferWeeks || 0, f = capacityFactor(state);   // rå uker × sprintmiksen = uker på tidslinjen; det rå estimatet står urørt
+    t.endLikely = t.start + (elapsedWeeks(lw, f) + b) * WEEK; t.end = t.start + (elapsedWeeks(hw, f) + b) * WEEK;
     touch(t, 'tid'); touch(t, 'meta'); touch(t, 'est'); touch(t, 'state');
     $('readyBack').classList.remove('open'); lifecycleId = null;
-    normalizePlan(state); pushDeps(); save(); render();
+    normalizePlan(state); pushQueue(); save(); render();
   });
   $('readyCancel').addEventListener('click', () => { $('readyBack').classList.remove('open'); lifecycleId = null; });
   function placeDialog(id){
@@ -1782,11 +1810,15 @@ window.__bootTimeline = function(){
     $('placePreview').textContent = 'Velg en epic for å se prisen.';
     $('placeBack').classList.add('open');
   }
-  function previewText(id, laneKey){
-    const pv = previewPlacement(state, id, laneKey), lane = getLane(laneKey);
-    if(!pv || !lane) return '';
+  function previewText(id, laneKey){   // prisen før beslutningen: fargen, featurens vindu, og hva den dytter (R5)
+    const pv = previewPlacement(state, id, laneKey), lane = getLane(laneKey), t = getTask(id);
+    if(!pv || !lane || !t) return '';
     const word = c => ({ gronn: 'grønn', gul: 'gul', rod: 'rød', venter: 'venter på utredning', 'ingen-mal': 'uten måldato', tom: 'tom' })[c] || c;
-    return esc(lane.name) + ' blir <b class="st-' + pv.after + '">' + word(pv.after) + '</b>' + (pv.before !== pv.after ? ' (var ' + word(pv.before) + ')' : ' (uendret)') + (pv.window ? ' · ' + esc(pv.window) : '') + '. Ingenting annet flyttes.';
+    const parts = [esc(lane.name) + ' blir <b class="st-' + pv.after + '">' + word(pv.after) + '</b>' + (pv.before !== pv.after ? ' (var ' + word(pv.before) + ')' : ' (uendret)') + (pv.window ? ' · ' + esc(pv.window) : '')];
+    if(pv.featureWindow) parts.push(esc(t.label) + ': ' + esc(pv.featureWindow) + (pv.featureWeeks ? ' (' + pv.featureWeeks.likely + '–' + pv.featureWeeks.late + ' uker' + (t.raw ? ', rått ' + t.raw.likely + '–' + t.raw.late + ' × ' + factorWord() : '') + ')' : ''));
+    pv.epics.forEach(e => parts.push(esc(e.name) + ' blir <b class="st-' + e.after + '">' + word(e.after) + '</b> (var ' + word(e.before) + ')'));
+    parts.push(pv.pushed.length ? 'Flytter: ' + pv.pushed.map(q => esc(q.label) + ' ' + weeksWord(q.weeks)).join(', ') + '.' : 'Ingenting annet flyttes.');
+    return parts.join(' · ');
   }
   $('placeLane').addEventListener('change', () => { $('placePreview').innerHTML = $('placeLane').value ? previewText(lifecycleId, $('placeLane').value) : 'Velg en epic for å se prisen.'; });
   $('placeSave').addEventListener('click', () => {
@@ -1836,6 +1868,8 @@ window.__bootTimeline = function(){
     $('edLate').value = r.late;
     $('edAdo').value = t.adoId || '';
     $('edSpec').value = t.specPath || '';
+    $('edQueueField').hidden = t.kind !== 'estimate' || t.lane === BACKLOG;
+    $('edQueue').checked = !t.pinned;
     $('edProgRow').hidden = t.kind !== 'estimate';
     const pr = t.progress || {};
     $('edDone').value = pr.pointsTotal ? pr.pointsDone || 0 : ''; $('edTotal').value = pr.pointsTotal || ''; $('edPct').value = pr.pointsTotal ? '' : (pr.pct !== undefined ? pr.pct : '');
@@ -1910,6 +1944,7 @@ window.__bootTimeline = function(){
     const ado = parseInt($('edAdo').value, 10);
     const newAdo = isFinite(ado) && ado > 0 ? ado : undefined;
     if(t.adoId !== newAdo){ if(newAdo) t.adoId = newAdo; else delete t.adoId; touch(t, 'meta'); }
+    if(t.kind === 'estimate' && t.lane !== BACKLOG){ const follow = $('edQueue').checked; if(!!t.pinned === follow){ if(follow) delete t.pinned; else t.pinned = true; touch(t, 'meta'); } }
     const spec = $('edSpec').value.trim();
     if((t.specPath || '') !== spec){ if(spec && /^[A-Za-z0-9._-]+$/.test(spec)) t.specPath = spec; else delete t.specPath; touch(t, 'meta'); }
     const owner = $('edOwner').value.trim();
@@ -1935,7 +1970,7 @@ window.__bootTimeline = function(){
     }
     if(t.kind === 'estimate' && edPulled){   // feltene står slik hentingen satte dem: det rå estimatet lagres med kilde
       const bufNow = t.bufferWeeks || 0, r1 = rangeWeeks(t);
-      if(r1 && r1.likely - bufNow === edPulled.likely && r1.late - bufNow === edPulled.late){
+      if(r1 && r1.likely - bufNow === edPulled.elapsed.likely && r1.late - bufNow === edPulled.elapsed.late){
         t.raw = { likely: edPulled.likely, late: edPulled.late, source: 'specs', pulledAt: new Date().toISOString() };
         if(edPulled.by) t.raw.by = edPulled.by;
         if(edPulled.date) t.raw.date = edPulled.date;
@@ -1948,8 +1983,8 @@ window.__bootTimeline = function(){
     const newLane = $('edLane').value;
     if(newLane && newLane !== t.lane && (getLane(newLane) || newLane === BACKLOG)) moveTask(t.id, newLane, laneTasks(newLane).length);
     normalizePlan(state);
-    pushDeps();
-    const lines = editReasonLines(before, t);
+    const lines = editReasonLines(before, t);   // brukerens egen endring; det køen flytter etterpå logges med årsak, ikke spørres om
+    pushQueue();
     if(lines.length) askReason(lines);
     save(); render();
     closeEditor();
@@ -1969,12 +2004,13 @@ window.__bootTimeline = function(){
       if(r.status === 401 && j.error === 'ado-login'){ adoLoginNeeded = true; renderAdoBar(); $('edPullNote').textContent = ''; askDialog('Hent estimat fra utredningen', 'Logg inn på nytt for å koble til ADO.', {confirmText:'OK', noCancel:true}); return; }
       if(!r.ok || !j.raw){ $('edPullNote').textContent = ''; askDialog('Hent estimat fra utredningen', j.message || 'Ikke tilgjengelig.', {confirmText:'OK', noCancel:true}); return; }
       const before = rangeWeeks(t), buf0 = t.bufferWeeks || 0, buf = Math.max(0, parseInt($('edBuffer').value, 10) || 0);
-      edPulled = { likely: j.raw.likely, late: j.raw.late, by: j.raw.estimatedBy || null, date: j.raw.date || null };
+      const f = capacityFactor(state), el = elapsedWeeks(j.raw.likely, f), eh = elapsedWeeks(j.raw.late, f);
+      edPulled = { likely: j.raw.likely, late: j.raw.late, elapsed: { likely: el, late: eh }, by: j.raw.estimatedBy || null, date: j.raw.date || null };
       if(edSel.kind !== 'estimate'){ edSel = { kind: 'estimate' }; paintEdKind(); }
-      $('edLikely').value = j.raw.likely + buf; $('edLate').value = j.raw.late + buf;
+      $('edLikely').value = el + buf; $('edLate').value = eh + buf;
       const who = [j.raw.estimatedBy, j.raw.date ? fmtDate(new Date(j.raw.date)) : null].filter(Boolean).join(', ');
       $('edPullNote').textContent = 'Utredningen sa ' + (j.raw.likely === j.raw.late ? j.raw.late : j.raw.likely + '–' + j.raw.late) + ' uker' + (who ? ' (' + who + ')' : '') +
-        '. Før: ' + (before ? (before.likely - buf0) + '–' + (before.late - buf0) : '–') + '.';
+        ' → ' + el + '–' + eh + ' uker på tidslinjen (× ' + factorWord() + '). Før: ' + (before ? (before.likely - buf0) + '–' + (before.late - buf0) : '–') + '.';
     }catch(e){ $('edPullNote').textContent = ''; askDialog('Hent estimat fra utredningen', 'Fikk ikke kontakt med Skytale.Specs.', {confirmText:'OK', noCancel:true}); }
   });
   // lagre først, så push: lagringen må ha landet før ruten leser planen
@@ -2105,7 +2141,7 @@ window.__bootTimeline = function(){
     applyingRemote = true;
     serverVersion = version;
     state = normalizePlan(data);
-    pushDeps(false);          // dytt fra andres lagring er ikke denne klientens redigering
+    pushQueue(false);          // dytt fra andres lagring er ikke denne klientens redigering
     pendingTouch.clear();     // dytt fra fletting er ikke en egen redigering
     render();
     applyingRemote = false;
@@ -2126,6 +2162,7 @@ window.__bootTimeline = function(){
       $('baselineBtn').hidden = !canWrite;   // lesere kan sammenligne, ikke merke baseliner
       $('registerBtn').hidden = !canWrite;
       $('adoRefreshBtn').hidden = !canWrite;
+      $('mixField').hidden = !canWrite;
       whoami.textContent = myName || '';
       refreshHistoryBadge();
       loadSnapshots();
@@ -2306,6 +2343,11 @@ window.__bootTimeline = function(){
     sg.textContent = cur.name + ' · dag ' + sprintDay(cur, new Date()) + ' · mål: ' + (g && g.text ? g.text : (canWrite ? 'sett sprintmål…' : '–'));
     sg.title = canWrite ? 'Klikk for å sette sprintmålet' : ((g && g.text) || '');
   }
+  $('mixSelect').addEventListener('change', () => {   // sprintmiksen: faktoren fra rå uker til tidslinjen (logges som plan.kapasitet)
+    if(!canWrite) return;
+    state.capacity = { mode: $('mixSelect').value === 'normal' ? 'normal' : 'transition', at: new Date().toISOString() };
+    save(); render();
+  });
   $('sprintGoal').addEventListener('click', async () => {
     if(!canWrite) return;
     const cur = currentSprint(sprintItems(), new Date()); if(!cur) return;
@@ -2400,7 +2442,7 @@ window.__bootTimeline = function(){
   window.addEventListener('resize', drawArrows);
 
   /* ================== start ================== */
-  pushDeps();
+  pushQueue();
   render();
   initServerPlan();
   if(HOSTED) setInterval(pollTick, POLL_MS);
