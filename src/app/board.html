@@ -1,0 +1,500 @@
+<!doctype html>
+<html lang="nb">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>SkyTracker – brettet</title>
+<style>
+  /* Same palette and controls as the timeline (timeline.html), kept in step by hand. */
+  :root{
+    color-scheme:light;
+    --bg:#f8fafc; --surface:#ffffff; --raised:#f1f5f9; --input-bg:#ffffff;
+    --line:#cbd5e1; --line-soft:#e2e8f0;
+    --text:#0d123e; --text-hover:#0d123e; --text-2:#475569; --text-3:#64748b; --text-4:#94a3b8;
+    --accent:#3b76b0; --accent-hover:#4e94c4; --accent-text:#3b76b0; --accent-soft:rgba(59,118,176,.2);
+    --danger:#ef4444; --danger-hover:#b91c1c; --warn:#f59e0b;
+    --ok-bg:#dcfce7; --ok-fg:#15803d; --warn-bg:#fef3c7; --warn-fg:#b45309; --bad-bg:#fee2e2; --bad-fg:#b91c1c;
+    --badge-bg:#f1f5f9; --badge-fg:#475569; --ado-bg:#e0f2fe; --ado-fg:#0369a1;
+    --backdrop:rgba(0,0,0,.4);
+    --shadow:0 20px 25px -5px rgba(0,0,0,.1),0 8px 10px -6px rgba(0,0,0,.1);
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      color-scheme:dark;
+      --bg:#0d123e; --surface:#1e2455; --raised:#212d63; --input-bg:#212d63;
+      --line:#294285; --line-soft:#294285;
+      --text:#ffffff; --text-hover:#71c4df; --text-2:#a5d6e6; --text-3:#a5d6e6; --text-4:#4e94c4;
+      --accent-text:#71c4df; --accent-soft:rgba(59,118,176,.35);
+      --danger:#f87171; --danger-hover:#fca5a5; --warn:#fbbf24;
+      --ok-bg:rgba(34,197,94,.2); --ok-fg:#86efac; --warn-bg:rgba(245,158,11,.2); --warn-fg:#fcd34d; --bad-bg:rgba(239,68,68,.2); --bad-fg:#fca5a5;
+      --badge-bg:#294285; --badge-fg:#cbd5e1; --ado-bg:#294285; --ado-fg:#a5d6e6;
+      --backdrop:rgba(0,0,0,.6);
+    }
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{background:var(--bg);color:var(--text);font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased}
+  .topbar{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;padding:12px 24px;background:var(--surface);border-bottom:1px solid var(--line-soft)}
+  .tb-left,.tb-right{display:flex;align-items:center;gap:12px;flex-wrap:wrap;min-width:0}
+  .topbar h1{font-size:18px;font-weight:600;letter-spacing:-.01em;color:var(--text);white-space:nowrap}
+  .topbar h1 .sub{color:var(--text-3);font-weight:400}
+  .whoami{font-size:12px;color:var(--text-3)}
+  .ro-tag{font-size:12px;font-weight:500;color:var(--warn)}
+  .save-note{font-size:11px;color:var(--text-4);min-width:120px;text-align:right}
+  .wrap{padding:16px 24px 40px}
+  .hint{font-size:12px;color:var(--text-3);max-width:100ch;margin-bottom:12px}
+  .hint b{color:var(--text);font-weight:600}
+  button,.btn{font:inherit;font-size:12px;font-weight:500;line-height:1.3;padding:5px 9px;border:1px solid var(--line);border-radius:4px;background:var(--surface);color:var(--text-3);cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;justify-content:center;gap:4px;white-space:nowrap;transition:color .15s ease,background-color .15s ease,border-color .15s ease}
+  button:hover,.btn:hover{color:var(--text-hover);border-color:var(--text-4)}
+  button:disabled{opacity:.5;cursor:default;pointer-events:none}
+  button.primary,#dlgYes{background:var(--accent);border-color:var(--accent);color:#fff}
+  button.primary:hover,#dlgYes:hover{background:var(--accent-hover);border-color:var(--accent-hover);color:#fff}
+  button.text{border-color:transparent;background:transparent}
+  button.text:hover{border-color:transparent;background:var(--raised)}
+  #dlgYes.danger{background:var(--danger);border-color:var(--danger)}
+  .modal-foot button{font-size:13px;padding:6px 12px}
+  .modal-back{display:none;position:fixed;inset:0;z-index:60;background:var(--backdrop);align-items:center;justify-content:center;padding:24px}
+  .modal-back.open{display:flex}
+  #dlgBack{z-index:80}
+  #reasonBack{z-index:70}
+  .modal{background:var(--surface);border:1px solid var(--line);border-radius:8px;width:min(620px,100%);max-height:90vh;display:flex;flex-direction:column;box-shadow:var(--shadow)}
+  .modal-head{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;padding:16px 20px 12px}
+  .modal-head h2{font-size:16px;font-weight:600;color:var(--text)}
+  .modal-head .md{font-size:12px;color:var(--text-3);margin-top:2px}
+  .modal-body{overflow:auto;padding:0}
+  .modal-foot{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:12px 20px;border-top:1px solid var(--line-soft);flex-wrap:wrap}
+  .modal-foot .btns{display:flex;gap:8px;align-items:center}
+  .ed-body{padding:4px 20px 16px;display:grid;gap:14px}
+  .ed-field > span{display:block;font-size:12px;font-weight:500;color:var(--text-2);margin-bottom:4px}
+  .ed-field input[type=text],.ed-field input[type=date],.ed-field input[type=number],.ed-field select,.ed-field textarea,.dlg-body input{width:100%;font:inherit;font-size:14px;padding:6px 12px;border:1px solid var(--line);border-radius:4px;background:var(--input-bg);color:var(--text)}
+  .ed-field textarea{min-height:72px;resize:vertical}
+  .ed-field input:focus,.ed-field select:focus,.ed-field textarea:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)}
+  [hidden]{display:none !important}
+  .ed-row{display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end}
+  .ed-row .ed-field{flex:1;min-width:140px}
+  .ed-kind{display:flex;gap:6px;flex-wrap:wrap}
+  .ed-kind button{padding:6px 10px}
+  .ed-kind button.on{background:var(--accent);border-color:var(--accent);color:#fff}
+  .ed-check{display:flex;gap:8px;align-items:center;font-size:13px;color:var(--text);cursor:pointer}
+  .ed-check input{accent-color:var(--accent)}
+  .md{font-size:12px;color:var(--text-3)}
+  .preview{padding:0 20px 16px;font-size:13px;color:var(--text-2);line-height:1.5}
+  .preview b.st-gronn{color:var(--ok-fg)} .preview b.st-gul{color:var(--warn-fg)} .preview b.st-rod{color:var(--bad-fg)}
+  /* reason dialog */
+  .reason-list{padding:0 20px 8px;font-size:13px;color:var(--text-2);display:grid;gap:2px}
+  .reason-codes{display:flex;flex-wrap:wrap;gap:6px;padding:4px 20px 10px}
+  .reason-codes button.on{background:var(--accent);border-color:var(--accent);color:#fff}
+  .reason-text{display:block;padding:0 20px 12px}
+  .reason-text textarea{width:100%;font:inherit;font-size:14px;padding:6px 12px;border:1px solid var(--line);border-radius:4px;background:var(--input-bg);color:var(--text);min-height:56px;resize:vertical}
+  /* the board */
+  .cols{display:grid;grid-template-columns:repeat(5,minmax(180px,1fr));gap:12px;align-items:start}
+  .col{background:var(--raised);border-radius:8px;padding:10px;min-height:50vh;border:2px solid transparent}
+  .col.over{border-color:var(--accent)}
+  .col.no{border-color:var(--danger)}
+  .col h2{font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--text-3);margin:2px 4px 10px;display:flex;justify-content:space-between}
+  .card{background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:9px 10px;margin-bottom:8px;display:grid;gap:5px;cursor:pointer}
+  .card[draggable=true]{cursor:grab}
+  .card.dragging{opacity:.5}
+  .card .ttl{font-weight:600;font-size:13px;line-height:1.3}
+  .card .epic{font-size:11px;color:var(--text-3)}
+  .card .chips{display:flex;flex-wrap:wrap;gap:4px}
+  .chip{font-size:10px;font-weight:500;line-height:1.5;padding:1px 6px;border-radius:4px;background:var(--badge-bg);color:var(--badge-fg);white-space:nowrap;text-decoration:none}
+  .chip.who{background:var(--accent-soft);color:var(--text);font-weight:600}
+  .chip.ado{background:var(--ado-bg);color:var(--ado-fg)}
+  .chip.st-gul{background:var(--warn-bg);color:var(--warn-fg)}
+  .chip.st-gronn{background:var(--ok-bg);color:var(--ok-fg)}
+  .chip.fixed{background:var(--text);color:var(--surface)}
+  .empty{padding:14px 6px;font-size:12px;color:var(--text-4)}
+  .note{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--text);color:var(--surface);padding:8px 14px;border-radius:6px;font-size:13px;box-shadow:var(--shadow);opacity:0;transition:opacity .2s;pointer-events:none}
+  .note.show{opacity:1}
+  @media (max-width:1100px){.cols{grid-template-columns:repeat(2,1fr)}}
+</style>
+</head>
+<body>
+<header class="topbar">
+  <div class="tb-left">
+    <h1>SkyTracker <span class="sub">– brettet</span></h1>
+    <a class="btn" href="/timeline" title="Planen: epics, features og hylla">Tidslinjen</a>
+    <a class="btn" href="/inntak" title="Ønskene PreSales har registrert, og forumets beslutninger">Inntak</a>
+  </div>
+  <div class="tb-right">
+    <span class="save-note" id="dirtyNote"></span>
+    <span class="whoami" id="whoami"></span>
+    <span class="ro-tag" id="roTag" hidden>Lesetilgang</span>
+    <button id="importCardsBtn" hidden></button>
+    <button class="primary" id="registerBtn" hidden title="Et ønske produktforum har sagt ja til: registreres og venter på utredning">＋ Registrer ønske</button>
+    <a class="btn" href="/api/auth/signout" title="Logg ut av SkyTracker">Logg ut</a>
+  </div>
+</header>
+<div class="wrap">
+  <p class="hint">Hvert kort er en feature i Tidslinjen, og kolonnene er livssyklusen. Dra et kort til neste kolonne: <b>Utredes</b> spør etter eier og størrelse, <b>Klar for veikart</b> etter byggetiden, <b>Aktiv</b> etter epicen. <b>Levert</b> settes fra ADO. Klikk et kort for å redigere beskrivelse, type, flater og fast dato.</p>
+  <div class="cols" id="cols"></div>
+</div>
+<div class="note" id="note"></div>
+
+<div class="modal-back" id="startBack"><div class="modal" style="width:min(520px,100%)">
+  <div class="modal-head"><div><h2>Start utredning</h2><div class="md" id="startSub">Én eier og en størrelse. Sluttdatoen regnes ut og kan justeres.</div></div></div>
+  <div class="modal-body"><div class="ed-body"><div class="ed-row">
+    <label class="ed-field"><span>Eier (initialer)</span><input id="startOwner" type="text" placeholder="THM"></label>
+    <div class="ed-field"><span>Størrelse</span><div class="ed-kind" id="startClass"><button data-c="S">S · 1 uke</button><button data-c="M" class="on">M · 2 uker</button><button data-c="L">L · 4 uker</button><button data-c="XL">XL · 6 uker</button></div></div>
+    <label class="ed-field"><span>Utredning ferdig</span><input id="startEnd" type="date"></label>
+  </div></div></div>
+  <div class="modal-foot"><span></span><span class="btns"><button class="text" id="startCancel">Avbryt</button><button class="primary" id="startSave">Start</button></span></div>
+</div></div>
+
+<div class="modal-back" id="readyBack"><div class="modal" style="width:min(460px,100%)">
+  <div class="modal-head"><div><h2>Klar for veikart</h2><div class="md">Byggetiden utredningen ga, i uker. Buffer legger forumet på senere.</div></div></div>
+  <div class="modal-body"><div class="ed-body"><div class="ed-row">
+    <label class="ed-field"><span>Sannsynlig (uker)</span><input id="readyLikely" type="number" min="1" step="1"></label>
+    <label class="ed-field"><span>Senest (uker)</span><input id="readyLate" type="number" min="1" step="1"></label>
+  </div><div class="md" id="readyNote"></div></div></div>
+  <div class="modal-foot"><span></span><span class="btns"><button class="text" id="readyCancel">Avbryt</button><button class="primary" id="readySave">Klar</button></span></div>
+</div></div>
+
+<div class="modal-back" id="placeBack"><div class="modal" style="width:min(520px,100%)">
+  <div class="modal-head"><div><h2>Legg i epic</h2><div class="md">Prisen vises før du bekrefter: fargen epicen får, og hva som flytter seg.</div></div></div>
+  <div class="modal-body"><div class="ed-body"><label class="ed-field"><span>Epic</span><select id="placeLane"></select></label></div><div class="preview" id="placePreview"></div></div>
+  <div class="modal-foot"><span></span><span class="btns"><button class="text" id="placeCancel">Avbryt</button><button class="primary" id="placeSave">Legg i epicen</button></span></div>
+</div></div>
+
+<div class="modal-back" id="editBack"><div class="modal">
+  <div class="modal-head"><div><h2 id="edTitle">Rediger kort</h2><div class="md" id="edSub"></div></div></div>
+  <div class="modal-body"><div class="ed-body">
+    <div class="ed-row">
+      <label class="ed-field"><span>Navn</span><input id="edName" type="text"></label>
+      <label class="ed-field" style="max-width:160px"><span>Eier (initialer)</span><input id="edOwner" type="text" placeholder="THM"></label>
+    </div>
+    <label class="ed-field"><span>Beskrivelse</span><textarea id="edDesc" placeholder="Hva featuren er, slik ADO skal vise det"></textarea></label>
+    <div class="ed-row">
+      <div class="ed-field"><span>Type</span><div class="ed-kind" id="edType"><button data-t="feature">Feature</button><button data-t="teknisk">Teknisk</button><button data-t="vedlikehold">Vedlikehold</button></div></div>
+      <div class="ed-field"><span>Flater</span><div class="ed-kind" id="edAreas"><button data-a="Backend">Backend</button><button data-a="Frontend">Frontend</button><button data-a="iOS">iOS</button><button data-a="Android">Android</button><button data-a="Desktop">Desktop</button><button data-a="Admin">Admin</button></div></div>
+    </div>
+    <label class="ed-check"><input type="checkbox" id="edFixed"> Fast dato – køen flytter den aldri</label>
+  </div></div>
+  <div class="modal-foot"><a class="btn" href="/timeline" id="edOpenTimeline">Åpne i Tidslinjen</a><span class="btns"><button class="text" id="edCancel">Avbryt</button><button class="primary" id="edSave">Lagre</button></span></div>
+</div></div>
+
+<div class="modal-back" id="reasonBack"><div class="modal" style="width:min(560px,100%)">
+  <div class="modal-head"><div><h2>Hvorfor?</h2><div class="md">Begrunnelsen lagres i historikken sammen med endringen.</div></div></div>
+  <div class="modal-body"><div class="reason-list" id="reasonList"></div><div class="reason-codes" id="reasonCodes"></div><label class="reason-text"><textarea id="reasonText" placeholder="Kort, slik ledelsen skal lese det"></textarea></label></div>
+  <div class="modal-foot"><button class="text" id="reasonSkip">Lagre uten begrunnelse</button><span class="btns"><button class="primary" id="reasonSave">Lagre</button></span></div>
+</div></div>
+
+<div class="modal-back" id="dlgBack"><div class="modal" style="width:min(460px,100%)">
+  <div class="modal-head"><div><h2 id="dlgTitle"></h2></div></div>
+  <div class="modal-body"><div class="dlg-body" style="padding:4px 20px 16px;display:grid;gap:12px;font-size:14px;color:var(--text-2)"><span id="dlgMsg"></span><input id="dlgInput" type="text" hidden></div></div>
+  <div class="modal-foot"><span></span><span class="btns"><button class="text" id="dlgNo">Avbryt</button><button id="dlgYes"></button></span></div>
+</div></div>
+
+<script>
+window.__bootBoard = function(){
+  const $ = id => document.getElementById(id);
+  const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+  const uid = () => 'f' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
+  const ADO_URL = id => 'https://dev.azure.com/SkytaleAS/Skytale/_workitems/edit/' + id;
+  const CLASS_WEEKS = { S: 1, M: 2, L: 4, XL: 6 };
+  const COLS = [['ny', 'Registrert'], ['utredes', 'Utredes'], ['klar', 'Klar for veikart'], ['aktiv', 'Aktiv'], ['levert', 'Levert']];
+  const REASON_CODES = [['utredning', 'Utredningen viste mer/mindre arbeid'], ['avhengighet', 'En avhengighet flyttet seg'], ['kapasitet', 'Kapasitet: annet gikk foran'], ['prioritering', 'Prioritert om i produktforum'], ['ekstern', 'Ekstern dato endret'], ['omfang', 'Omfanget endret'], ['rydding', 'Retting / rydding'], ['annet', 'Annet']];
+  const POLL_MS = 10000;
+  let state = emptyPlan(), serverVersion = null, canWrite = false, myName = null, serverReady = false;
+  let pendingSave = false, pushing = false, saveTimer = null, dlgResolve = null, reasonOpen = false;
+  let pendingNote = newNote(), lifecycleId = null, startClass = 'M', editId = null, edType = 'feature', edAreas = new Set(), dragId = null;
+
+  function emptyPlan(){ return normalizePlan({ schema: SCHEMA, lanes: [], tasks: [], wishes: [], deleted: {}, deletedLanes: {}, deletedWishes: {} }); }
+  function newNote(){ return { reason: null, reasonCode: null, causes: {}, lines: [] }; }
+  const anyModalOpen = () => ['startBack', 'readyBack', 'placeBack', 'editBack', 'reasonBack', 'dlgBack'].some(id => $(id).classList.contains('open'));
+  const setNote = m => { $('dirtyNote').textContent = m ? '☁ ' + m : ''; };
+  const todayUnit = () => Math.round(dateToUnit(new Date()) / WEEK) * WEEK;
+  const toDateInput = u => { const d = unitToDate(u); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); };
+  const fromDateInput = v => { if(!v) return null; const p = v.split('-').map(Number); if(p.length !== 3 || p.some(isNaN)) return null; return dateToUnit(new Date(p[0], p[1] - 1, p[2])); };
+  const getTask = id => state.tasks.find(t => t.id === id);
+  const getLane = key => state.lanes.find(l => l.key === key);
+  const laneTasks = key => state.tasks.filter(t => t.lane === key).sort((a, b) => (a.order || 0) - (b.order || 0));
+  const touch = (t, g) => { t.fv = t.fv || {}; t.fv[g] = (t.fv[g] || 0) + 1; if(myName){ t.editedBy = myName; t.editedAt = new Date().toISOString(); } };
+  const weeksWord = n => n + ' uke' + (n === 1 ? '' : 'r');
+  let noteTimer = null;
+  function toast(msg){ const n = $('note'); n.textContent = msg; n.classList.add('show'); clearTimeout(noteTimer); noteTimer = setTimeout(() => n.classList.remove('show'), 2600); }
+
+  /* ---------- the board ---------- */
+  const colOf = t => t.state === 'levert' ? 'levert' : t.state === 'ny' ? 'ny' : t.state === 'utredes' ? 'utredes' : t.lane === BACKLOG ? 'klar' : 'aktiv';
+  function cardHtml(t){
+    const lane = t.lane === BACKLOG ? null : getLane(t.lane);
+    const chips = [];
+    if(t.assignee) chips.push('<span class="chip who" title="Eier">' + esc(t.assignee) + '</span>');
+    if(t.kind === 'discovery' && t.state === 'utredes'){ chips.push('<span class="chip" title="Utredning: størrelse, til dato">' + esc(sizeClassText(t)) + ' · til ' + esc(fmtDate(unitToDate(t.end))) + '</span>'); if(discoveryOverdue(t, todayUnit())) chips.push('<span class="chip st-gul">Utredning forsinket</span>'); }
+    if(t.kind === 'estimate' && (t.state === 'klar' || t.state === 'aktiv')) chips.push('<span class="chip" title="Byggetid på tidslinjen">' + esc(bufferLabel(t)) + (t.state === 'aktiv' ? ' → ' + esc(windowLabel(t)) : '') + '</span>');
+    if(t.state === 'levert') chips.push('<span class="chip st-gronn">Levert' + (t.deliveredAt ? ' ' + esc(fmtDate(new Date(t.deliveredAt))) : '') + '</span>');
+    if(t.adoId) chips.push('<a class="chip ado" target="_blank" rel="noopener" href="' + ADO_URL(t.adoId) + '" title="Åpne i Azure DevOps">#' + t.adoId + '</a>');
+    if(t.type && t.type !== 'feature') chips.push('<span class="chip" title="Type">' + esc(FEATURE_TYPE_LABEL[t.type] || t.type) + '</span>');
+    (t.areas || []).forEach(a => chips.push('<span class="chip" title="Flate">' + esc(a) + '</span>'));
+    if(t.fixedEnd) chips.push('<span class="chip fixed" title="Fast dato: køen flytter den aldri">fast dato</span>');
+    return '<div class="card" data-id="' + esc(t.id) + '"' + (canWrite && t.state !== 'levert' ? ' draggable="true"' : '') + '><div class="ttl">' + esc(t.label) + '</div>' +
+      '<div class="epic">' + (lane ? esc(lane.name) : 'Hylla') + '</div><div class="chips">' + chips.join('') + '</div></div>';
+  }
+  function render(){
+    const groups = Object.fromEntries(COLS.map(([k]) => [k, []]));
+    state.tasks.forEach(t => groups[colOf(t)].push(t));
+    const laneIdx = new Map(state.lanes.map((l, i) => [l.key, i]));
+    const sortKey = t => (t.lane === BACKLOG ? 999 : laneIdx.get(t.lane) || 0) * 1000 + (t.order || 0);
+    $('cols').innerHTML = COLS.map(([k, name]) => '<div class="col" data-col="' + k + '"><h2><span>' + name + '</span><span>' + groups[k].length + '</span></h2>' +
+      (groups[k].length ? groups[k].sort((a, b) => sortKey(a) - sortKey(b)).map(cardHtml).join('') : '<div class="empty">Ingen</div>') + '</div>').join('');
+    $('registerBtn').hidden = !canWrite;
+  }
+  $('cols').addEventListener('click', e => { const c = e.target.closest('.card'); if(!c || e.target.closest('a')) return; openEdit(c.dataset.id); });
+  // HTML5 drag between columns
+  $('cols').addEventListener('dragstart', e => { const c = e.target.closest('.card[draggable=true]'); if(!c) return; dragId = c.dataset.id; e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', dragId); c.classList.add('dragging'); });
+  $('cols').addEventListener('dragend', () => { dragId = null; document.querySelectorAll('.col.over, .col.no').forEach(c => c.classList.remove('over', 'no')); document.querySelectorAll('.card.dragging').forEach(c => c.classList.remove('dragging')); });
+  $('cols').addEventListener('dragover', e => { const col = e.target.closest('.col'); if(!col || !dragId) return; e.preventDefault(); document.querySelectorAll('.col.over, .col.no').forEach(c => c.classList.remove('over', 'no')); col.classList.add(allowed(getTask(dragId), col.dataset.col) ? 'over' : 'no'); });
+  $('cols').addEventListener('drop', e => { const col = e.target.closest('.col'); if(!col) return; e.preventDefault(); const id = dragId || e.dataTransfer.getData('text/plain'); dragId = null; document.querySelectorAll('.col.over, .col.no').forEach(c => c.classList.remove('over', 'no')); const t = getTask(id); if(!t) return; dropOn(t, col.dataset.col); });
+  function allowed(t, to){
+    if(!t || !canWrite) return false;
+    const from = colOf(t);
+    if(from === to) return false;
+    if(to === 'levert') return false;
+    if(to === 'ny') return false;
+    if(from === 'ny') return to === 'utredes';
+    if(from === 'utredes') return to === (t.lane === BACKLOG ? 'klar' : 'aktiv');
+    if(from === 'klar') return to === 'aktiv';
+    if(from === 'aktiv') return to === 'klar';
+    return false;
+  }
+  function dropOn(t, to){
+    if(!allowed(t, to)){
+      toast(to === 'levert' ? '«Levert» settes fra ADO når stories er lukket.' : to === 'ny' ? 'Et ønske går ikke tilbake til Registrert. Slett det i Tidslinjen om det var feil.'
+        : colOf(t) === 'utredes' && t.lane !== BACKLOG && to === 'klar' ? 'Utredningen ligger i en epic: dra den rett til Aktiv.' : 'Den overgangen finnes ikke: ett steg om gangen.');
+      return;
+    }
+    if(to === 'utredes') openStart(t.id);
+    else if(to === 'klar' && colOf(t) === 'utredes') openReady(t.id);
+    else if(to === 'aktiv' && colOf(t) === 'utredes') openReady(t.id);   // inside an epic: the span makes it aktiv
+    else if(to === 'aktiv') openPlace(t.id);
+    else if(to === 'klar' && colOf(t) === 'aktiv') backToShelf(t);
+  }
+
+  /* ---------- transitions, the same rules as the timeline ---------- */
+  function setStartClass(c){ startClass = c; [...$('startClass').querySelectorAll('button')].forEach(b => b.classList.toggle('on', b.dataset.c === c)); $('startEnd').value = toDateInput(todayUnit() + CLASS_WEEKS[c] * WEEK); }
+  $('startClass').addEventListener('click', e => { const b = e.target.closest('button[data-c]'); if(b) setStartClass(b.dataset.c); });
+  function openStart(id){ const t = getTask(id); if(!t) return; lifecycleId = id; $('startSub').textContent = '«' + t.label + '»: én eier og en størrelse. Sluttdatoen regnes ut og kan justeres.'; $('startOwner').value = t.assignee || ''; setStartClass('M'); $('startBack').classList.add('open'); setTimeout(() => $('startOwner').focus(), 0); }
+  $('startCancel').addEventListener('click', () => { $('startBack').classList.remove('open'); lifecycleId = null; });
+  $('startSave').addEventListener('click', () => {
+    const t = getTask(lifecycleId); if(!t){ $('startBack').classList.remove('open'); return; }
+    const end = fromDateInput($('startEnd').value); if(end === null){ $('startEnd').focus(); return; }
+    const owner = $('startOwner').value.trim().toUpperCase();
+    t.kind = 'discovery'; t.state = 'utredes'; t.start = todayUnit(); t.end = Math.max(t.start + WEEK, end); delete t.endLikely;
+    t.sizeClass = startClass; t.startedAt = new Date().toISOString();
+    if(owner) t.assignee = owner; else delete t.assignee;
+    touch(t, 'tid'); touch(t, 'meta'); touch(t, 'state');
+    $('startBack').classList.remove('open'); lifecycleId = null;
+    commit();
+  });
+  const mixWord = () => MIX_LABEL[(state.capacity && state.capacity.mode) || 'transition'];
+  function readyNoteText(){ const lw = Math.max(1, parseInt($('readyLikely').value, 10) || 1), hw = Math.max(lw, parseInt($('readyLate').value, 10) || lw), f = capacityFactor(state); return 'Utredningen sa rått ' + lw + '–' + hw + ' → ' + elapsedWeeks(lw, f) + '–' + elapsedWeeks(hw, f) + ' uker på tidslinjen (sprintmiks ' + mixWord() + ', × ' + String(f).replace('.', ',') + ').'; }
+  ['readyLikely', 'readyLate'].forEach(id => $(id).addEventListener('input', () => { $('readyNote').textContent = readyNoteText(); }));
+  function openReady(id){ const t = getTask(id); if(!t) return; lifecycleId = id; $('readyLikely').value = t.raw ? t.raw.likely : 4; $('readyLate').value = t.raw ? t.raw.late : 6; $('readyNote').textContent = readyNoteText(); $('readyBack').classList.add('open'); setTimeout(() => $('readyLikely').focus(), 0); }
+  $('readyCancel').addEventListener('click', () => { $('readyBack').classList.remove('open'); lifecycleId = null; });
+  function applyReady(t, lw, hw){
+    t.kind = 'estimate'; t.raw = { likely: lw, late: hw, source: 'utredning', pulledAt: new Date().toISOString().slice(0, 10) };
+    const b = t.bufferWeeks || 0, f = capacityFactor(state);
+    t.endLikely = t.start + (elapsedWeeks(lw, f) + b) * WEEK; t.end = t.start + (elapsedWeeks(hw, f) + b) * WEEK;
+    if(t.lane !== BACKLOG){ const r = rangeWeeks(t); t.state = 'aktiv'; if(r) t.committedRange = { likely: r.likely, late: r.late, start: t.start }; t.activatedAt = new Date().toISOString().slice(0, 10); }
+    touch(t, 'tid'); touch(t, 'meta'); touch(t, 'est'); touch(t, 'state');
+  }
+  $('readySave').addEventListener('click', () => {
+    const t = getTask(lifecycleId); if(!t){ $('readyBack').classList.remove('open'); return; }
+    const lw = Math.max(1, parseInt($('readyLikely').value, 10) || 1), hw = Math.max(lw, parseInt($('readyLate').value, 10) || lw);
+    applyReady(t, lw, hw);
+    $('readyBack').classList.remove('open'); lifecycleId = null;
+    commit();
+  });
+  function openPlace(id){
+    const t = getTask(id); if(!t) return; lifecycleId = id;
+    $('placeLane').innerHTML = '<option value="">Velg epic …</option>' + state.lanes.filter(l => l.state !== 'avsluttet').map(l => '<option value="' + esc(l.key) + '">' + esc(l.name) + '</option>').join('');
+    $('placePreview').textContent = 'Velg en epic for å se prisen.';
+    $('placeBack').classList.add('open');
+  }
+  function previewText(id, laneKey){
+    const pv = previewPlacement(state, id, laneKey), lane = getLane(laneKey), t = getTask(id);
+    if(!pv || !lane || !t) return '';
+    const word = c => ({ gronn: 'grønn', gul: 'gul', rod: 'rød', venter: 'venter på utredning', 'ingen-mal': 'uten måldato', tom: 'tom' })[c] || c;
+    const parts = [esc(lane.name) + ' blir <b class="st-' + pv.after + '">' + word(pv.after) + '</b>' + (pv.before !== pv.after ? ' (var ' + word(pv.before) + ')' : ' (uendret)') + (pv.window ? ' · ' + esc(pv.window) : '')];
+    if(pv.featureWindow) parts.push(esc(t.label) + ': ' + esc(pv.featureWindow));
+    parts.push(pv.pushed.length ? 'Flytter: ' + pv.pushed.map(q => esc(q.label) + ' ' + weeksWord(q.weeks)).join(', ') + '.' : 'Ingenting annet flyttes.');
+    return parts.join(' · ');
+  }
+  $('placeLane').addEventListener('change', () => { $('placePreview').innerHTML = $('placeLane').value ? previewText(lifecycleId, $('placeLane').value) : 'Velg en epic for å se prisen.'; });
+  $('placeCancel').addEventListener('click', () => { $('placeBack').classList.remove('open'); lifecycleId = null; });
+  $('placeSave').addEventListener('click', () => {
+    const key = $('placeLane').value, t = getTask(lifecycleId), lane = getLane(key);
+    if(!key || !t || !lane){ $('placeLane').focus(); return; }
+    $('placeBack').classList.remove('open'); lifecycleId = null;
+    t.lane = key; t.order = Math.max(0, ...laneTasks(key).map(v => v.order || 0)) + 1; touch(t, 'meta');
+    const r = rangeWeeks(t);
+    if(t.kind === 'estimate' && r){ t.state = 'aktiv'; t.committedRange = { likely: r.likely, late: r.late, start: t.start }; t.activatedAt = new Date().toISOString().slice(0, 10); touch(t, 'state'); }
+    pendingNote.reasonCode = 'prioritering';
+    askReason([t.label + ': lagt i «' + lane.name + '»']);
+    commit();
+  });
+  async function backToShelf(t){
+    const lane = getLane(t.lane);
+    if(!(await confirmDialog('Tilbake til hylla', 'Ta «' + t.label + '» ut av «' + (lane ? lane.name : t.lane) + '»? Den blir klar for veikart igjen, og det logges.', {confirmText:'Ta ut'}))) return;
+    t.lane = BACKLOG; t.state = 'klar'; delete t.committedRange; delete t.activatedAt; touch(t, 'meta'); touch(t, 'state');
+    askReason([t.label + ': tatt ut av «' + (lane ? lane.name : t.lane) + '»']);
+    commit();
+  }
+
+  /* ---------- the card editor: the four attributes, name and owner ---------- */
+  function paintEdAttrs(){ document.querySelectorAll('#edType button').forEach(b => b.classList.toggle('on', b.dataset.t === edType)); document.querySelectorAll('#edAreas button').forEach(b => b.classList.toggle('on', edAreas.has(b.dataset.a))); }
+  $('edType').addEventListener('click', e => { const b = e.target.closest('button[data-t]'); if(b){ edType = b.dataset.t; paintEdAttrs(); } });
+  $('edAreas').addEventListener('click', e => { const b = e.target.closest('button[data-a]'); if(b){ if(edAreas.has(b.dataset.a)) edAreas.delete(b.dataset.a); else edAreas.add(b.dataset.a); paintEdAttrs(); } });
+  function openEdit(id){
+    const t = getTask(id); if(!t) return; editId = id;
+    const lane = t.lane === BACKLOG ? null : getLane(t.lane);
+    $('edSub').textContent = (lane ? 'I «' + lane.name + '»' : 'På hylla') + ' · ' + (STATE_LABEL[t.state] || t.state) + (t.adoId ? ' · ADO #' + t.adoId : '');
+    $('edName').value = t.label; $('edOwner').value = t.assignee || ''; $('edDesc').value = t.description || '';
+    edType = t.type || 'feature'; edAreas = new Set(t.areas || []); paintEdAttrs(); $('edFixed').checked = !!t.fixedEnd;
+    ['edName', 'edOwner', 'edDesc', 'edFixed'].forEach(k => { $(k).disabled = !canWrite; });
+    $('edSave').hidden = !canWrite;
+    $('editBack').classList.add('open');
+  }
+  $('edCancel').addEventListener('click', () => { $('editBack').classList.remove('open'); editId = null; });
+  $('editBack').addEventListener('click', e => { if(e.target === $('editBack')){ $('editBack').classList.remove('open'); editId = null; } });
+  $('edSave').addEventListener('click', () => {
+    const t = getTask(editId); if(!t){ $('editBack').classList.remove('open'); return; }
+    const name = $('edName').value.trim(); if(name && name !== t.label){ t.label = name; touch(t, 'label'); }
+    const owner = $('edOwner').value.trim().toUpperCase(); if((t.assignee || '') !== owner){ if(owner) t.assignee = owner; else delete t.assignee; touch(t, 'meta'); }
+    const desc = $('edDesc').value.trim(); if((t.description || '') !== desc){ if(desc) t.description = desc; else delete t.description; touch(t, 'meta'); }
+    if((t.type || 'feature') !== edType){ if(edType === 'feature') delete t.type; else t.type = edType; touch(t, 'meta'); }
+    const areas = AREAS.filter(a => edAreas.has(a)); if((t.areas || []).join(';') !== areas.join(';')){ if(areas.length) t.areas = areas; else delete t.areas; touch(t, 'meta'); }
+    const fixed = $('edFixed').checked; if(!!t.fixedEnd !== fixed){ if(fixed) t.fixedEnd = true; else delete t.fixedEnd; touch(t, 'tid'); }
+    $('editBack').classList.remove('open'); editId = null;
+    commit();
+  });
+
+  /* ---------- register a wish (as on the shelf) ---------- */
+  $('registerBtn').addEventListener('click', async () => {
+    const name = await askDialog('Registrer ønske', 'Et ønske produktforum har sagt ja til. Det ligger som Registrert til utredningen starter.', {input:true, placeholder:'Kontaktkort for bedrifter', confirmText:'Registrer'});
+    if(!name || typeof name !== 'string' || !name.trim()) return;
+    const start = todayUnit();
+    const t = { id: uid(), lane: BACKLOG, label: name.trim(), kind: 'discovery', state: 'ny', start, end: start + WEEK, deps: [], fv: { state: 1 } };
+    if(myName){ t.editedBy = myName; t.editedAt = new Date().toISOString(); }
+    state.tasks.push(t); state.example = false;
+    commit();
+  });
+
+  /* ---------- reason dialog (the timeline's rules: it never blocks the save) ---------- */
+  function askReason(lines){
+    if(!canWrite) return;
+    pendingNote.lines = pendingNote.lines.concat(lines);
+    reasonOpen = true;
+    $('reasonList').innerHTML = pendingNote.lines.map(l => '<span>' + esc(l) + '</span>').join('');
+    const cur = pendingNote.reasonCode;
+    $('reasonCodes').innerHTML = REASON_CODES.map(([c, lbl]) => '<button data-code="' + c + '"' + (c === cur ? ' class="on"' : '') + '>' + esc(lbl) + '</button>').join('');
+    $('reasonText').value = pendingNote.reason || '';
+    $('reasonBack').classList.add('open');
+  }
+  $('reasonCodes').addEventListener('click', e => { const b = e.target.closest('button[data-code]'); if(!b) return; const on = b.classList.contains('on'); $('reasonCodes').querySelectorAll('button').forEach(x => x.classList.remove('on')); if(!on) b.classList.add('on'); });
+  function closeReason(code, text){ $('reasonBack').classList.remove('open'); reasonOpen = false; pendingNote.reasonCode = code; pendingNote.reason = text || null; pendingNote.lines = []; if(pendingSave) scheduleSave(); }
+  $('reasonSave').addEventListener('click', () => { const on = $('reasonCodes').querySelector('button.on'); const text = $('reasonText').value.trim(); if(!on && !text){ $('reasonText').focus(); return; } closeReason(on ? on.dataset.code : 'annet', text); });
+  $('reasonSkip').addEventListener('click', () => closeReason('ingen', null));
+
+  /* ---------- confirm / input dialog ---------- */
+  function askDialog(title, msg, opts){
+    opts = opts || {};
+    return new Promise(res => {
+      dlgResolve = res;
+      $('dlgTitle').textContent = title; $('dlgMsg').textContent = msg;
+      const inp = $('dlgInput'); inp.hidden = !opts.input; inp.value = ''; inp.placeholder = opts.placeholder || '';
+      $('dlgYes').textContent = opts.confirmText || 'OK'; $('dlgYes').classList.toggle('danger', !!opts.danger);
+      $('dlgBack').classList.add('open');
+      if(opts.input) setTimeout(() => inp.focus(), 0);
+    });
+  }
+  const confirmDialog = (title, msg, opts) => askDialog(title, msg, opts).then(v => v === true);
+  const dlgClose = v => { $('dlgBack').classList.remove('open'); const r = dlgResolve; dlgResolve = null; if(r) r(v); };
+  $('dlgYes').addEventListener('click', () => { const inp = $('dlgInput'); dlgClose(inp.hidden ? true : inp.value); });
+  $('dlgNo').addEventListener('click', () => dlgClose(false));
+  document.addEventListener('keydown', e => { if(e.key === 'Escape'){ ['startBack', 'readyBack', 'placeBack', 'editBack'].forEach(id => $(id).classList.remove('open')); if($('dlgBack').classList.contains('open')) dlgClose(false); } });
+
+  /* ---------- the shared plan: queue, save, poll ---------- */
+  function commit(){
+    state = normalizePlan(state);
+    resolveQueue(state).forEach(({id, by, kind}) => { if(by) pendingNote.causes[id] = kind + ':' + by; });   // the queue moves what the transition pushes
+    render(); scheduleSave();
+  }
+  function applyRemote(data, version){ serverVersion = version; state = normalizePlan(data); resolveQueue(state); render(); }
+  async function init(){
+    setNote('henter…');
+    try{
+      const r = await fetch('api/timeline-plan', {cache:'no-store'});
+      if(!r.ok) throw new Error('HTTP ' + r.status);
+      const j = await r.json();
+      canWrite = j.role === 'writer'; myName = j.user || null; serverReady = true;
+      $('roTag').hidden = canWrite; $('whoami').textContent = myName || '';
+      if(j.plan) applyRemote(j.plan.data, j.plan.version); else { state = emptyPlan(); render(); }
+      setNote(canWrite ? '' : 'kun lesetilgang');
+      checkOldCards();
+    }catch(e){ setNote('frakoblet – kunne ikke hente planen'); render(); }
+  }
+  function scheduleSave(){ if(!serverReady || !canWrite) return; pendingSave = true; if(reasonOpen){ setNote('venter på begrunnelse…'); return; } setNote('lagrer…'); clearTimeout(saveTimer); saveTimer = setTimeout(push, 600); }
+  async function push(){
+    pendingSave = false; pushing = true;
+    const note = pendingNote; pendingNote = newNote();
+    try{
+      const r = await fetch('api/timeline-plan', { method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ data: state, note: { reason: note.reason, reasonCode: note.reasonCode, causes: note.causes, source: 'bruker' } }) });
+      if(r.status === 403){ canWrite = false; $('roTag').hidden = false; setNote('kun lesetilgang – endringene ble ikke lagret'); render(); return; }
+      if(r.status === 409){ pendingNote = note; setNote('travelt – prøver igjen'); scheduleSave(); return; }
+      if(!r.ok) throw new Error('HTTP ' + r.status);
+      const j = await r.json();
+      if(!pendingSave) applyRemote(j.data, j.version);
+      setNote('lagret ' + new Date().toLocaleTimeString('nb-NO', {hour:'2-digit', minute:'2-digit'}));
+    }catch(e){ pendingNote = note; setNote('lagring feilet – prøver igjen'); clearTimeout(saveTimer); saveTimer = setTimeout(push, 5000); pendingSave = true; }
+    finally{ pushing = false; }
+  }
+  async function poll(){
+    if(!serverReady || pendingSave || pushing || anyModalOpen() || dragId) return;
+    try{
+      const r = await fetch('api/timeline-plan', {cache:'no-store'});
+      if(!r.ok) return;
+      const j = await r.json();
+      if(pendingSave || pushing || anyModalOpen() || dragId) return;
+      if(j.plan && j.plan.version !== serverVersion) applyRemote(j.plan.data, j.plan.version);
+    }catch(e){ /* frakoblet – prøver igjen neste runde */ }
+  }
+  setInterval(poll, POLL_MS);
+
+  /* ---------- the old board's cards, imported once (R9) ---------- */
+  async function checkOldCards(){
+    if(!canWrite) return;
+    try{
+      const r = await fetch('api/board-import', { method:'POST', headers:{'Content-Type':'application/json'}, body: '{"list":true}' });
+      if(!r.ok) return;
+      const j = await r.json();
+      const n = (j.cards || []).length;
+      const b = $('importCardsBtn');
+      b.hidden = !n; b.textContent = 'Importer kortene fra det gamle brettet (' + n + ')';
+      b.onclick = async () => {
+        if(!(await confirmDialog('Importer kortene', n + ' kort fra det gamle brettet blir features på hylla: tittel, beskrivelse, type, flater, estimat og avhengigheter. Ferdige kort blir «Levert». Gjøres én gang.', {confirmText:'Importer'}))) return;
+        b.disabled = true; setNote('importerer kortene…');
+        const r2 = await fetch('api/board-import', { method:'POST', headers:{'Content-Type':'application/json'}, body: '{"import":true}' });
+        const j2 = await r2.json().catch(() => ({}));
+        if(!r2.ok){ setNote(''); toast(j2.message || 'Importen feilet.'); b.disabled = false; return; }
+        if(j2.data) applyRemote(j2.data, j2.version);
+        setNote('importerte ' + (j2.imported || []).length + ' kort'); b.hidden = true;
+      };
+    }catch(e){ /* the route is optional while the old tables are empty */ }
+  }
+
+  render();
+  init();
+};
+</script>
+<script>
+(function(){
+  var s = document.createElement('script');
+  s.src = 'timeline/epic-tools.js';
+  s.onload = function(){ window.__bootBoard(); };
+  s.onerror = function(){ document.getElementById('cols').textContent = 'Kunne ikke laste epic-tools.js.'; };
+  document.head.appendChild(s);
+})();
+</script>
+</body>
+</html>
