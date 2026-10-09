@@ -213,6 +213,8 @@
   .task-label .chip.who{background:var(--accent-soft);color:var(--text);font-weight:600;cursor:default}
   .task-label .chip.ado{background:var(--ado-bg);color:var(--ado-fg);text-decoration:none}
   .task-label .chip.ado:hover{text-decoration:underline}
+  .task-label .chip.ado.stale{outline:1px dashed var(--ado-fg);outline-offset:-1px}
+  .task-label .chip.ado.conflict{background:var(--bad-bg);color:var(--bad-fg)}
   .row-actions{position:absolute;right:8px;top:50%;transform:translateY(-50%);display:none;gap:3px}
   .task-label:hover .row-actions{display:flex}
   .row-actions button{width:22px;height:22px;padding:0;font-size:12px;line-height:1}
@@ -226,6 +228,10 @@
   .axis .mth .mm{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:var(--text-2)}
   .axis .mth .yy{font-size:10px;color:var(--text-4)}
   .axis .mth.jan{border-left:2px solid var(--text-4)}
+  .axis .sprints{position:absolute;left:0;right:0;bottom:0;height:16px;pointer-events:none}
+  .axis .sprint{position:absolute;bottom:0;height:16px;font-size:9px;line-height:16px;padding-left:4px;border-left:1px solid var(--line);color:var(--text-4);white-space:nowrap;overflow:hidden;pointer-events:auto}
+  .axis .sprint.alt{background:var(--raised)}
+  .axis .sprint.now{color:var(--text);font-weight:600;border-left-color:var(--today)}
   .grid{position:absolute;inset:0;top:58px;pointer-events:none}
   .grid .v{position:absolute;top:0;bottom:0;width:1px;background:var(--line-soft)}
   .grid .v.jan{width:2px;background:var(--text-4);opacity:.6}
@@ -369,6 +375,16 @@
   .cmp-bar[hidden]{display:none}
   .cmp-bar b{font-weight:600}
   .cmp-bar .sp{flex:1}
+  .ado-bar{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin:12px 0 0;padding:8px 12px;border:1px solid var(--warn-dot);border-radius:6px;background:var(--warn-bg);color:var(--warn-fg);font-size:12px}
+  .ado-bar .sp{flex:1}
+  .ado-list{border:1px solid var(--line);border-top:none;border-radius:0 0 6px 6px;background:var(--surface)}
+  .ado-list .ado-row{display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:6px 12px;font-size:12px;border-bottom:1px solid var(--line-soft)}
+  .ado-list .ado-row:last-child{border-bottom:none}
+  .ado-list .ado-row .where{font-weight:600}
+  .ado-list .ado-row .what{flex:1;min-width:200px;color:var(--text-2)}
+  .sprint-goal{font-size:11px;color:var(--text-3);cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:420px}
+  .sprint-goal:hover{text-decoration:underline}
+  #dlgMsg.pre{white-space:pre-wrap;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11px;text-align:left;max-height:50vh;overflow:auto}
   .cmp-list{margin:8px 0 0;border:1px solid var(--line);border-radius:6px;background:var(--surface);padding:10px 14px;font-size:13px}
   .cmp-list[hidden]{display:none}
   .cmp-list h4{font-size:12px;font-weight:600;margin:10px 0 4px;color:var(--text)}
@@ -436,6 +452,7 @@
     <button id="baselineBtn" title="Lagre planen slik den er nå, som et punkt å sammenligne med">Merk baseline…</button>
     <select id="cmpSelect" title="Sammenlign planen med et tidligere punkt"><option value="">Sammenlign med …</option></select>
     <input id="cmpDate" type="date" hidden title="Planen slik den var om morgenen denne dagen">
+    <button id="adoRefreshBtn" hidden title="Les tilbake fra ADO: stories, poeng, sprint og det som er lukket">Oppdater fra ADO</button>
     <button id="exportBtn">Eksporter (JSON)</button>
     <button id="histBtn" title="Hva har flyttet seg, og hvorfor">Historikk<span class="count" id="histBadge" hidden></span></button>
     <button id="helpBtn">Hjelp</button>
@@ -450,6 +467,13 @@
   </p>
 
   <div class="ro-banner" id="roBanner" hidden><b>👁 Lesetilgang</b> – endringer du gjør deles ikke og forsvinner når siden lastes på nytt.</div>
+
+  <div class="ado-bar" id="adoBar" hidden>
+    <span id="adoText"></span><span class="sp"></span>
+    <a class="btn" id="adoLogin" hidden href="/login?callbackUrl=/timeline">Logg inn på nytt</a>
+    <button class="text" id="adoBarClose">Skjul</button>
+  </div>
+  <div class="ado-list" id="adoList" hidden></div>
 
   <div class="help" id="helpPanel">
     <h3>Slik bruker du tidslinjen</h3>
@@ -490,6 +514,12 @@
         <p>Rekkefølgen på epicene er prioriteten produktforum har satt; rekkefølgen i en epic er byggerekkefølgen. Dra i <b>⋮⋮</b>
         for å flytte en rad, eller sett tallet i redigeringen. Dra en feature til en annen epic for å flytte den dit. En utredning
         som har passert sluttdatoen sin merkes <b>Utredning forsinket</b>.</p></div>
+      <div class="help-card"><h4>ADO og sprinter</h4>
+        <p>Tidslinjen eier epics, features, estimater og avhengigheter; ADO speiler dem. <b>Lagre og push til ADO</b> i redigeringen oppretter
+        eller oppdaterer epicen/featuren (tittel, beskrivelse, tilstand, parent, datoer, avhengigheter) og en discovery-story med eier og sluttdato
+        mens featuren utredes. <b>Oppdater fra ADO</b> leser tilbake stories, poeng, sprint og det som er lukket («Levert»). Endres et felt i ADO
+        etter siste push, listes det som <b>konflikt</b> øverst og overskrives aldri uten at du ber om det. Sprintene på aksen kommer fra ADO;
+        «Sprint 71 · dag 4» står på dagens strek, og sprintmålet ved tegnforklaringen. Mangler tilgangen, ber siden deg logge inn på nytt.</p></div>
     </div>
   </div>
 
@@ -513,6 +543,7 @@
     <span><i class="sw goal"></i>Måldato</span>
     <span><i class="sw today"></i>I dag</span>
     <span><i class="sw depsw"></i>Avhengighet</span>
+    <span class="sprint-goal" id="sprintGoal" hidden></span>
     <span class="tl-summary" id="tlSummary" title="Status per epic"></span>
   </div>
 
@@ -576,12 +607,20 @@
           <label class="ed-field" id="edLikelyField"><span>Sannsynlig (uker)</span><input id="edLikely" type="number" min="1" step="1"></label>
           <label class="ed-field" id="edLateField"><span>Senest (uker)</span><input id="edLate" type="number" min="1" step="1"></label>
         </div>
-        <label class="ed-field"><span>ADO-id (Feature)</span><input id="edAdo" type="number" min="1" step="1" placeholder="f.eks. 4742"></label>
+        <div class="ed-row">
+          <label class="ed-field"><span>ADO-id (Feature)</span><input id="edAdo" type="number" min="1" step="1" placeholder="f.eks. 4742"></label>
+          <label class="ed-field"><span>Spec-mappe i Skytale.Specs</span><input id="edSpec" type="text" placeholder="f.eks. Threading"></label>
+        </div>
         <div class="ed-row">
           <label class="ed-field"><span>Eier (initialer)</span><input id="edOwner" type="text" placeholder="THM"></label>
           <label class="ed-field" id="edBufferField"><span>Buffer (uker)</span><input id="edBuffer" type="number" min="0" step="1"></label>
         </div>
-        <div class="ed-row" id="edPullRow"><button class="ghost" type="button" id="edPull" title="Henter det rå estimatet fra Skytale.Specs (etappe 4)">Hent estimat fra utredningen</button></div>
+        <div class="ed-row" id="edPullRow"><button class="ghost" type="button" id="edPull" title="Henter likely/late fra estimate.yaml i spec-mappen (Skytale.Specs)">Hent estimat fra utredningen</button><span class="md" id="edPullNote"></span></div>
+        <div class="ed-row" id="edPushRow" hidden>
+          <button class="ghost" type="button" id="edPush" title="Lagrer, og oppretter eller oppdaterer featuren i ADO som deg">Lagre og push til ADO</button>
+          <button class="text" type="button" id="edPushDry" title="Viser hva som ville blitt skrevet til ADO, uten å sende">Lagre og tørrkjør</button>
+          <span class="md" id="edAdoNote"></span>
+        </div>
         <div class="ed-field"><span>Venter på (blokkere)</span><div class="ed-deps" id="edDeps"></div></div>
         <div class="ed-row"><button class="ghost" type="button" id="edLink">Koble avhengighet …</button></div>
       </div>
@@ -616,6 +655,11 @@
           <label class="ed-field" id="epOutcomeField"><span>Utfall</span><select id="epOutcome"><option value="nådd">Måltallet nådd</option><option value="ikke nådd">Ikke nådd</option><option value="endret">Endret underveis</option></select></label>
         </div>
         <label class="ed-field" id="epClosedField"><span>Hvorfor avsluttet (kort)</span><input id="epClosedReason" type="text"></label>
+        <div class="ed-row" id="epPushRow" hidden>
+          <button class="ghost" type="button" id="epPush" title="Lagrer, og oppretter eller oppdaterer epicen i ADO som deg">Lagre og push til ADO</button>
+          <button class="text" type="button" id="epPushDry" title="Viser hva som ville blitt skrevet til ADO, uten å sende">Lagre og tørrkjør</button>
+          <span class="md" id="epAdoNote"></span>
+        </div>
       </div>
     </div>
     <div class="modal-foot">
@@ -695,7 +739,7 @@ window.__bootTimeline = function(){
   const ADO_URL = id => 'https://dev.azure.com/SkytaleAS/Skytale/_workitems/edit/' + id;
   const MND_UP = ['JAN','FEB','MAR','APR','MAI','JUN','JUL','AUG','SEP','OKT','NOV','DES'];
   const MND_S = ['jan','feb','mar','apr','mai','jun','jul','aug','sep','okt','nov','des'];
-  const FV_FIELDS = ['tid','label','deps','meta','state','est'];
+  const FV_FIELDS = ['tid','label','deps','meta','state','est','ado'];
   const REASON_CODES = [
     ['utredning', 'Utredningen viste mer/mindre arbeid'], ['avhengighet', 'En avhengighet flyttet seg'],
     ['kapasitet', 'Kapasitet: annet gikk foran'], ['prioritering', 'Prioritert om i produktforum'],
@@ -704,6 +748,12 @@ window.__bootTimeline = function(){
   const REASON_LABEL = Object.fromEntries(REASON_CODES);
   /* Hvilke endringer som spør etter begrunnelse. Speiler needsReason() i events.ts; GO justerer her. */
   const ASK_REASON_FOR = { goalChanged: true, startLaterWeeks: 1, rangeWidened: true, discoveryEndLater: true, movedToOtherEpic: true, epicReordered: true, estimateDeleted: true };
+  /* ADO-speilet (etappe 4): tilstand for konfliktlinjen, push etter lagring, estimat hentet fra Skytale.Specs */
+  let adoLoginNeeded = false, adoBarDismissed = '', edPulled = null;
+  const afterSaveQueue = [];
+  const FIELD_LABEL = { title:'Tittel', description:'Beskrivelse', state:'Tilstand', targetDate:'Måldato', startDate:'Startdato' };
+  const ACTION_TEXT = { create:'opprettes', update:'oppdateres', none:'uendret' };
+  const whenText = iso => iso ? new Date(iso).toLocaleString('nb-NO', {day:'numeric', month:'short', hour:'2-digit', minute:'2-digit'}) : '';
 
   function cssNum(v){ return parseFloat(getComputedStyle(document.documentElement).getPropertyValue(v)); }
   const x = u => (u - VIEW_FROM) * MONTH_W;                       // enhet → px i diagrammet
@@ -878,18 +928,35 @@ window.__bootTimeline = function(){
     chart.innerHTML = '';
     barRefs = {}; rowRefs = {}; rangeRefs = {}; labelDateRefs = {};
     updateTlSummary();
+    renderAdoBar();
     if(!state.lanes.length){ renderShelf(); return; }
 
     const corner = el('div', 'corner', 'Epic / feature');
     labels.appendChild(corner);
 
-    // akse
+    // akse, med sprintene fra ADO nederst
+    const sprintsNow = (state.sprints && state.sprints.items) || [];
     const axis = el('div', 'axis');
     for(let i = VIEW_FROM; i < N_MONTHS; i++){
       const {m, y} = monthInfo(i);
       const mth = el('div', 'mth' + (m === 0 ? ' jan' : ''));
       mth.innerHTML = '<div class="mm">' + MND_S[m] + '</div><div class="yy">' + y + '</div>';
       axis.appendChild(mth);
+    }
+    if(sprintsNow.length){
+      const layer = el('div', 'sprints');
+      const cur = currentSprint(sprintsNow, new Date());
+      const dayToUnit = d => { const q = d.split('-').map(Number); return dateToUnit(new Date(q[0], q[1] - 1, q[2])); };
+      sprintsNow.forEach((sp, i) => {
+        const a = Math.max(VIEW_FROM, dayToUnit(sp.start)), b = Math.min(N_MONTHS, dayToUnit(sp.finish) + 1 / 30);
+        if(b <= a) return;
+        const d = el('div', 'sprint' + (i % 2 ? ' alt' : '') + (cur === sp ? ' now' : ''));
+        d.style.left = x(a) + 'px'; d.style.width = (x(b) - x(a)) + 'px';
+        d.textContent = (x(b) - x(a)) >= 56 ? sp.name : sp.name.replace('Sprint ', '');
+        d.title = sp.name + ': ' + sp.start + ' – ' + sp.finish;
+        layer.appendChild(d);
+      });
+      axis.appendChild(layer);
     }
     chart.appendChild(axis);
 
@@ -906,7 +973,8 @@ window.__bootTimeline = function(){
     const today = el('div', 'today');
     today.style.left = x(todayUnit()) + 'px';
     const tn = new Date();
-    today.innerHTML = '<span class="tl">I DAG · ' + tn.getDate() + '. ' + MND_UP[tn.getMonth()] + '</span>';
+    const spl = sprintLabel(sprintsNow, tn);
+    today.innerHTML = '<span class="tl">I DAG · ' + tn.getDate() + '. ' + MND_UP[tn.getMonth()] + (spl ? ' · ' + spl : '') + '</span>';
     chart.appendChild(today);
 
     // epics (lanes) og features (rader)
@@ -925,7 +993,7 @@ window.__bootTimeline = function(){
       const stateChip = lane.state === 'avsluttet'
         ? '<span class="chip" title="Epicen er avsluttet">Avsluttet: ' + esc(lane.outcome || 'uten utfall') + '</span>'
         : (lane.state === 'forslag' ? '<span class="chip st-forslag" title="Ikke valgt i produktforum ennå">Forslag</span>' : '') + '<span class="chip st-' + st.code + '">' + esc(STATUS_LABEL[st.code]) + '</span>';
-      lm.innerHTML = stateChip +
+      lm.innerHTML = stateChip + (lane.ado && lane.ado.conflicts && lane.ado.conflicts.length ? '<span class="chip st-rod" title="Et felt er endret i ADO etter siste push – se øverst på siden">ADO-konflikt</span>' : '') +
         (lane.externalDate ? '<span class="chip ext-chip" title="Datoen er satt utenfra">Ekstern dato</span>' : '') +
         (overdue ? '<span class="chip st-gul">' + overdue + ' utredning' + (overdue > 1 ? 'er' : '') + ' forsinket</span>' : '') +
         '<span class="goal">' + esc((win ? win + ' · ' : '') + goalText(lane)) + '</span>' +
@@ -1105,7 +1173,11 @@ window.__bootTimeline = function(){
     rl.textContent = t.kind === 'estimate' ? bufferLabel(t) + ' → ' + windowLabel(t) : 'til ' + fmtDate(unitToDate(t.end));
     rl.className = 'range-lbl ' + (t.kind === 'estimate' ? 'weeks' : 'date');
     const chips = [];
-    if(t.adoId) chips.push('<a class="chip ado" target="_blank" rel="noopener" href="' + ADO_URL(t.adoId) + '" title="Åpne i Azure DevOps">#' + t.adoId + '</a>');
+    if(t.adoId){
+      const conflict = t.ado && t.ado.conflicts && t.ado.conflicts.length, stale = !conflict && t.ado && t.editedAt && t.ado.pushedAt < t.editedAt;
+      chips.push('<a class="chip ado' + (conflict ? ' conflict' : stale ? ' stale' : '') + '" target="_blank" rel="noopener" href="' + ADO_URL(t.adoId) + '" title="' +
+        (conflict ? 'Konflikt med ADO – se øverst på siden' : stale ? 'Endret etter siste push – push på nytt fra redigeringen' : 'Åpne i Azure DevOps') + '">#' + t.adoId + '</a>');
+    }
     if(t.deps.length) chips.push('<span class="chip" title="Venter på ' + t.deps.length + ' feature(s)">⇠ ' + t.deps.length + '</span>');
     if(discoveryOverdue(t, todayUnit())) chips.push('<span class="chip st-gul" title="Sluttdatoen er passert: sett en ny før den passerer">Utredning forsinket</span>');
     if(t.editedBy){
@@ -1159,6 +1231,7 @@ window.__bootTimeline = function(){
         '<span><i class="st-rod"></i>' + n.rod + '</span><span><i></i>' + (n.venter + n.other) + ' venter</span>' +
         '<span title="Epics etter tilstand">' + c.aktiv + ' aktive · ' + c.forslag + ' forslag · ' + c.avsluttet + ' avsluttet</span>'
       : '';
+    renderSprintGoal();
   }
 
   /* ================== drag ================== */
@@ -1463,7 +1536,7 @@ window.__bootTimeline = function(){
     }
     const lane = e.laneKey ? getLane(e.laneKey) : null;
     const where = e.targetType === 'feature' ? (lane ? lane.name + ' › ' : '') + e.targetLabel : e.targetLabel;
-    const cause = e.cause === 'avhengighet'
+    const cause = e.cause === 'ado' ? '<span class="chip cause">ADO</span>' : e.cause === 'avhengighet'
       ? '<span class="chip cause">avhengighet' + (e.causeRef ? ': ' + esc((getTask(e.causeRef) || {label: e.causeRef}).label) : '') + '</span>' : '';
     const row = el('div', 'hist-ev');
     row.innerHTML = '<span class="where">' + esc(where) + '</span><span class="sum">' + esc(e.summary) + cause + '</span>';
@@ -1559,7 +1632,7 @@ window.__bootTimeline = function(){
       const lane = key ? (getLane(key) || cmp.lanes[key]) : null;
       html += '<h4>' + esc(lane ? lane.name : 'Planen') + '</h4>' + evs.map(e => {
         const cs = e.changeset || {};
-        const why = e.cause === 'avhengighet' ? '<span class="chip cause">avhengighet' + (e.causeRef ? ': ' + esc((getTask(e.causeRef) || cmp.tasks[e.causeRef] || {label: e.causeRef}).label) : '') + '</span>'
+        const why = e.cause === 'ado' ? '<span class="chip cause">ADO</span>' : e.cause === 'avhengighet' ? '<span class="chip cause">avhengighet' + (e.causeRef ? ': ' + esc((getTask(e.causeRef) || cmp.tasks[e.causeRef] || {label: e.causeRef}).label) : '') + '</span>'
           : cs.reasonCode && cs.reasonCode !== 'ingen' ? '<span class="chip reason">' + esc(REASON_LABEL[cs.reasonCode] || cs.reasonCode) + (cs.reason ? ' – ' + esc(cs.reason) : '') + '</span>'
           : cs.reasonCode === 'ingen' ? '<span class="chip reason missing">Begrunnelse mangler</span>' : '';
         return '<div class="row"><span>' + (e.targetType === 'feature' ? esc(e.targetLabel) + ': ' : '') + esc(e.summary) + '</span>' + why +
@@ -1730,6 +1803,15 @@ window.__bootTimeline = function(){
     $('edLikely').value = r.likely;
     $('edLate').value = r.late;
     $('edAdo').value = t.adoId || '';
+    $('edSpec').value = t.specPath || '';
+    $('edPullNote').textContent = '';
+    edPulled = null;
+    $('edPushRow').hidden = !HOSTED || !canWrite || t.lane === BACKLOG;
+    $('edAdoNote').textContent = t.ado
+      ? 'Sist pushet ' + whenText(t.ado.pushedAt) + (t.ado.storyId ? ' · discovery-story #' + t.ado.storyId : '') +
+        (t.ado.stories ? ' · ' + t.ado.stories.count + ' stories, ' + t.ado.stories.pointsDone + '/' + t.ado.stories.pointsTotal + ' poeng' + (t.ado.stories.iteration ? ' · ' + t.ado.stories.iteration : '') : '') +
+        (t.ado.conflicts && t.ado.conflicts.length ? ' · konflikt' : '')
+      : (t.adoId ? 'ADO-id satt for hånd; ikke pushet herfra ennå' : 'Ikke pushet ennå');
     $('edOwner').value = t.assignee || '';
     $('edBuffer').value = t.bufferWeeks || 0;
     $('edBufferField').hidden = t.kind !== 'estimate';
@@ -1790,6 +1872,8 @@ window.__bootTimeline = function(){
     const ado = parseInt($('edAdo').value, 10);
     const newAdo = isFinite(ado) && ado > 0 ? ado : undefined;
     if(t.adoId !== newAdo){ if(newAdo) t.adoId = newAdo; else delete t.adoId; touch(t, 'meta'); }
+    const spec = $('edSpec').value.trim();
+    if((t.specPath || '') !== spec){ if(spec && /^[A-Za-z0-9._-]+$/.test(spec)) t.specPath = spec; else delete t.specPath; touch(t, 'meta'); }
     const owner = $('edOwner').value.trim();
     if((t.assignee || '') !== owner){ if(owner) t.assignee = owner; else delete t.assignee; touch(t, 'meta'); }
     if(t.kind === 'estimate'){
@@ -1801,6 +1885,16 @@ window.__bootTimeline = function(){
         // bufferen legges på begge ender av spennet; det rå estimatet (raw) står urørt
         t.endLikely = t.start + (r0.likely - oldBuf + buf) * WEEK; t.end = t.start + (r0.late - oldBuf + buf) * WEEK; touch(t, 'tid');
       }
+    }
+    if(t.kind === 'estimate' && edPulled){   // feltene står slik hentingen satte dem: det rå estimatet lagres med kilde
+      const bufNow = t.bufferWeeks || 0, r1 = rangeWeeks(t);
+      if(r1 && r1.likely - bufNow === edPulled.likely && r1.late - bufNow === edPulled.late){
+        t.raw = { likely: edPulled.likely, late: edPulled.late, source: 'specs', pulledAt: new Date().toISOString() };
+        if(edPulled.by) t.raw.by = edPulled.by;
+        if(edPulled.date) t.raw.date = edPulled.date;
+        touch(t, 'est');
+      }
+      edPulled = null;
     }
     const keep = [...document.querySelectorAll('#edDeps .depchip')].map(c => c.dataset.id);
     if(keep.length !== t.deps.length){ t.deps = t.deps.filter(d => keep.includes(d)); touch(t, 'deps'); }
@@ -1817,15 +1911,29 @@ window.__bootTimeline = function(){
   $('edClose').addEventListener('click', closeEditor);
   editorBack.addEventListener('click', e => { if(e.target === editorBack) closeEditor(); });
   $('edLink').addEventListener('click', () => { const id = editorTaskId; closeEditor(); startLink(id); });
-  $('edPull').addEventListener('click', async () => {   // etappe 4 fyller ruten; nå svarer den med en melding
+  $('edPull').addEventListener('click', async () => {   // likely/late fra estimate.yaml i Skytale.Specs, lest som deg
     const t = getTask(editorTaskId); if(!t) return;
+    const spec = $('edSpec').value.trim();
+    if(!spec){ askDialog('Hent estimat fra utredningen', 'Skriv navnet på spec-mappen i Skytale.Specs først (feltet «Spec-mappe»).', {confirmText:'OK', noCancel:true}); return; }
+    $('edPullNote').textContent = 'henter…';
     try{
-      const r = await fetch('api/specs-estimate?id=' + encodeURIComponent(t.id), {cache:'no-store'});
-      const j = await r.json();
-      if(r.ok && j.raw){ $('edLikely').value = j.raw.likely; $('edLate').value = j.raw.late; }
-      else askDialog('Hent estimat fra utredningen', j.message || 'Ikke tilgjengelig ennå.', {confirmText:'OK', noCancel:true});
-    }catch(e){ askDialog('Hent estimat fra utredningen', 'Fikk ikke kontakt med Skytale.Specs.', {confirmText:'OK', noCancel:true}); }
+      const r = await fetch('api/specs-estimate?id=' + encodeURIComponent(t.id) + '&folder=' + encodeURIComponent(spec), {cache:'no-store'});
+      let j = {}; try{ j = await r.json(); }catch(e){}
+      if(r.status === 401 && j.error === 'ado-login'){ adoLoginNeeded = true; renderAdoBar(); $('edPullNote').textContent = ''; askDialog('Hent estimat fra utredningen', 'Logg inn på nytt for å koble til ADO.', {confirmText:'OK', noCancel:true}); return; }
+      if(!r.ok || !j.raw){ $('edPullNote').textContent = ''; askDialog('Hent estimat fra utredningen', j.message || 'Ikke tilgjengelig.', {confirmText:'OK', noCancel:true}); return; }
+      const before = rangeWeeks(t), buf0 = t.bufferWeeks || 0, buf = Math.max(0, parseInt($('edBuffer').value, 10) || 0);
+      edPulled = { likely: j.raw.likely, late: j.raw.late, by: j.raw.estimatedBy || null, date: j.raw.date || null };
+      if(edSel.kind !== 'estimate'){ edSel = { kind: 'estimate' }; paintEdKind(); }
+      $('edLikely').value = j.raw.likely + buf; $('edLate').value = j.raw.late + buf;
+      const who = [j.raw.estimatedBy, j.raw.date ? fmtDate(new Date(j.raw.date)) : null].filter(Boolean).join(', ');
+      $('edPullNote').textContent = 'Utredningen sa ' + (j.raw.likely === j.raw.late ? j.raw.late : j.raw.likely + '–' + j.raw.late) + ' uker' + (who ? ' (' + who + ')' : '') +
+        '. Før: ' + (before ? (before.likely - buf0) + '–' + (before.late - buf0) : '–') + '.';
+    }catch(e){ $('edPullNote').textContent = ''; askDialog('Hent estimat fra utredningen', 'Fikk ikke kontakt med Skytale.Specs.', {confirmText:'OK', noCancel:true}); }
   });
+  // lagre først, så push: lagringen må ha landet før ruten leser planen
+  const pushAfterSave = (kind, id, opts, saveBtn) => { afterSave(() => pushToAdo(kind, id, opts)); $(saveBtn).click(); if(!pendingSave) afterSaveQueue.splice(0).forEach(fn => fn()); };
+  $('edPush').addEventListener('click', () => pushAfterSave('feature', editorTaskId, {}, 'edSave'));
+  $('edPushDry').addEventListener('click', () => pushAfterSave('feature', editorTaskId, { dry: true }, 'edSave'));
   $('edDelete').addEventListener('click', async () => {
     const t = getTask(editorTaskId);
     if(!t) return;
@@ -1856,6 +1964,8 @@ window.__bootTimeline = function(){
     $('epGoal').value = typeof l.goalDate === 'number' ? toDateInput(l.goalDate) : '';
     $('epProvisional').checked = !!l.goalProvisional;
     $('epAdo').value = l.adoId || '';
+    $('epPushRow').hidden = !HOSTED || !canWrite;
+    $('epAdoNote').textContent = l.ado ? 'Sist pushet ' + whenText(l.ado.pushedAt) + (l.ado.conflicts && l.ado.conflicts.length ? ' · konflikt' : '') : (l.adoId ? 'ADO-id satt for hånd; ikke pushet herfra ennå' : 'Ikke pushet ennå');
     $('epMetric').value = l.metric || '';
     $('epExternal').checked = !!l.externalDate;
     $('epPriority').value = state.lanes.findIndex(v => v.key === key) + 1;
@@ -1869,6 +1979,8 @@ window.__bootTimeline = function(){
   function closeEpicEditor(){ epicKey = null; epicBack.classList.remove('open'); }
   function paintEpState(){ const closed = $('epState').value === 'avsluttet'; $('epOutcomeField').hidden = !closed; $('epClosedField').hidden = !closed; }
   $('epState').addEventListener('change', paintEpState);
+  $('epPush').addEventListener('click', () => pushAfterSave('epic', epicKey, {}, 'epSave'));
+  $('epPushDry').addEventListener('click', () => pushAfterSave('epic', epicKey, { dry: true }, 'epSave'));
   $('epSave').addEventListener('click', () => {
     const l = getLane(epicKey);
     if(!l){ closeEpicEditor(); return; }
@@ -1966,6 +2078,7 @@ window.__bootTimeline = function(){
       roTag.hidden = canWrite;
       $('baselineBtn').hidden = !canWrite;   // lesere kan sammenligne, ikke merke baseliner
       $('registerBtn').hidden = !canWrite;
+      $('adoRefreshBtn').hidden = !canWrite;
       whoami.textContent = myName || '';
       refreshHistoryBadge();
       loadSnapshots();
@@ -1977,6 +2090,7 @@ window.__bootTimeline = function(){
         render();
         setSaveNote(canWrite ? 'ingen delt plan ennå' : 'ingen delt plan ennå – kun lesetilgang');
       }
+      loadSprints();
     }catch(err){
       serverFailed = true;
       setSaveNote('frakoblet – kunne ikke hente planen');
@@ -1998,6 +2112,8 @@ window.__bootTimeline = function(){
         roBanner.hidden = false;
         roTag.hidden = false;
         $('baselineBtn').hidden = true;
+        $('adoRefreshBtn').hidden = true;
+        afterSaveQueue.length = 0;
         setSaveNote('kun lesetilgang – endringer forblir lokale');
         return;
       }
@@ -2006,6 +2122,7 @@ window.__bootTimeline = function(){
       const j = await r.json();
       refreshHistoryBadge();
       if(cmp) refreshCompare();
+      afterSaveQueue.splice(0).forEach(fn => fn());
       const tid = new Date().toLocaleTimeString('nb-NO', {hour:'2-digit', minute:'2-digit'});
       if(drag || colDrag){
         // brukeren drar: ikke bytt ut tilstanden under hånden. serverVersion holdes gammel,
@@ -2039,6 +2156,120 @@ window.__bootTimeline = function(){
   }
   const anyModalOpen = () => editorBack.classList.contains('open') || epicBack.classList.contains('open') || dlgBack.classList.contains('open') || reasonBack.classList.contains('open') ||
     $('startBack').classList.contains('open') || $('readyBack').classList.contains('open') || $('placeBack').classList.contains('open');
+  /* ================== ADO-speilet: push, tilbakelesing, konflikter, sprinter ================== */
+  function afterSave(fn){ afterSaveQueue.push(fn); }
+  async function adoCall(path, body){
+    const r = await fetch(path, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body || {}) });
+    let j = {}; try{ j = await r.json(); }catch(e){}
+    if(r.status === 401 && j.error === 'ado-login'){ adoLoginNeeded = true; renderAdoBar(); throw new Error('ado-login'); }
+    if(!r.ok) throw new Error(j.message || ('HTTP ' + r.status));
+    adoLoginNeeded = false;
+    return j;
+  }
+  function dryText(j){
+    const items = (j.items || []).map(i => {
+      const head = i.type + (i.adoId ? ' #' + i.adoId : '') + ' · ' + (ACTION_TEXT[i.action] || i.action) + ' (' + i.patch.length + ' operasjoner)' +
+        (i.conflicts && i.conflicts.length ? ' · konflikter: ' + i.conflicts.map(c => FIELD_LABEL[c.field] || c.field).join(', ') : '');
+      const ops = i.patch.map(p => '  ' + p.op + ' ' + p.path + (p.value === undefined ? '' : ' = ' +
+        (typeof p.value === 'string' ? p.value.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 90) : JSON.stringify(p.value).slice(0, 90))));
+      return [head].concat(ops).join('\n');
+    });
+    return (items.join('\n\n') || 'Ingenting å sende.') + (j.note ? '\n\n' + j.note : '');
+  }
+  async function pushToAdo(kind, id, opts){
+    opts = opts || {};
+    try{
+      const j = await adoCall('api/ado-push' + (opts.dry ? '?dry=1' : ''), { kind, id, force: !!opts.force });
+      if(opts.dry){
+        $('dlgMsg').classList.add('pre');
+        await askDialog('Tørrkjøring mot ADO', dryText(j), {confirmText:'OK', noCancel:true});
+        $('dlgMsg').classList.remove('pre');
+        return;
+      }
+      if(j.data && !pendingSave && !drag) applyRemote(j.data, j.version);
+      const made = (j.items || []).filter(i => i.action === 'create').map(i => i.type + ' #' + i.adoId);
+      const conflicts = (j.items || []).some(i => i.conflicts && i.conflicts.length);
+      setSaveNote('pushet til ADO' + (made.length ? ': ' + made.join(', ') : '') + (conflicts ? ' – konflikter, se øverst' : ''));
+      refreshHistoryBadge();
+    }catch(e){
+      if(e.message !== 'ado-login') askDialog('Push til ADO', e.message, {confirmText:'OK', noCancel:true});
+      else setSaveNote('ADO: logg inn på nytt');
+    }
+  }
+  async function refreshFromAdo(){
+    try{
+      setSaveNote('leser fra ADO…');
+      const j = await adoCall('api/ado-refresh');
+      if(j.data && !pendingSave && !drag) applyRemote(j.data, j.version);
+      const r = j.read || {}, nc = (j.conflicts || []).length;
+      setSaveNote('lest fra ADO: ' + (r.features || 0) + ' features, ' + (r.stories || 0) + ' stories' + (r.levert ? ', ' + r.levert + ' levert' : '') + (nc ? ', ' + nc + ' konflikt' + (nc > 1 ? 'er' : '') : ''));
+      refreshHistoryBadge();
+    }catch(e){
+      if(e.message === 'ado-login') setSaveNote('ADO: logg inn på nytt');
+      else { setSaveNote(''); askDialog('Oppdater fra ADO', e.message, {confirmText:'OK', noCancel:true}); }
+    }
+  }
+  async function loadSprints(){   // sprintlinjalen: fra ADO når cachen er gammel, ellers fra planen
+    if(!HOSTED) return;
+    try{
+      const j = await adoCall('api/ado-sprints');
+      if(j.data){ if(!pendingSave && !drag) applyRemote(j.data, j.version); }
+      else if(j.sprints && j.sprints.length && !state.sprints){ state.sprints = { at: new Date().toISOString(), items: j.sprints }; render(); }
+    }catch(e){
+      if(e.message === 'ado-login' && !canWrite){ adoLoginNeeded = false; renderAdoBar(); }   // lesere trenger ikke ADO; linjalen tegnes fra cachen
+    }
+  }
+  function adoConflictRows(){
+    const rows = [];
+    state.lanes.forEach(l => ((l.ado && l.ado.conflicts) || []).forEach(c => rows.push({ kind:'epic', id:l.key, where:l.name, adoId:l.adoId, c })));
+    state.tasks.forEach(t => ((t.ado && t.ado.conflicts) || []).forEach(c => { const l = getLane(t.lane); rows.push({ kind:'feature', id:t.id, where:(l ? l.name + ' › ' : '') + t.label, adoId:t.adoId, c }); }));
+    return rows;
+  }
+  const adoBarKey = rows => JSON.stringify(rows.map(r => [r.id, r.c.field, r.c.theirs])) + (adoLoginNeeded ? '|login' : '');
+  function renderAdoBar(){
+    const bar = $('adoBar'), list = $('adoList');
+    const rows = HOSTED ? adoConflictRows() : [];
+    if((!rows.length && !adoLoginNeeded) || adoBarDismissed === adoBarKey(rows)){ bar.hidden = true; list.hidden = true; return; }
+    bar.hidden = false;
+    $('adoLogin').hidden = !adoLoginNeeded;
+    $('adoText').textContent = (adoLoginNeeded ? 'Logg inn på nytt for å koble til ADO. ' : '') +
+      (rows.length ? 'ADO-konflikter: ' + rows.length + ' – endret i ADO etter siste push. Ingenting er overskrevet.' : '');
+    list.hidden = !rows.length;
+    list.innerHTML = rows.map(r =>
+      '<div class="ado-row"><span class="where">' + esc(r.where) + '</span><span class="what">' + esc((FIELD_LABEL[r.c.field] || r.c.field) + ' er «' + (r.c.theirs || '') + '» i ADO, «' + (r.c.ours || '') + '» her') + '</span>' +
+      (r.adoId ? '<a class="btn" target="_blank" rel="noopener" href="' + ADO_URL(r.adoId) + '">Åpne i ADO</a>' : '') +
+      (canWrite ? '<button class="text force" data-kind="' + r.kind + '" data-id="' + esc(r.id) + '" title="Skriver Tidslinjens verdi over ADO">Push på nytt (overskriv)</button>' : '') + '</div>').join('');
+  }
+  $('adoBarClose').addEventListener('click', () => { adoBarDismissed = adoBarKey(adoConflictRows()); renderAdoBar(); });
+  $('adoList').addEventListener('click', async e => {
+    const b = e.target.closest('.force'); if(!b) return;
+    const kind = b.dataset.kind, id = b.dataset.id;
+    const what = kind === 'epic' ? (getLane(id) || {name: id}).name : (getTask(id) || {label: id}).label;
+    if(!(await confirmDialog('Push på nytt', 'Skriver Tidslinjens verdier over det som står i ADO for «' + what + '». Konflikten logges.', {confirmText:'Overskriv', danger:true}))) return;
+    pushToAdo(kind, id, { force: true });
+  });
+  $('adoRefreshBtn').addEventListener('click', refreshFromAdo);
+  const sprintItems = () => (state.sprints && state.sprints.items) || [];
+  function renderSprintGoal(){
+    const sg = $('sprintGoal');
+    const cur = currentSprint(sprintItems(), new Date());
+    if(!cur){ sg.hidden = true; return; }
+    const g = state.sprintGoals && state.sprintGoals[cur.name];
+    sg.hidden = false;
+    sg.textContent = cur.name + ' · dag ' + sprintDay(cur, new Date()) + ' · mål: ' + (g && g.text ? g.text : (canWrite ? 'sett sprintmål…' : '–'));
+    sg.title = canWrite ? 'Klikk for å sette sprintmålet' : ((g && g.text) || '');
+  }
+  $('sprintGoal').addEventListener('click', async () => {
+    if(!canWrite) return;
+    const cur = currentSprint(sprintItems(), new Date()); if(!cur) return;
+    const old = (state.sprintGoals && state.sprintGoals[cur.name] && state.sprintGoals[cur.name].text) || '';
+    const text = await askDialog(cur.name + ': sprintmål', 'Én setning: hva sprinten skal ha levert.', { input: true, value: old, confirmText: 'Lagre' });
+    if(typeof text !== 'string' || text.trim() === old) return;
+    state.sprintGoals = state.sprintGoals || {};
+    state.sprintGoals[cur.name] = { text: text.trim(), at: new Date().toISOString() };
+    save(); renderSprintGoal();
+  });
+
   async function pollTick(){
     if(!HOSTED || !serverReady) return;
     if(drag || colDrag || linkSource || anyModalOpen()) return;   // ikke midt i brukerens egen redigering
