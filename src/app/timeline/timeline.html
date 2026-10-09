@@ -325,7 +325,10 @@
   .ed-row .ed-field{flex:1;min-width:140px}
   .ed-kind{display:flex;gap:6px;flex-wrap:wrap}
   .ed-kind button{padding:6px 10px}
-  .ed-kind button.on[data-c]{background:var(--accent);border-color:var(--accent);color:#fff}
+  .ed-kind button.on[data-c],.ed-kind button.on[data-t],.ed-kind button.on[data-a]{background:var(--accent);border-color:var(--accent);color:#fff}
+  .ed-field textarea{width:100%;font:inherit;font-size:14px;padding:6px 12px;border:1px solid var(--line);border-radius:4px;background:var(--input-bg);color:var(--text);resize:vertical}
+  .ed-field textarea:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)}
+  .task-label .chip.fixed{background:var(--text);color:var(--surface)}
   .ed-kind button.on[data-k=discovery]{background:var(--warn-bg);border-color:var(--warn);color:var(--warn-fg)}
   .ed-kind button.on[data-k=estimate]{background:var(--accent);border-color:var(--accent);color:#fff}
   .ed-check{display:flex;gap:8px;align-items:center;font-size:13px;color:var(--text);cursor:pointer;padding-bottom:8px}
@@ -664,6 +667,12 @@
           <label class="ed-field"><span>Eier (initialer)</span><input id="edOwner" type="text" placeholder="THM"></label>
           <label class="ed-field" id="edBufferField"><span>Buffer (uker)</span><input id="edBuffer" type="number" min="0" step="1"></label>
         </div>
+        <label class="ed-field"><span>Beskrivelse</span><textarea id="edDesc" rows="3" placeholder="Hva featuren er, slik ADO skal vise det"></textarea></label>
+        <div class="ed-row">
+          <div class="ed-field"><span>Type</span><div class="ed-kind" id="edType"><button data-t="feature">Feature</button><button data-t="teknisk">Teknisk</button><button data-t="vedlikehold">Vedlikehold</button></div></div>
+          <div class="ed-field"><span>Flater</span><div class="ed-kind" id="edAreas"><button data-a="Backend">Backend</button><button data-a="Frontend">Frontend</button><button data-a="iOS">iOS</button><button data-a="Android">Android</button><button data-a="Desktop">Desktop</button><button data-a="Admin">Admin</button></div></div>
+        </div>
+        <label class="ed-check"><input type="checkbox" id="edFixed"> Fast dato – køen flytter den aldri; flyttes sluttdatoen, spørres det etter en ekstern grunn</label>
         <label class="ed-check" id="edQueueField"><input type="checkbox" id="edQueue"> Følger køen – starter automatisk etter blokkere og eierens tidligere arbeid (av = dratt foran køen med vilje)</label>
         <div class="ed-row" id="edPullRow"><button class="ghost" type="button" id="edPull" title="Henter likely/late fra estimate.yaml i spec-mappen (Skytale.Specs)">Hent estimat fra utredningen</button><span class="md" id="edPullNote"></span></div>
         <div class="ed-row" id="edPushRow" hidden>
@@ -1277,7 +1286,8 @@ window.__bootTimeline = function(){
     const psig = progressSignal(t, todayUnit());
     if(psig) chips.push('<span class="chip sig st-' + psig.code + '" title="Andre signal: fremdrift mot tid i det sannsynlige vinduet (teller ikke i epicens farge)">' + esc(progressText(t, psig)) + '</span>');
     if(t.pinned){ const fl = queueFloor(state, t.id).floor; chips.push('<span class="chip pinned" title="Dratt foran køen med vilje' + (fl !== null ? ' (køen sier start ' + esc(fmtDate(unitToDate(fl))) + ')' : '') + '. Slå på «Følger køen» i redigeringen for å slippe den.">overstyrt</span>'); }
-    if(!t.pinned && t.lane !== BACKLOG && t.state !== 'levert'){   // køen: hvem den venter på, synlig uten Historikk
+    if(t.fixedEnd) chips.push('<span class="chip fixed" title="Fast dato: køen flytter den aldri">fast dato</span>');
+    if(!t.pinned && !t.fixedEnd && t.lane !== BACKLOG && t.state !== 'levert'){   // køen: hvem den venter på, synlig uten Historikk
       const q = queueFloor(state, t.id), qb = q.by ? getTask(q.by) : null;
       if(q.kind === 'queue' && qb && q.floor !== null && Math.abs(q.floor - t.start) < 1e-6){
         const who = (qb.kind === 'discovery' ? 'utredning ' : '') + '«' + esc(qb.label) + '»';
@@ -1398,6 +1408,7 @@ window.__bootTimeline = function(){
     if(d.pinnedByDrag && d.t.pinned) touch(d.t, 'meta');
     if(d.moved){
       const lines = dragReasonLines(d);
+      if(d.t.fixedEnd && d.t.end > d.end0 + 1e-9) pendingNote.reasonCode = 'ekstern';   // en fast dato flyttes bare av verden utenfor
       if(lines.length) askReason(lines);   // dialogen holder lagringen til den er lukket
       save(); render();
     }
@@ -1929,6 +1940,13 @@ window.__bootTimeline = function(){
   let editorTaskId = null;
   let edSel = { kind: 'estimate' };
   const ED_DEPS_NONE = '<span class="none">Ingen – denne kan starte når som helst.</span>';
+  let edType = 'feature', edAreas = new Set();
+  function paintEdAttrs(){
+    document.querySelectorAll('#edType button').forEach(b => b.classList.toggle('on', b.dataset.t === edType));
+    document.querySelectorAll('#edAreas button').forEach(b => b.classList.toggle('on', edAreas.has(b.dataset.a)));
+  }
+  $('edType').addEventListener('click', e => { const b = e.target.closest('button[data-t]'); if(b){ edType = b.dataset.t; paintEdAttrs(); } });
+  $('edAreas').addEventListener('click', e => { const b = e.target.closest('button[data-a]'); if(b){ if(edAreas.has(b.dataset.a)) edAreas.delete(b.dataset.a); else edAreas.add(b.dataset.a); paintEdAttrs(); } });
   function paintEdKind(){
     document.querySelectorAll('#edKind button').forEach(b => b.classList.toggle('on', b.dataset.k === edSel.kind));
     const disc = edSel.kind === 'discovery';
@@ -1954,6 +1972,9 @@ window.__bootTimeline = function(){
     $('edLate').value = r.late;
     $('edAdo').value = t.adoId || '';
     $('edSpec').value = t.specPath || '';
+    $('edDesc').value = t.description || '';
+    edType = t.type || 'feature'; edAreas = new Set(t.areas || []); paintEdAttrs();
+    $('edFixed').checked = !!t.fixedEnd;
     $('edQueueField').hidden = t.kind !== 'estimate' || t.lane === BACKLOG;
     $('edQueue').checked = !t.pinned;
     $('edProgRow').hidden = t.kind !== 'estimate';
@@ -1999,7 +2020,7 @@ window.__bootTimeline = function(){
   $('edSave').addEventListener('click', () => {
     const t = getTask(editorTaskId);
     if(!t){ closeEditor(); return; }
-    const before = { label: t.label, lane: t.lane, kind: t.kind, start: t.start, end: t.end, endLikely: t.endLikely };
+    const before = { label: t.label, lane: t.lane, kind: t.kind, start: t.start, end: t.end, endLikely: t.endLikely, fixedEnd: !!t.fixedEnd };
     const name = $('edName').value.trim();
     if(name && name !== t.label){ t.label = name; touch(t, 'label'); }
     const start = fromDateInput($('edStart').value);
@@ -2067,6 +2088,14 @@ window.__bootTimeline = function(){
       }
       edPulled = null;
     }
+    const desc = $('edDesc').value.trim();
+    if((t.description || '') !== desc){ if(desc) t.description = desc; else delete t.description; touch(t, 'meta'); }
+    if((t.type || 'feature') !== edType){ if(edType === 'feature') delete t.type; else t.type = edType; touch(t, 'meta'); }
+    const areas = AREAS.filter(a => edAreas.has(a));
+    if((t.areas || []).join(';') !== areas.join(';')){ if(areas.length) t.areas = areas; else delete t.areas; touch(t, 'meta'); }
+    const fixed = $('edFixed').checked;
+    if(!!t.fixedEnd !== fixed){ if(fixed) t.fixedEnd = true; else delete t.fixedEnd; touch(t, 'tid'); }
+    if(before.fixedEnd && t.end > before.end + 1e-9) pendingNote.reasonCode = 'ekstern';   // en fast dato flyttes bare av verden utenfor
     const keep = [...document.querySelectorAll('#edDeps .depchip')].map(c => c.dataset.id);
     if(keep.length !== t.deps.length){ t.deps = t.deps.filter(d => keep.includes(d)); touch(t, 'deps'); }
     const newLane = $('edLane').value;
