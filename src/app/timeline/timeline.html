@@ -200,6 +200,9 @@
   .chip.st-rod{background:var(--bad-bg);color:var(--bad-fg)}
   .chip.sig{outline:1px dashed currentColor;outline-offset:-1px}
   .chip.pinned{background:var(--text);color:var(--surface)}
+  .inv-list{margin:0 0 14px;padding-left:18px;font-size:12px}.inv-list li{margin:3px 0}.inv-list ul{padding-left:16px;margin:2px 0}
+  .inv-big{font-size:34px;font-weight:700;margin:4px 0;color:var(--text)}
+  #invBody h3{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--text-3);margin:14px 0 6px}
   .legend .mix label{display:inline-flex;gap:6px;align-items:center;font-size:11px;color:var(--text-3)}
   .legend .mix select{font-size:11px;padding:1px 4px}
   .lane-label .add-feature{
@@ -461,6 +464,7 @@
     <button id="adoRefreshBtn" hidden title="Les tilbake fra ADO: stories, poeng, sprint og det som er lukket">Oppdater fra ADO</button>
     <button id="exportBtn">Eksporter (JSON)</button>
     <button id="histBtn" title="Hva har flyttet seg, og hvorfor">Historikk<span class="count" id="histBadge" hidden></span></button>
+    <button id="investorBtn" hidden title="Planen nå, gjennomføringsevne og målopnåelse – tallene investorene spør om">Investorer</button>
     <button id="helpBtn">Hjelp</button>
     <button class="primary" id="addEpicBtn">＋ Epic</button>
   </div>
@@ -602,6 +606,16 @@
   </div>
   <div class="drawer-body" id="histList"></div>
   <div class="drawer-foot"><button id="histMore">Last flere</button></div>
+</aside>
+
+<aside class="drawer" id="invDrawer" hidden>
+  <div class="drawer-head">
+    <h2>Investorer</h2>
+    <span class="md" id="invWindow"></span>
+    <button class="x" id="invClose" title="Lukk">✕</button>
+  </div>
+  <div class="drawer-body" id="invBody"></div>
+  <div class="drawer-foot"><button id="invExport" title="Last ned som markdown">Eksporter (markdown)</button> <button id="invSlide" title="Åpner ett lysbilde (1280×720) i ny fane">Lysbilde</button></div>
 </aside>
 
 <!-- feature-editor -->
@@ -2162,6 +2176,7 @@ window.__bootTimeline = function(){
       $('baselineBtn').hidden = !canWrite;   // lesere kan sammenligne, ikke merke baseliner
       $('registerBtn').hidden = !canWrite;
       $('adoRefreshBtn').hidden = !canWrite;
+      $('investorBtn').hidden = false;   // tallene er for alle som er logget inn
       $('mixField').hidden = !canWrite;
       whoami.textContent = myName || '';
       refreshHistoryBadge();
@@ -2358,6 +2373,41 @@ window.__bootTimeline = function(){
     state.sprintGoals[cur.name] = { text: text.trim(), at: new Date().toISOString() };
     save(); renderSprintGoal();
   });
+
+  /* ================== investorer: planen nå, gjennomføringsevne, målopnåelse (R6) ================== */
+  let invData = null;
+  const invDrawer = $('invDrawer');
+  function renderInvestor(d){
+    const day = s => fmtDate(new Date(s));
+    const plan = d.plan.length
+      ? '<ul class="inv-list">' + d.plan.map(p => '<li><b>' + esc(p.name) + '</b>: ' + esc([p.colour, p.metric, p.goal, p.window].filter(Boolean).join(' · ')) + '</li>').join('') + '</ul>'
+      : '<div class="empty">Ingen aktive epics.</div>';
+    const dl = d.delivery, free = dl.delivered - dl.withCommitment;
+    const delivery = '<div class="inv-big">' + esc(dl.ratio === null ? '–' : Math.round(dl.ratio * 100) + ' %') + '</div>' +
+      '<div class="md">' + esc(dl.inside + ' av ' + dl.withCommitment + ' levert innenfor lovet spenn' + (free ? ' · ' + free + ' levert uten lovet spenn' : '')) + '</div>' +
+      (dl.items.length ? '<ul class="inv-list">' + dl.items.map(i => '<li>' + esc(i.label) + ': levert ' + esc(day(i.deliveredAt)) +
+        (i.committedEnd ? ', lovet senest ' + esc(day(i.committedEnd)) + (i.inside ? ' – innenfor' : ' – utenfor') : ' – uten lovet spenn') + '</li>').join('') + '</ul>' : '');
+    const g = d.goals;
+    const goals = '<div class="md">' + esc('nådd ' + g.counts['nådd'] + ' · ikke nådd ' + g.counts['ikke nådd'] + ' · endret ' + g.counts.endret) + '</div>' +
+      (g.epics.length ? '<ul class="inv-list">' + g.epics.map(e => '<li><b>' + esc(e.name) + '</b>: ' + esc((e.outcome || 'uten utfall') + (e.closedReason ? ' – ' + e.closedReason : '') + (e.closedAt ? ' (' + day(e.closedAt) + ')' : '')) +
+        (e.reasons.length ? '<ul>' + e.reasons.map(r => '<li class="md">' + esc(r) + '</li>').join('') + '</ul>' : '') + '</li>').join('') + '</ul>' : '<div class="empty">Ingen avsluttede epics.</div>');
+    $('invBody').innerHTML = '<h3>Planen nå</h3>' + plan + '<h3>Gjennomføringsevne</h3>' + delivery + '<h3>Målopnåelse</h3>' + goals;
+    $('invWindow').textContent = 'Leveranser ' + day(d.window.since) + ' – ' + day(d.window.until);
+  }
+  async function openInvestor(){
+    invDrawer.hidden = false;
+    $('invBody').innerHTML = '<div class="empty">Henter tallene…</div>';
+    try{
+      const r = await fetch('api/timeline-investor', {cache:'no-store'});
+      const j = await r.json();
+      if(!r.ok) throw new Error(j.message || 'HTTP ' + r.status);
+      invData = j; renderInvestor(j);
+    }catch(e){ $('invBody').innerHTML = '<div class="empty">Fikk ikke hentet tallene: ' + esc(e.message) + '</div>'; }
+  }
+  $('investorBtn').addEventListener('click', openInvestor);
+  $('invClose').addEventListener('click', () => { invDrawer.hidden = true; });
+  $('invExport').addEventListener('click', () => { if(invData) downloadFile('tidslinjen-investorer-' + new Date().toISOString().slice(0, 10) + '.md', invData.markdown, 'text/markdown'); });
+  $('invSlide').addEventListener('click', () => { window.open('api/timeline-investor?format=html', '_blank', 'noopener'); });
 
   async function pollTick(){
     if(!HOSTED || !serverReady) return;
