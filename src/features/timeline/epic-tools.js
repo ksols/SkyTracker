@@ -120,6 +120,7 @@ function normalizePlan(plan) {
     if (!FEATURE_TYPES.includes(t.type)) delete t.type;   // R9: feature · teknisk · vedlikehold
     const areas = normalizeAreas(t.areas); if (areas.length) t.areas = areas; else delete t.areas;
     if (t.fixedEnd) t.fixedEnd = true; else delete t.fixedEnd;   // a hard date: the queue never moves it
+    if (typeof t.cardId !== "string" || !t.cardId) delete t.cardId;   // the old board's card this came from (R9 import, once)
     // progress: points (ADO or typed) or a percent; the source says who wrote it
     if (t.progress && typeof t.progress === "object") {
       const pr = t.progress, out = {};

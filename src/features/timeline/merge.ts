@@ -16,7 +16,7 @@ export const GROUP_PROPS: Record<TaskFieldGroup, string[]> = {
   tid: ["start", "end", "endLikely", "sizeClass", "fixedEnd"],
   label: ["label"],
   deps: ["deps"],
-  meta: ["lane", "kind", "adoId", "order", "assignee", "specPath", "pinned", "description", "type", "areas"],
+  meta: ["lane", "kind", "adoId", "order", "assignee", "specPath", "pinned", "description", "type", "areas", "cardId"],
   state: ["state", "committedRange", "activatedAt", "deliveredAt", "startedAt"],
   est: ["raw", "bufferWeeks"],
   ado: ["ado"],
@@ -87,6 +87,8 @@ export type PlanTask = {
   areas?: string[];
   /** R9: a hard date; the queue never moves it, moving its end asks with reason «ekstern». */
   fixedEnd?: boolean;
+  /** R9: the old board's card this feature was imported from; keeps the import idempotent. */
+  cardId?: string;
   /** The planner dragged it below the queue's floor: it keeps its place and still counts for the ones after it. */
   pinned?: boolean;
   ado?: TaskAdo;
