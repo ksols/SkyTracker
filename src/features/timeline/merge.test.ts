@@ -118,3 +118,13 @@ describe("the ado group and the sprint keys", () => {
     expect(g).toEqual({ "Sprint 71": { text: "a", at: "2026-10-09T10:00:00.000Z" }, "Sprint 70": { text: "x", at: "2026-09-21T00:00:00.000Z" } });
   });
 });
+
+describe("the progress group", () => {
+  it("progress is its own field group: a higher fv.progress wins, and a page without the field cannot drop a server-written one", () => {
+    const stored = plan([task({ fv: { tid: 1, progress: 1 }, progress: { pointsDone: 3, pointsTotal: 8, at: "a", source: "ado" } })]);
+    const fresher = plan([task({ fv: { tid: 1, progress: 2 }, progress: { pct: 70, at: "b", source: "manuell" } })]);
+    expect(mergePlans(stored, fresher).tasks[0].progress).toEqual({ pct: 70, at: "b", source: "manuell" });
+    const unaware = plan([task({ fv: { tid: 2 } })]);
+    expect(mergePlans(stored, unaware).tasks[0].progress).toEqual({ pointsDone: 3, pointsTotal: 8, at: "a", source: "ado" });
+  });
+});

@@ -62,6 +62,7 @@ const SECTIONS: [string, PlanEvent["code"][]][] = [
   ["Flyttet", ["feature.flyttet", "feature.utredning-slutt"]],
   ["Prioritet", ["epic.prioritet", "feature.prioritet", "feature.epic"]],
   ["Tilstand", ["epic.tilstand", "feature.tilstand", "feature.eier"]],
+  ["Fremdrift", ["feature.fremdrift"]],
   ["Nye og fjernet", ["epic.ny", "epic.slettet", "feature.ny", "feature.slettet", "feature.utredning"]],
   ["ADO", ["ado.push", "ado.konflikt", "ado.lest", "feature.ado", "epic.ado"]],
   ["Sprintmål", ["plan.sprintmaal"]],

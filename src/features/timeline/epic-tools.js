@@ -85,6 +85,16 @@ function normalizePlan(plan) {
     }
     if (num(t.adoId, null) === null) delete t.adoId;
     if (typeof t.specPath !== "string" || !/^[A-Za-z0-9._-]+$/.test(t.specPath)) delete t.specPath;   // a folder under spec/ in Skytale.Specs
+    // progress: points (ADO or typed) or a percent; the source says who wrote it
+    if (t.progress && typeof t.progress === "object") {
+      const pr = t.progress, out = {};
+      if (num(pr.pointsTotal, 0) > 0) { out.pointsTotal = num(pr.pointsTotal, 0); out.pointsDone = Math.max(0, Math.min(out.pointsTotal, num(pr.pointsDone, 0))); }
+      else if (num(pr.pct, null) !== null && pr.pct >= 0 && pr.pct <= 100) out.pct = pr.pct;
+      if (typeof pr.sprint === "string" && pr.sprint) out.sprint = pr.sprint;
+      out.at = typeof pr.at === "string" ? pr.at : new Date().toISOString();
+      out.source = pr.source === "ado" ? "ado" : "manuell";
+      if (progressFraction(out) === null) delete t.progress; else t.progress = out;
+    } else delete t.progress;
     if (typeof t.assignee !== "string" || !t.assignee.trim()) delete t.assignee; else t.assignee = t.assignee.trim();
     if (num(t.bufferWeeks, null) === null || t.bufferWeeks <= 0) delete t.bufferWeeks; else t.bufferWeeks = Math.round(t.bufferWeeks);
     if (!t.raw || typeof t.raw !== "object" || num(t.raw.likely, null) === null || num(t.raw.late, null) === null) delete t.raw;
@@ -302,6 +312,30 @@ function exampleSeed(prev) {
   return p;
 }
 
+/* ---------- progress: the v3.1 rule as a second signal (never the epic colour) ---------- */
+function progressFraction(p) {
+  if (!p || typeof p !== "object") return null;
+  if (num(p.pointsTotal, 0) > 0) return Math.max(0, Math.min(1, num(p.pointsDone, 0) / p.pointsTotal));
+  if (num(p.pct, null) !== null) return Math.max(0, Math.min(1, p.pct / 100));
+  return null;
+}
+function progressSignal(t, today) {   // green: progress keeps up with the time spent in the likely window (10 % slack); yellow: behind; red: the late end passed
+  if (t.kind !== "estimate" || t.state === "levert") return null;
+  const done = progressFraction(t.progress);
+  if (done === null || today < t.start - 1e-9) return null;
+  const span = Math.max(WEEK, t.endLikely - t.start);
+  const elapsed = Math.max(0, Math.min(1, (today - t.start) / span));
+  const code = today > t.end + 1e-9 && done < 1 ? "rod" : done + 0.1 >= elapsed ? "gronn" : "gul";
+  return { code, done, elapsed };
+}
+const SIG_RANK = { gronn: 0, gul: 1, rod: 2 };
+function epicProgressSignal(plan, laneKey, today) {
+  let worst = null;
+  plan.tasks.filter((t) => t.lane === laneKey).forEach((t) => { const s = progressSignal(t, today); if (s && (worst === null || SIG_RANK[s.code] > SIG_RANK[worst])) worst = s.code; });
+  return worst;
+}
+function progressText(t, s) { return "fremdrift " + Math.round(s.done * 100) + " % · tid " + Math.round(s.elapsed * 100) + " %"; }
+
 /* ---------- sprints: from ADO's iterations, cached in plan.sprints ---------- */
 function dayKey(d) { return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0"); }
 function currentSprint(sprints, date) {
@@ -328,5 +362,6 @@ if (typeof module !== "undefined") {
     isoWeek, weekSpan, windowLabel, epicWindowText, discoveryOverdue,
     shelfTasks, epicCounts, sizeClass, bufferLabel, rawLabel, previewPlacement,
     dayKey, currentSprint, sprintDay, sprintLabel,
+    progressFraction, progressSignal, epicProgressSignal, progressText,
   };
 }

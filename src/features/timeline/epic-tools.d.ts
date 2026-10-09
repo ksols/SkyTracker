@@ -1,5 +1,9 @@
 import type { Plan, PlanLane, PlanTask, Sprint } from "./merge";
 
+export declare function progressFraction(p: PlanTask["progress"] | undefined | null): number | null;
+export declare function progressSignal(task: PlanTask, todayUnit: number): { code: "gronn" | "gul" | "rod"; done: number; elapsed: number } | null;
+export declare function epicProgressSignal(plan: Plan, laneKey: string, todayUnit: number): "gronn" | "gul" | "rod" | null;
+export declare function progressText(task: PlanTask, signal: { done: number; elapsed: number }): string;
 export declare function dayKey(d: Date): string;
 export declare function currentSprint(sprints: Sprint[] | undefined | null, date: Date): Sprint | null;
 export declare function sprintDay(sprint: Sprint, date: Date): number;

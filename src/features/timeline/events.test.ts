@@ -203,3 +203,16 @@ describe("the mirror's events", () => {
       .toEqual({ targetType: "feature", targetId: "k", targetLabel: "Kapasitet", laneKey: "l", code: "ado.push", cause: "ado", summary: "Pushet til ADO #4791 (Feature opprettet)", after: { adoId: 4791 } });
   });
 });
+
+describe("feature.fremdrift", () => {
+  it("points, percent, nothing when equal, cause ado when ADO wrote it", () => {
+    const b = one([lane("x")], [est({ state: "aktiv" })]);
+    const pts = one([lane("x")], [est({ state: "aktiv", progress: { pointsDone: 13, pointsTotal: 21, at: "t", source: "manuell" } })]);
+    expect(diffPlans(b, pts).map((e) => [e.code, e.cause, e.summary])).toEqual([["feature.fremdrift", "bruker", "Fremdrift: 13 av 21 poeng"]]);
+    const pct = one([lane("x")], [est({ state: "aktiv", progress: { pct: 60, at: "t", source: "manuell" } })]);
+    expect(diffPlans(b, pct).map((e) => e.summary)).toEqual(["Fremdrift: 60 %"]);
+    expect(diffPlans(pts, one([lane("x")], [est({ state: "aktiv", progress: { pointsDone: 13, pointsTotal: 21, at: "later", source: "manuell" } })]))).toEqual([]);
+    const ado = one([lane("x")], [est({ state: "aktiv", progress: { pointsDone: 5, pointsTotal: 21, sprint: "Sprint 71", at: "t", source: "ado" } })]);
+    expect(diffPlans(pts, ado).map((e) => [e.code, e.cause])).toEqual([["feature.fremdrift", "ado"]]);
+  });
+});

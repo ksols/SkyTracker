@@ -8,8 +8,8 @@
 // tombstones (`deleted[taskId] = version`, `deletedLanes[key] = version`):
 // a tombstone wins over an item whose version hasn't been bumped past it.
 
-export type TaskFieldGroup = "tid" | "label" | "deps" | "meta" | "state" | "est" | "ado";
-export const TASK_FIELD_GROUPS: TaskFieldGroup[] = ["tid", "label", "deps", "meta", "state", "est", "ado"];
+export type TaskFieldGroup = "tid" | "label" | "deps" | "meta" | "state" | "est" | "ado" | "progress";
+export const TASK_FIELD_GROUPS: TaskFieldGroup[] = ["tid", "label", "deps", "meta", "state", "est", "ado", "progress"];
 
 // Which task properties belong to which field group. `ado` is written by the server (push/refresh), never by the page.
 export const GROUP_PROPS: Record<TaskFieldGroup, string[]> = {
@@ -20,6 +20,7 @@ export const GROUP_PROPS: Record<TaskFieldGroup, string[]> = {
   state: ["state", "committedRange", "activatedAt", "deliveredAt"],
   est: ["raw", "bufferWeeks"],
   ado: ["ado"],
+  progress: ["progress"],
 };
 
 export type Sprint = { name: string; path: string; start: string; finish: string };
@@ -49,6 +50,8 @@ export type PlanTask = {
   deliveredAt?: string;
   specPath?: string;
   ado?: TaskAdo;
+  /** Typed on day 10 (`manuell`) or read from ADO's stories (`ado`): points, or a percent when no points exist. */
+  progress?: { pointsDone?: number; pointsTotal?: number; pct?: number; sprint?: string | null; at: string; source: "manuell" | "ado" };
   fv?: Partial<Record<TaskFieldGroup, number>>;
   [key: string]: unknown;
 };

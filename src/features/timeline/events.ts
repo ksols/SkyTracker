@@ -12,6 +12,7 @@ export const EVENT_CODES = [
   "feature.tilstand", "feature.eier", "feature.buffer", "feature.raw", "epic.tilstand",
   "plan.seed", "plan.begrunnelse", "plan.baseline",
   "feature.estimat-hentet", "plan.sprintmaal", "ado.push", "ado.konflikt", "ado.lest",
+  "feature.fremdrift",
 ] as const;
 export type EventCode = (typeof EVENT_CODES)[number];
 export type Cause = "bruker" | "avhengighet" | "ado" | "system";
@@ -206,6 +207,11 @@ export function diffPlans(before: Plan, after: Plan, opts: DiffOptions = {}): Pl
       const sameBuf = (b.bufferWeeks ?? 0) === (t.bufferWeeks ?? 0);
       ev.push({ ...base, code: "feature.estimat-hentet", before: rawOf(b), after: rawOf(t), summary: "Estimat hentet fra utredningen: " + span(t.raw) + (sameBuf && t.bufferWeeks ? " (uendret buffer " + wk(t.bufferWeeks) + ")" : "") });
     } else if (rawChanged && t.raw) ev.push({ ...base, code: "feature.raw", before: rawOf(b), after: rawOf(t), summary: "Utredningen sa " + span(t.raw) + " uker" });
+    const pb = b.progress, pa = t.progress;
+    const pkey = (p?: PlanTask["progress"]) => (p ? JSON.stringify([p.pointsDone ?? null, p.pointsTotal ?? null, p.pct ?? null]) : null);
+    const pval = (p: NonNullable<PlanTask["progress"]>) => ({ pointsDone: p.pointsDone ?? null, pointsTotal: p.pointsTotal ?? null, pct: p.pct ?? null });
+    if (pkey(pb) !== pkey(pa) && pa) ev.push({ ...base, code: "feature.fremdrift", before: pb ? pval(pb) : null, after: pval(pa), cause: pa.source === "ado" ? "ado" : dc,
+      summary: (pa.pointsTotal ?? 0) > 0 ? `Fremdrift: ${pa.pointsDone ?? 0} av ${pa.pointsTotal} poeng` : `Fremdrift: ${pa.pct ?? 0} %` });
     const bd = b.deps ?? [], ad = t.deps ?? [];
     for (const id of ad) if (!bd.includes(id)) ev.push({ ...base, code: "feature.avhengighet", after: id, summary: `Blokkeres nå av ${q(label(id))}` });
     for (const id of bd) if (!ad.includes(id)) ev.push({ ...base, code: "feature.avhengighet", before: id, summary: `Avhengighet til ${q(label(id))} fjernet` });

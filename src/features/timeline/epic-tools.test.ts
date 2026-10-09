@@ -4,7 +4,7 @@ import {
   rangeLabel, goalText, exampleSeed, STATUS_LABEL,
   isoWeek, weekSpan, windowLabel, epicWindowText, discoveryOverdue,
   shelfTasks, epicCounts, sizeClass, bufferLabel, rawLabel, previewPlacement,
-  currentSprint, sprintDay, sprintLabel,
+  currentSprint, sprintDay, sprintLabel, progressFraction, progressSignal, epicProgressSignal, progressText,
 } from "./epic-tools.js";
 import type { Plan, PlanTask } from "./merge";
 
@@ -297,5 +297,45 @@ describe("sprints", () => {
     expect(p.sprints!.items.length).toBe(2);
     expect(Object.keys(p.sprintGoals!)).toEqual(["Sprint 71"]);
     expect(normalizePlan({ lanes: [], tasks: [], sprints: "nope", sprintGoals: 3 })).not.toHaveProperty("sprints");
+  });
+});
+
+describe("progress: the second signal", () => {
+  const E = (over: Partial<PlanTask>): PlanTask => est({ start: 4, endLikely: 6, end: 7, state: "aktiv", ...over });   // likely window = 2 months
+  it("progressFraction: points first, then percent, else null", () => {
+    expect(progressFraction({ pointsDone: 13, pointsTotal: 21, at: "", source: "manuell" })).toBeCloseTo(13 / 21);
+    expect(progressFraction({ pct: 60, at: "", source: "manuell" })).toBe(0.6);
+    expect(progressFraction({ pointsDone: 0, pointsTotal: 0, at: "", source: "manuell" })).toBeNull();
+    expect(progressFraction(undefined)).toBeNull();
+  });
+  it("green when progress keeps up with time (10 % slack), yellow when behind, red after the late end while not delivered", () => {
+    expect(progressSignal(E({ progress: { pct: 50, at: "", source: "manuell" } }), 5)).toMatchObject({ code: "gronn", done: 0.5, elapsed: 0.5 });
+    expect(progressSignal(E({ progress: { pct: 45, at: "", source: "manuell" } }), 5)!.code).toBe("gronn");
+    expect(progressSignal(E({ progress: { pct: 30, at: "", source: "manuell" } }), 5)!.code).toBe("gul");
+    expect(progressSignal(E({ progress: { pct: 30, at: "", source: "manuell" } }), 7.5)!.code).toBe("rod");
+    expect(progressSignal(E({ progress: { pct: 100, at: "", source: "manuell" } }), 7.5)!.code).toBe("gronn");
+  });
+  it("no signal without progress, before the start, for discoveries, for delivered features", () => {
+    expect(progressSignal(E({}), 5)).toBeNull();
+    expect(progressSignal(E({ progress: { pct: 50, at: "", source: "manuell" } }), 3)).toBeNull();
+    expect(progressSignal(disc({ progress: { pct: 50, at: "", source: "manuell" } }), 2.5)).toBeNull();
+    expect(progressSignal(E({ state: "levert", deliveredAt: "2026-12-03", progress: { pct: 50, at: "", source: "manuell" } }), 7.5)).toBeNull();
+  });
+  it("the epic's signal is the worst of its features; null when none has progress", () => {
+    const p = normalizePlan({ lanes: [{ key: "x", name: "X" }], tasks: [E({ id: "a", progress: { pct: 50, at: "", source: "manuell" } }), E({ id: "b", progress: { pct: 10, at: "", source: "manuell" } }), E({ id: "c" })] });
+    expect(epicProgressSignal(p, "x", 5)).toBe("gul");
+    expect(epicProgressSignal(normalizePlan({ lanes: [{ key: "x", name: "X" }], tasks: [E({ id: "c" })] }), "x", 5)).toBeNull();
+  });
+  it("progressText and the normaliser", () => {
+    const t = E({ progress: { pointsDone: 13, pointsTotal: 21, at: "", source: "manuell" } });
+    expect(progressText(t, progressSignal(t, 5)!)).toBe("fremdrift 62 % · tid 50 %");
+    const p = normalizePlan({ lanes: [{ key: "x", name: "X" }], tasks: [
+      E({ id: "ok", progress: { pct: 60, at: "2026-10-09", source: "ado" } }),
+      E({ id: "bad", progress: { pct: 140, at: "2026-10-09", source: "manuell" } }),
+      E({ id: "src", progress: { pointsDone: 2, pointsTotal: 5, at: "x", source: "nope" as never } }),
+    ] });
+    expect(p.tasks.find((t) => t.id === "ok")!.progress!.source).toBe("ado");
+    expect(p.tasks.find((t) => t.id === "bad")!.progress).toBeUndefined();
+    expect(p.tasks.find((t) => t.id === "src")!.progress!.source).toBe("manuell");
   });
 });
