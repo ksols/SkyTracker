@@ -13,10 +13,10 @@ export const TASK_FIELD_GROUPS: TaskFieldGroup[] = ["tid", "label", "deps", "met
 
 // Which task properties belong to which field group. `ado` is written by the server (push/refresh), never by the page.
 export const GROUP_PROPS: Record<TaskFieldGroup, string[]> = {
-  tid: ["start", "end", "endLikely", "sizeClass"],
+  tid: ["start", "end", "endLikely", "sizeClass", "fixedEnd"],
   label: ["label"],
   deps: ["deps"],
-  meta: ["lane", "kind", "adoId", "order", "assignee", "specPath", "pinned", "description"],
+  meta: ["lane", "kind", "adoId", "order", "assignee", "specPath", "pinned", "description", "type", "areas"],
   state: ["state", "committedRange", "activatedAt", "deliveredAt", "startedAt"],
   est: ["raw", "bufferWeeks"],
   ado: ["ado"],
@@ -81,6 +81,12 @@ export type PlanTask = {
   sizeClass?: "S" | "M" | "L" | "XL";
   /** Free text: imported from ADO or typed; pushed as the ADO description instead of the generated lines. */
   description?: string;
+  /** R9, from the old board: what kind of work (investor split product vs. maintenance). */
+  type?: "feature" | "teknisk" | "vedlikehold";
+  /** R9: Backend · Frontend · iOS · Android · Desktop · Admin, pushed as ADO tags. */
+  areas?: string[];
+  /** R9: a hard date; the queue never moves it, moving its end asks with reason «ekstern». */
+  fixedEnd?: boolean;
   /** The planner dragged it below the queue's floor: it keeps its place and still counts for the ones after it. */
   pinned?: boolean;
   ado?: TaskAdo;

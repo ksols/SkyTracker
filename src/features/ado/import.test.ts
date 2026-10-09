@@ -77,7 +77,7 @@ describe("listImportable", () => {
     const t = out.find((x) => x.id === 4566)!;
     expect(t.description).toBe("Tråder i kanaler.\nSvar på meldinger.");
     expect(t.assignedEmail).toBe("thm@skytale.no");
-    expect(t.snapshot).toEqual({ title: "Message threading and replies", description: adoValue(ITEMS[4566], "description"), state: "Discovery", targetDate: "2026-11-27", startDate: "2026-11-02" });
+    expect(t.snapshot).toEqual({ title: "Message threading and replies", description: adoValue(ITEMS[4566], "description"), state: "Discovery", targetDate: "2026-11-27", startDate: "2026-11-02", tags: null });
   });
 });
 

@@ -159,3 +159,14 @@ describe("mergePlans - wishes (the intake)", () => {
     expect(m.wishes).toEqual([]);
   });
 });
+
+describe("mergePlans - the four attributes (R9)", () => {
+  it("type and areas ride with meta, the fixed end with tid", () => {
+    const stored = plan([task({ id: "a", type: "feature", areas: ["Backend"], fv: { meta: 1, tid: 2 }, fixedEnd: true } as Partial<PlanTask>)]);
+    const incoming = plan([task({ id: "a", type: "teknisk", areas: ["iOS"], fv: { meta: 2, tid: 1 } } as Partial<PlanTask>)]);
+    const m = mergePlans(stored, incoming).tasks[0];
+    expect(m.type).toBe("teknisk");
+    expect(m.areas).toEqual(["iOS"]);
+    expect(m.fixedEnd).toBe(true);
+  });
+});

@@ -5,7 +5,7 @@ import {
   isoWeek, weekSpan, windowLabel, epicWindowText, discoveryOverdue,
   shelfTasks, epicCounts, sizeClass, bufferLabel, rawLabel, previewPlacement,
   currentSprint, sprintDay, sprintLabel, progressFraction, progressSignal, epicProgressSignal, progressText,
-  resolveQueue, queueFloor, capacityFactor, elapsedWeeks, wishesByStatus, WISH_STATUS_LABEL, WISH_SOURCE_LABEL, sizeClassDerived, sizeClassText,
+  resolveQueue, queueFloor, capacityFactor, elapsedWeeks, wishesByStatus, WISH_STATUS_LABEL, WISH_SOURCE_LABEL, sizeClassDerived, sizeClassText, FEATURE_TYPE_LABEL, AREAS,
 } from "./epic-tools.js";
 import type { Plan, PlanTask } from "./merge";
 
@@ -499,5 +499,33 @@ describe("R8: a discovery occupies its owner", () => {
     const p = mk([F({ assignee: "KSO" }), D({ deps: ["f"], assignee: undefined })]);
     expect(resolveQueue(p)).toEqual([{ id: "d", by: "f", kind: "dep" }]);
     expect(startOf(p, "d")).toBeCloseTo(S + 1.5);
+  });
+});
+
+describe("R9: the four attributes from the old board", () => {
+  it("normalises type, areas (canonical names, deduplicated, in order) and the fixed end", () => {
+    const p = normalizePlan({ lanes: [{ key: "x", name: "X" }], tasks: [
+      est({ type: "teknisk", areas: ["frontend", "Backend", "frontend", "Nope", "ios"], fixedEnd: 1 } as unknown as Partial<PlanTask>),
+      est({ id: "g", type: "nope", areas: "x", fixedEnd: false } as unknown as Partial<PlanTask>),
+    ] });
+    expect(p.tasks[0].type).toBe("teknisk");
+    expect(p.tasks[0].areas).toEqual(["Backend", "Frontend", "iOS"]);
+    expect(p.tasks[0].fixedEnd).toBe(true);
+    expect(p.tasks[1].type).toBeUndefined();
+    expect(p.tasks[1].areas).toBeUndefined();
+    expect(p.tasks[1].fixedEnd).toBeUndefined();
+    expect(FEATURE_TYPE_LABEL.vedlikehold).toBe("Vedlikehold");
+    expect(AREAS).toEqual(["Backend", "Frontend", "iOS", "Android", "Desktop", "Admin"]);
+  });
+  it("a fixed-end feature is never shifted by the queue, yet the owner's next feature waits for it", () => {
+    const S = 4;
+    const p = normalizePlan({ lanes: [{ key: "x", name: "X", priority: 1 }], tasks: [
+      est({ id: "a", lane: "x", start: S, endLikely: S + 1, end: S + 1.5, state: "aktiv", assignee: "THM", order: 1 }),
+      est({ id: "b", lane: "x", start: S + 0.5, endLikely: S + 1.5, end: S + 2, state: "aktiv", assignee: "THM", order: 2, fixedEnd: true } as Partial<PlanTask>),
+      est({ id: "c", lane: "x", start: S, endLikely: S + 1, end: S + 1.5, state: "aktiv", assignee: "THM", order: 3 }),
+    ] });
+    expect(resolveQueue(p)).toEqual([{ id: "c", by: "b", kind: "queue" }]);
+    expect(p.tasks.find((t) => t.id === "b")!.start).toBeCloseTo(S + 0.5);
+    expect(p.tasks.find((t) => t.id === "c")!.start).toBeCloseTo(S + 2);
   });
 });

@@ -287,3 +287,19 @@ describe("diffPlans: a queue push behind a discovery", () => {
     expect(ev[0].causeRef).toBe("d");
   });
 });
+
+describe("diffPlans: the four attributes (R9)", () => {
+  it("logs description, type, areas and the fixed end, each in words", () => {
+    const b = one([lane("x")], [est({ id: "f", description: "Gammel", type: "feature", areas: ["Backend"] } as Partial<PlanTask>)]);
+    const a = one([lane("x")], [est({ id: "f", description: "Ny tekst", type: "teknisk", areas: ["Backend", "iOS"], fixedEnd: true } as Partial<PlanTask>)]);
+    const ev = diffPlans(b, a);
+    expect(ev.map((e) => [e.code, e.summary])).toEqual([
+      ["feature.beskrivelse", "Beskrivelse endret"],
+      ["feature.type", "Type: Feature → Teknisk"],
+      ["feature.flater", "Flater: Backend, iOS"],
+      ["feature.fastdato", "Fast dato: på"],
+    ]);
+    expect(ev.every((e) => !needsReason(e))).toBe(true);
+    expect(diffPlans(a, b).map((e) => e.summary)).toContain("Fast dato: av");
+  });
+});

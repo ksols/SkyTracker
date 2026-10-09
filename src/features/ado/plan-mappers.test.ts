@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { dateToUnit } from "@/features/timeline/epic-tools.js";
 import type { Plan } from "@/features/timeline/merge";
 import type { AdoWorkItem } from "./client";
-import { epicFields, featureFields, fieldPatch, planFieldWrites, relationPatch, snapshotAfter, storyFields, unitToAdoDate, type Fields } from "./plan-mappers";
+import { adoValue, epicFields, featureFields, fieldPatch, planFieldWrites, relationPatch, snapshotAfter, storyFields, unitToAdoDate, type Fields } from "./plan-mappers";
 
 const D = (y: number, m: number, d: number) => dateToUnit(new Date(y, m - 1, d));
 const plan: Plan = {
@@ -109,5 +109,20 @@ describe("review: what ADO hands back", () => {
     const ours: Fields = { description: "<p>Planlagt i Tidslinjen (SkyTracker) under epicen «Telenor & co».</p><p>Spenn: 4–6 uker + 1 uke buffer → uke 49–51.</p>" };
     const cur = item({ "System.Description": "<div>Planlagt&nbsp;i Tidslinjen (SkyTracker) under epicen &#171;Telenor &amp; co&#187;.</div><div>Spenn: 4&#8211;6 uker + 1 uke buffer &#8594; uke 49&#8211;51.</div>" });
     expect(planFieldWrites(ours, cur, { description: "x" })).toEqual({ writes: {}, conflicts: [] });
+  });
+});
+
+describe("areas as ADO tags (R9)", () => {
+  it("areas push as System.Tags; ADO's tags compare in canonical order and case; no tags → nothing written", () => {
+    const t = { ...plan.tasks[0], areas: ["iOS", "Backend"] };
+    const f = featureFields(plan, t);
+    expect(f.tags).toBe("Backend; iOS");
+    expect(featureFields(plan, plan.tasks[0]).tags).toBeNull();
+    expect(adoValue(item({ "System.Tags": "ios; backend " }), "tags")).toBe("Backend; iOS");
+    expect(adoValue(item({}), "tags")).toBeNull();
+    const w = planFieldWrites({ tags: "Backend; iOS" }, item({ "System.Tags": "backend; ios" }), { tags: "Backend; iOS" });
+    expect(w.writes).toEqual({});
+    expect(w.conflicts).toEqual([]);
+    expect(fieldPatch({ tags: "Backend; iOS" })).toEqual([{ op: "add", path: "/fields/System.Tags", value: "Backend; iOS" }]);
   });
 });

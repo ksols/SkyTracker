@@ -14,6 +14,7 @@ export const EVENT_CODES = [
   "feature.estimat-hentet", "plan.sprintmaal", "ado.push", "ado.konflikt", "ado.lest",
   "feature.fremdrift", "feature.ko", "plan.kapasitet",
   "onske.registrert", "onske.besluttet", "onske.slettet",
+  "feature.beskrivelse", "feature.type", "feature.flater", "feature.fastdato",
 ] as const;
 export type EventCode = (typeof EVENT_CODES)[number];
 export type Cause = "bruker" | "avhengighet" | "ado" | "system";
@@ -49,6 +50,7 @@ const near = (a: number | undefined, b: number | undefined) =>
   a === undefined || b === undefined ? a === b : Math.abs(a - b) < 1e-6;
 const date = (u: number) => fmtDate(unitToDate(u));
 const q = (s: string) => "«" + s + "»";
+const typeLabel = (v: string | undefined) => ({ feature: "Feature", teknisk: "Teknisk", vedlikehold: "Vedlikehold" } as Record<string, string>)[v ?? "feature"] ?? v ?? "Feature";
 const n = (count: number, one: string, many: string) => count + " " + (count === 1 ? one : many);
 const span = (r: { likely: number; late: number }) => (r.likely === r.late ? String(r.late) : r.likely + "–" + r.late);
 const rangeWords = (t: PlanTask) => span(rangeWeeks(t)!) + " uker";
@@ -168,6 +170,11 @@ export function diffPlans(before: Plan, after: Plan, opts: DiffOptions = {}): Pl
       continue;
     }
     if (b.label !== t.label) ev.push({ ...base, code: "feature.navn", before: b.label, after: t.label, summary: "Navn: " + q(b.label) + " → " + q(t.label) });
+    // R9: the four attributes from the old board
+    if ((b.description ?? "") !== (t.description ?? "")) ev.push({ ...base, code: "feature.beskrivelse", before: b.description ?? null, after: t.description ?? null, summary: "Beskrivelse endret" });
+    if ((b.type ?? "feature") !== (t.type ?? "feature")) ev.push({ ...base, code: "feature.type", before: b.type ?? "feature", after: t.type ?? "feature", summary: "Type: " + typeLabel(b.type) + " → " + typeLabel(t.type) });
+    if ((b.areas ?? []).join(";") !== (t.areas ?? []).join(";")) ev.push({ ...base, code: "feature.flater", before: b.areas ?? [], after: t.areas ?? [], summary: "Flater: " + ((t.areas ?? []).join(", ") || "ingen") });
+    if (!!b.fixedEnd !== !!t.fixedEnd) ev.push({ ...base, code: "feature.fastdato", before: !!b.fixedEnd, after: !!t.fixedEnd, summary: "Fast dato: " + (t.fixedEnd ? "på" : "av") });
     if (b.lane !== t.lane) ev.push({ ...base, code: "feature.epic", before: b.lane, after: t.lane, summary: `Flyttet fra ${q(laneName(b.lane))} til ${q(laneName(t.lane))}` });
     else if (movedTasks.has(t.id)) {
       const from = taskIdsInLane(before, t.lane).indexOf(t.id) + 1, to = taskIdsInLane(after, t.lane).indexOf(t.id) + 1;

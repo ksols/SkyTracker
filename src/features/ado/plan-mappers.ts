@@ -13,10 +13,18 @@ export const F = {
   targetDate: "Microsoft.VSTS.Scheduling.TargetDate",
   startDate: "Microsoft.VSTS.Scheduling.StartDate",
   assignedTo: "System.AssignedTo",
+  tags: "System.Tags",
 } as const;
-export type OwnedField = "title" | "description" | "state" | "targetDate" | "startDate";
-export const OWNED_FIELDS: OwnedField[] = ["title", "description", "state", "targetDate", "startDate"];
-export const FIELD_LABEL: Record<OwnedField, string> = { title: "Tittel", description: "Beskrivelse", state: "Tilstand", targetDate: "Måldato", startDate: "Startdato" };
+export type OwnedField = "title" | "description" | "state" | "targetDate" | "startDate" | "tags";
+export const OWNED_FIELDS: OwnedField[] = ["title", "description", "state", "targetDate", "startDate", "tags"];
+export const FIELD_LABEL: Record<OwnedField, string> = { title: "Tittel", description: "Beskrivelse", state: "Tilstand", targetDate: "Måldato", startDate: "Startdato", tags: "Flater" };
+/** ADO tags as the snapshot stores them: trimmed, canonical case for the areas we know, sorted, «; »-joined. */
+export const normTags = (v: unknown): string | null => {
+  const canon = new Map(["Backend", "Frontend", "iOS", "Android", "Desktop", "Admin"].map((a) => [a.toLowerCase(), a]));
+  const list = (typeof v === "string" ? v.split(";") : []).map((x) => x.trim()).filter(Boolean).map((x) => canon.get(x.toLowerCase()) ?? x);
+  const uniq = [...new Set(list)].sort((a, b) => a.localeCompare(b, "en", { sensitivity: "base" }));
+  return uniq.length ? uniq.join("; ") : null;
+};
 export type Snapshot = Partial<Record<OwnedField, string | null>>;
 export type Fields = Snapshot & { parentAdoId?: number | null; assignedTo?: string | null };
 export type Conflict = { field: OwnedField; ours: string | null; theirs: string | null };
@@ -87,6 +95,7 @@ export function featureFields(plan: Plan, task: PlanTask): Fields {
     targetDate: unitToAdoDate(task.end),
     startDate: unitToAdoDate(task.start),
     parentAdoId: lane?.adoId ?? null,
+    tags: task.areas?.length ? normTags(task.areas.join("; ")) : null,
   };
 }
 export function storyFields(task: PlanTask, people: Record<string, string>): Fields {
@@ -107,10 +116,11 @@ export function adoValue(item: AdoWorkItem | null, f: OwnedField): string | null
   const v = item.fields[F[f]];
   if (f === "targetDate" || f === "startDate") return adoDay(v);
   if (f === "description") return normHtml(typeof v === "string" ? v : "") || null;
+  if (f === "tags") return normTags(v);
   return typeof v === "string" ? v : null;
 }
 const norm = (f: OwnedField, v: string | null | undefined): string | null =>
-  v === undefined || v === null ? null : f === "targetDate" || f === "startDate" ? adoDay(v) : f === "description" ? normHtml(v) || null : v;
+  v === undefined || v === null ? null : f === "targetDate" || f === "startDate" ? adoDay(v) : f === "description" ? normHtml(v) || null : f === "tags" ? normTags(v) : v;
 const same = (f: OwnedField, a: string | null | undefined, b: string | null | undefined) => norm(f, a) === norm(f, b);
 
 /** Per field: ours null → never written; equal to ADO → skipped; ADO still holds what we wrote last (or we never

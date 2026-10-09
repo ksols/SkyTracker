@@ -42,6 +42,16 @@ const WISH_SOURCE_LABEL = { "egen-plan": "Egen plan", investor: "Investor", kund
 const WISH_STATUSES = ["ubehandlet", "utred", "senere", "nei"];
 const WISH_STATUS_LABEL = { ubehandlet: "Ubehandlet", utred: "Utred nå", senere: "Senere", nei: "Nei" };
 const SIZE_CLASSES = ["S", "M", "L", "XL"];
+// the four attributes from the old board (R9)
+const FEATURE_TYPES = ["feature", "teknisk", "vedlikehold"];
+const FEATURE_TYPE_LABEL = { feature: "Feature", teknisk: "Teknisk", vedlikehold: "Vedlikehold" };
+const AREAS = ["Backend", "Frontend", "iOS", "Android", "Desktop", "Admin"];
+/** Areas as typed or imported → the canonical names, deduplicated, in the canonical order; [] when none. */
+function normalizeAreas(v) {
+  const list = Array.isArray(v) ? v : typeof v === "string" ? v.split(/[;,]/) : [];
+  const want = new Set(list.filter((x) => typeof x === "string").map((x) => x.trim().toLowerCase()));
+  return AREAS.filter((a) => want.has(a.toLowerCase()));
+}
 const num = (v, fallback) => (typeof v === "number" && isFinite(v) ? v : fallback);
 
 function normalizePlan(plan) {
@@ -107,6 +117,9 @@ function normalizePlan(plan) {
     if (t.pinned) t.pinned = true; else delete t.pinned;   // the planner's override of the queue
     if (!SIZE_CLASSES.includes(t.sizeClass)) delete t.sizeClass;   // the class the forum promised at «Start utredning» (R8)
     if (typeof t.startedAt !== "string" || !t.startedAt) delete t.startedAt;   // when the discovery was started: its place in the owner's queue (R8)
+    if (!FEATURE_TYPES.includes(t.type)) delete t.type;   // R9: feature · teknisk · vedlikehold
+    const areas = normalizeAreas(t.areas); if (areas.length) t.areas = areas; else delete t.areas;
+    if (t.fixedEnd) t.fixedEnd = true; else delete t.fixedEnd;   // a hard date: the queue never moves it
     // progress: points (ADO or typed) or a percent; the source says who wrote it
     if (t.progress && typeof t.progress === "object") {
       const pr = t.progress, out = {};
@@ -237,18 +250,18 @@ function resolveQueue(plan) {
     // R8: an owner's discoveries run one after the other, by start; a discovery never waits for a feature
     discs.forEach((t, i) => {
       const f = floorOf(plan, t, discs.slice(0, i));
-      if (f.floor === null || t.pinned || f.floor <= t.start + 1e-9) return;
+      if (f.floor === null || t.pinned || t.fixedEnd || f.floor <= t.start + 1e-9) return;
       if (shiftTask(t, f.floor - t.start) !== 0) { note(t, f); changed = true; }
     });
     order.forEach((t, i) => {
       const f = floorOf(plan, t, order.slice(0, i));
-      if (f.floor === null || t.pinned || f.floor <= t.start + 1e-9) return;
+      if (f.floor === null || t.pinned || t.fixedEnd || f.floor <= t.start + 1e-9) return;   // a fixed end is never moved (R9)
       if (shiftTask(t, f.floor - t.start) !== 0) { note(t, f); changed = true; }
     });
     // ownerless discoveries, the shelf and delivered features keep the plain rule: after a blocker's late end
     plan.tasks.filter((t) => !inQueue.has(t.id)).forEach((t) => {
       const f = floorOf(plan, t, []);
-      if (f.floor === null || t.pinned || f.floor <= t.start + 1e-9) return;
+      if (f.floor === null || t.pinned || t.fixedEnd || f.floor <= t.start + 1e-9) return;
       if (shiftTask(t, f.floor - t.start) !== 0) { note(t, f); changed = true; }
     });
   }
@@ -469,6 +482,7 @@ if (typeof module !== "undefined") {
     BASE_Y, BASE_M, N_MONTHS, WEEK, SCHEMA, OWNER_DEFAULT, STATUS_LABEL,
     BACKLOG, FEATURE_STATES, EPIC_STATES, STATE_LABEL, EPIC_STATE_LABEL, OUTCOMES,
     WISH_SOURCES, WISH_SOURCE_LABEL, WISH_STATUSES, WISH_STATUS_LABEL, SIZE_CLASSES, wishesByStatus,
+    FEATURE_TYPES, FEATURE_TYPE_LABEL, AREAS, normalizeAreas,
     dateToUnit, unitToDate, fmtDate, normalizePlan, epicStatus, shiftTask, resolveDeps,
     rangeWeeks, rangeLabel, goalText, exampleSeed,
     isoWeek, weekSpan, windowLabel, epicWindowText, discoveryOverdue,
