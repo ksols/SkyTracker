@@ -200,6 +200,8 @@
   .chip.st-rod{background:var(--bad-bg);color:var(--bad-fg)}
   .chip.sig{outline:1px dashed currentColor;outline-offset:-1px}
   .chip.pinned{background:var(--text);color:var(--surface)}
+  #personBtn.on{background:var(--accent);border-color:var(--accent);color:#fff}
+  .lane-label.virtual .ln{cursor:default}
   .task-label .chip.queue{background:transparent;border:1px dashed var(--text-3);color:var(--text-2)}
   .inv-list{margin:0 0 14px;padding-left:18px;font-size:12px}.inv-list li{margin:3px 0}.inv-list ul{padding-left:16px;margin:2px 0}
   .inv-big{font-size:34px;font-weight:700;margin:4px 0;color:var(--text)}
@@ -475,6 +477,7 @@
     <button id="adoImportBtn" hidden title="Epics og features som allerede ligger i ADO, inn i planen. Skriver ingenting til ADO.">Hent fra ADO</button>
     <button id="adoRefreshBtn" hidden title="Les tilbake fra ADO: stories, poeng, sprint og det som er lukket">Oppdater fra ADO</button>
     <button id="exportBtn">Eksporter (JSON)</button>
+    <button id="personBtn" title="Én rad per eier: utredninger og features i rekkefølge. Lesevisning; rediger i epic-visningen.">Per person</button>
     <button id="histBtn" title="Hva har flyttet seg, og hvorfor">Historikk<span class="count" id="histBadge" hidden></span></button>
     <button id="investorBtn" hidden title="Planen nå, gjennomføringsevne og målopnåelse – tallene investorene spør om">Investorer</button>
     <button id="helpBtn">Hjelp</button>
@@ -535,7 +538,7 @@
       <div class="help-card"><h4>Prioritet</h4>
         <p>Rekkefølgen på epicene er prioriteten produktforum har satt; rekkefølgen i en epic er byggerekkefølgen. Dra i <b>⋮⋮</b>
         for å flytte en rad, eller sett tallet i redigeringen. Dra en feature til en annen epic for å flytte den dit. En utredning
-        som har passert sluttdatoen sin merkes <b>Utredning forsinket</b>.</p></div>
+        som har passert sluttdatoen sin merkes <b>Utredning forsinket</b>. <b>Per person</b> viser én rad per eier med utredninger og features i rekkefølge: en utredning opptar eieren, så eierens features og senere utredninger legges etter den («i kø bak utredning …»). Nålen overstyrer.</p></div>
       <div class="help-card"><h4>ADO og sprinter</h4>
         <p>Tidslinjen eier epics, features, estimater og avhengigheter; ADO speiler dem. <b>Lagre og push til ADO</b> i redigeringen oppretter
         eller oppdaterer epicen/featuren (tittel, beskrivelse, tilstand, parent, datoer, avhengigheter) og en discovery-story med eier og sluttdato
@@ -955,6 +958,25 @@ window.__bootTimeline = function(){
   /* ================== hovedvisning ================== */
   let barRefs = {}, rowRefs = {}, rangeRefs = {}, labelDateRefs = {}, depSvg = null;
 
+  /* ---------- per person (R8): virtuelle rader, én per eier ---------- */
+  let personMode = false;
+  function viewLanes(){
+    if(!personMode) return state.lanes;
+    const live = state.tasks.filter(t => t.state !== 'levert' && (t.lane !== BACKLOG || t.kind === 'discovery'));
+    const owners = [...new Set(live.filter(t => t.assignee).map(t => t.assignee))].sort((a, b) => a.localeCompare(b, 'nb'));
+    const lanes = owners.map(o => ({ key: 'person:' + o, name: o, state: 'aktiv', virtual: true, owner: o }));
+    if(live.some(t => !t.assignee)) lanes.push({ key: 'person:', name: 'Uten eier', state: 'aktiv', virtual: true, owner: '' });
+    return lanes;
+  }
+  function viewTasks(lane){
+    if(!lane.virtual) return laneTasks(lane.key);
+    return state.tasks.filter(t => t.state !== 'levert' && (t.assignee || '') === lane.owner && (t.lane !== BACKLOG || t.kind === 'discovery')).sort((a, b) => a.start - b.start || a.end - b.end);
+  }
+  function personSummary(lane){
+    const ts = viewTasks(lane), d = ts.filter(t => t.kind === 'discovery').length, f = ts.length - d;
+    return [d ? d + (d === 1 ? ' utredning' : ' utredninger') : '', f ? f + (f === 1 ? ' feature' : ' features') : ''].filter(Boolean).join(' · ') || 'ingenting';
+  }
+  $('personBtn').addEventListener('click', () => { personMode = !personMode; $('personBtn').classList.toggle('on', personMode); render(); });
   function showEmpty(){
     const empty = !state.lanes.length;
     emptyState.hidden = !empty;
@@ -1042,24 +1064,24 @@ window.__bootTimeline = function(){
     today.innerHTML = '<span class="tl">I DAG · ' + tn.getDate() + '. ' + MND_UP[tn.getMonth()] + (spl ? ' · ' + spl : '') + '</span>';
     chart.appendChild(today);
 
-    // epics (lanes) og features (rader)
-    state.lanes.forEach(lane => {
-      const st = epicStatus(state, lane.key);
+    // epics (lanes) og features (rader); i per-person-visningen én virtuell rad per eier (R8)
+    viewLanes().forEach(lane => {
+      const st = lane.virtual ? { code: 'tom' } : epicStatus(state, lane.key);
       const hasGoal = typeof lane.goalDate === 'number';
 
-      const ll = el('div', 'lane-label' + (lane.externalDate ? ' ext' : '') + (lane.state === 'avsluttet' ? ' closed' : lane.state === 'forslag' ? ' proposal' : ''));
+      const ll = el('div', 'lane-label' + (lane.virtual ? ' virtual' : '') + (lane.externalDate ? ' ext' : '') + (lane.state === 'avsluttet' ? ' closed' : lane.state === 'forslag' ? ' proposal' : ''));
       ll.dataset.key = lane.key;
       const ln = el('span', 'ln', lane.name);
       ln.title = 'Klikk for å redigere epicen';
-      ln.addEventListener('click', () => openEpicEditor(lane.key));
+      if(!lane.virtual) ln.addEventListener('click', () => openEpicEditor(lane.key));
       const lm = el('div', 'lm');
-      const overdue = laneTasks(lane.key).filter(t => discoveryOverdue(t, todayUnit())).length;
+      const overdue = viewTasks(lane).filter(t => discoveryOverdue(t, todayUnit())).length;
       const win = epicWindowText(state, lane.key);
       const esig = epicProgressSignal(state, lane.key, todayUnit());
       const stateChip = lane.state === 'avsluttet'
         ? '<span class="chip" title="Epicen er avsluttet">Avsluttet: ' + esc(lane.outcome || 'uten utfall') + '</span>'
         : (lane.state === 'forslag' ? '<span class="chip st-forslag" title="Ikke valgt i produktforum ennå">Forslag</span>' : '') + '<span class="chip st-' + st.code + '">' + esc(STATUS_LABEL[st.code]) + '</span>';
-      lm.innerHTML = stateChip + (esig ? '<span class="chip sig st-' + esig + '" title="Fremdrift mot tid, det dårligste av featurene (andre signal; teller ikke i fargen)">fremdrift</span>' : '') + (lane.ado && lane.ado.conflicts && lane.ado.conflicts.length ? '<span class="chip st-rod" title="Et felt er endret i ADO etter siste push – se øverst på siden">ADO-konflikt</span>' : '') +
+      lm.innerHTML = lane.virtual ? '<span class="goal">' + esc(personSummary(lane)) + '</span>' : stateChip + (esig ? '<span class="chip sig st-' + esig + '" title="Fremdrift mot tid, det dårligste av featurene (andre signal; teller ikke i fargen)">fremdrift</span>' : '') + (lane.ado && lane.ado.conflicts && lane.ado.conflicts.length ? '<span class="chip st-rod" title="Et felt er endret i ADO etter siste push – se øverst på siden">ADO-konflikt</span>' : '') +
         (lane.externalDate ? '<span class="chip ext-chip" title="Datoen er satt utenfra">Ekstern dato</span>' : '') +
         (overdue ? '<span class="chip st-gul">' + overdue + ' utredning' + (overdue > 1 ? 'er' : '') + ' forsinket</span>' : '') +
         '<span class="goal">' + esc((win ? win + ' · ' : '') + goalText(lane)) + '</span>' +
@@ -1067,9 +1089,11 @@ window.__bootTimeline = function(){
       const add = el('button', 'add-feature', '＋');
       add.title = 'Ny feature i denne epicen (utredning eller estimert velges i redigeringen)';
       add.addEventListener('click', e => { e.stopPropagation(); addFeature(lane.key, 'discovery'); });
+      add.hidden = !!lane.virtual;
       const grip = el('span', 'grip', '⋮⋮');
       grip.title = 'Dra for å endre prioritet';
-      grip.draggable = true;
+      grip.draggable = !lane.virtual;
+      grip.hidden = !!lane.virtual;
       grip.addEventListener('dragstart', e => { rowDrag = { type: 'lane', key: lane.key }; e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', lane.key); ll.classList.add('dragging-row'); });
       grip.addEventListener('dragend', () => { rowDrag = null; clearDropMarks(); });
       ll.addEventListener('dragover', e => {
@@ -1123,20 +1147,22 @@ window.__bootTimeline = function(){
       }
       chart.appendChild(lb);
 
-      laneTasks(lane.key).forEach(t => {
+      viewTasks(lane).forEach(t => {
         const tl = el('div', 'task-label');
         tl.dataset.id = t.id;
         const tt = el('span', 't', t.label);
         tt.title = t.label + ' (klikk for å redigere)';
         const dd = el('span', 'd');
         const acts = el('div', 'row-actions');
+        acts.hidden = personMode;
         acts.innerHTML = '<button class="link" title="Koble avhengighet: velg hvem som venter på denne">⇢</button>' +
           '<button class="del" title="Slett feature">×</button>';
         acts.querySelector('.link').addEventListener('click', e => { e.stopPropagation(); startLink(t.id); });
         acts.querySelector('.del').addEventListener('click', e => { e.stopPropagation(); removeTask(t.id); });
         const tg = el('span', 'grip', '⋮⋮');
         tg.title = 'Dra for å endre rekkefølgen, eller slipp på en annen epic';
-        tg.draggable = true;
+        tg.draggable = !personMode;
+        tg.hidden = personMode;
         tg.addEventListener('dragstart', e => { rowDrag = { type: 'task', id: t.id }; e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', t.id); tl.classList.add('dragging-row'); });
         tg.addEventListener('dragend', () => { rowDrag = null; clearDropMarks(); });
         tl.addEventListener('dragover', e => {
@@ -1265,7 +1291,8 @@ window.__bootTimeline = function(){
       chips.push('<span class="chip who" title="Sist endret av ' + esc(t.editedBy) + (when ? ' · ' + esc(when) : '') + '">' + esc(initials(t.editedBy)) + '</span>');
     }
     const size = sizeClassText(t);
-    labelDateRefs[t.id].innerHTML = esc(rangeText(t) + (size ? ' · ' + size : '') + (t.kind === 'estimate' && rawLabel(t) ? ' · ' + rawLabel(t) : '')) + chips.join('');
+    const where = personMode ? (t.lane === BACKLOG ? 'Hylla' : (getLane(t.lane) || {name: t.lane}).name) + ' · ' : '';
+    labelDateRefs[t.id].innerHTML = esc(where + rangeText(t) + (size ? ' · ' + size : '') + (t.kind === 'estimate' && rawLabel(t) ? ' · ' + rawLabel(t) : '')) + chips.join('');
     bar.title = t.label + ' · ' + rangeText(t);
   }
 
@@ -1318,7 +1345,7 @@ window.__bootTimeline = function(){
   /* ================== drag ================== */
   chart.addEventListener('pointerdown', e => {
     const bar = e.target.closest('.bar');
-    if(!bar) return;
+    if(!bar || personMode) return;   // per person er en lesevisning
     if(linkSource){ completeLink(bar.dataset.id); e.preventDefault(); return; }
     const t = getTask(bar.dataset.id);
     if(!t) return;
