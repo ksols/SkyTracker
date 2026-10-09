@@ -7,11 +7,12 @@ import { prisma } from "@/lib/prisma";
 import { auth } from "@/lib/auth";
 import { getOrCreateBoard } from "@/features/board/queries";
 import { DEFAULT_TAGS, parseTags, type CardTag } from "@/features/board/types";
-import { createWorkItem, resolveIterationPath, addPredecessorLink } from "@/features/ado/client";
+import { createWorkItem, resolveIterationPath, addPredecessorLink, createAdoClient } from "@/features/ado/client";
 import { cardTagsToAdoTags, buildAttributionDescription } from "@/features/ado/mappers";
+import { adoAuthFor, defaultTokenDeps } from "@/features/ado/token";
 
 type AuthResult = {
-  user: { name?: string | null; email?: string | null };
+  user: { id?: string | null; name?: string | null; email?: string | null };
   role: "writer" | "reader";
 };
 
@@ -191,7 +192,7 @@ export async function createCard(formData: FormData) {
       const n = sprintNumber ? parseInt(sprintNumber, 10) : null;
       try {
         // Never block local card creation on ADO availability.
-        await syncCardToAdo(card.id, Number.isNaN(n as number) ? null : n, userName ?? "Unknown");
+        await syncCardToAdo(session, card.id, Number.isNaN(n as number) ? null : n, userName ?? "Unknown");
       } catch (e) {
         logError("ADO_SYNC_FAILED", userName, e);
       }
@@ -208,6 +209,7 @@ export async function createCard(formData: FormData) {
  * callers can decide whether to surface or swallow. Writes adoWorkItemId back.
  */
 async function syncCardToAdo(
+  session: AuthResult,
   cardId: string,
   sprintNumber: number | null,
   userName: string,
@@ -218,8 +220,10 @@ async function syncCardToAdo(
   });
   if (card.adoWorkItemId) return card.adoWorkItemId;
 
-  const iterationPath = sprintNumber ? await resolveIterationPath(sprintNumber) : null;
-  const workItemId = await createWorkItem({
+  // As the signed-in person (spec §3 «ADO access»): the work item's history names who pressed the button.
+  const client = createAdoClient(await adoAuthFor(session, defaultTokenDeps(prisma)));
+  const iterationPath = sprintNumber ? await resolveIterationPath(client, sprintNumber) : null;
+  const workItemId = await createWorkItem(client, {
     title: card.title,
     description: buildAttributionDescription(card.description, userName),
     tags: cardTagsToAdoTags(parseTags(card.tags)),
@@ -230,7 +234,7 @@ async function syncCardToAdo(
   for (const dep of card.blockedBy) {
     if (dep.blockerCard.adoWorkItemId) {
       try {
-        await addPredecessorLink(workItemId, dep.blockerCard.adoWorkItemId);
+        await addPredecessorLink(client, workItemId, dep.blockerCard.adoWorkItemId);
       } catch (e) {
         logError("ADO_LINK_FAILED", userName, e);
       }
@@ -248,7 +252,7 @@ export async function createCardInAdo(cardId: string, sprintNumber: number | nul
   requireWriter(session);
   const userName = session.user?.name ?? undefined;
   try {
-    const workItemId = await syncCardToAdo(cardId, sprintNumber, userName ?? "Unknown");
+    const workItemId = await syncCardToAdo(session, cardId, sprintNumber, userName ?? "Unknown");
     const card = await prisma.card.findUniqueOrThrow({ where: { id: cardId }, select: { boardId: true } });
     await audit(card.boardId, session, "ADO_WORK_ITEM_CREATED", "Card", cardId, { workItemId, sprintNumber });
     log("ADO_WORK_ITEM_CREATED", userName, { cardId, workItemId });
