@@ -36,6 +36,12 @@ const EPIC_STATES = ["forslag", "aktiv", "avsluttet"];
 const STATE_LABEL = { ny: "Registrert", utredes: "Utredes", klar: "Klar for veikart", aktiv: "Aktiv", levert: "Levert" };
 const EPIC_STATE_LABEL = { forslag: "Forslag", aktiv: "Aktiv", avsluttet: "Avsluttet" };
 const OUTCOMES = ["nådd", "ikke nådd", "endret"];
+// the intake (R7b): where a wish came from and what produktforum decided
+const WISH_SOURCES = ["egen-plan", "investor", "kunde", "ledermote", "annet"];
+const WISH_SOURCE_LABEL = { "egen-plan": "Egen plan", investor: "Investor", kunde: "Kunde", ledermote: "Ledermøte", annet: "Annet" };
+const WISH_STATUSES = ["ubehandlet", "utred", "senere", "nei"];
+const WISH_STATUS_LABEL = { ubehandlet: "Ubehandlet", utred: "Utred nå", senere: "Senere", nei: "Nei" };
+const SIZE_CLASSES = ["S", "M", "L", "XL"];
 const num = (v, fallback) => (typeof v === "number" && isFinite(v) ? v : fallback);
 
 function normalizePlan(plan) {
@@ -45,6 +51,15 @@ function normalizePlan(plan) {
   p.tasks = Array.isArray(p.tasks) ? p.tasks : [];
   p.deleted = p.deleted && typeof p.deleted === "object" ? p.deleted : {};
   p.deletedLanes = p.deletedLanes && typeof p.deletedLanes === "object" ? p.deletedLanes : {};
+  p.deletedWishes = p.deletedWishes && typeof p.deletedWishes === "object" ? p.deletedWishes : {};
+  const text = (v, max) => (typeof v === "string" && v.trim() ? v.trim().slice(0, max) : null);
+  p.wishes = (Array.isArray(p.wishes) ? p.wishes : []).filter((w) => w && typeof w === "object" && typeof w.id === "string" && w.id && text(w.title, 200)).map((w) => {
+    const out = { id: w.id, v: num(w.v, 0), title: text(w.title, 200), status: WISH_STATUSES.includes(w.status) ? w.status : "ubehandlet", source: WISH_SOURCES.includes(w.source) ? w.source : "annet" };
+    for (const k of ["note", "askedBy", "askedOn", "registeredBy", "registeredAt", "decidedAt", "decidedBy", "forum", "reason", "featureId"]) { const v = text(w[k], k === "note" || k === "reason" ? 2000 : 200); if (v) out[k] = v; }
+    const owner = text(w.owner, 12); if (owner) out.owner = owner.toUpperCase();
+    if (SIZE_CLASSES.includes(w.sizeClass)) out.sizeClass = w.sizeClass;
+    return out;
+  });
   // sprints (from ADO's iterations, cached by the sprints route) and the sprint goals typed on the page
   const isDay = (s) => typeof s === "string" && /^\d{4}-\d{2}-\d{2}$/.test(s);
   const okSprint = (s) => !!s && typeof s === "object" && typeof s.name === "string" && isDay(s.start) && isDay(s.finish);
@@ -146,6 +161,13 @@ function epicStatus(plan, laneKey) {
   return { code, likely, late };
 }
 function shelfTasks(plan) { return plan.tasks.filter((t) => t.lane === BACKLOG); }
+/** The intake grouped by decision, newest registration first inside each group. */
+function wishesByStatus(plan) {
+  const out = { ubehandlet: [], utred: [], senere: [], nei: [] };
+  const sorted = [...(plan.wishes || [])].sort((a, b) => (b.registeredAt || "").localeCompare(a.registeredAt || ""));
+  sorted.forEach((w) => out[w.status || "ubehandlet"].push(w));
+  return out;
+}
 function epicCounts(plan) {
   const c = { forslag: 0, aktiv: 0, avsluttet: 0 };
   plan.lanes.forEach((l) => { c[l.state || "aktiv"]++; });
@@ -411,6 +433,7 @@ if (typeof module !== "undefined") {
   module.exports = {
     BASE_Y, BASE_M, N_MONTHS, WEEK, SCHEMA, OWNER_DEFAULT, STATUS_LABEL,
     BACKLOG, FEATURE_STATES, EPIC_STATES, STATE_LABEL, EPIC_STATE_LABEL, OUTCOMES,
+    WISH_SOURCES, WISH_SOURCE_LABEL, WISH_STATUSES, WISH_STATUS_LABEL, SIZE_CLASSES, wishesByStatus,
     dateToUnit, unitToDate, fmtDate, normalizePlan, epicStatus, shiftTask, resolveDeps,
     rangeWeeks, rangeLabel, goalText, exampleSeed,
     isoWeek, weekSpan, windowLabel, epicWindowText, discoveryOverdue,

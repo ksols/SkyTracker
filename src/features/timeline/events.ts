@@ -2,7 +2,7 @@
 // (a goal date moved, a span widened, an epic reordered), with a Norwegian
 // summary rendered once. The PUT handler logs these on every save; later the
 // compare mode (R1b) reuses the same function for "since the baseline".
-import type { Plan, PlanLane, PlanTask } from "./merge";
+import type { Plan, PlanLane, PlanTask, Wish } from "./merge";
 import { WEEK, BACKLOG, MIX_LABEL, unitToDate, fmtDate, rangeWeeks } from "./epic-tools.js";
 
 export const EVENT_CODES = [
@@ -13,11 +13,12 @@ export const EVENT_CODES = [
   "plan.seed", "plan.begrunnelse", "plan.baseline",
   "feature.estimat-hentet", "plan.sprintmaal", "ado.push", "ado.konflikt", "ado.lest",
   "feature.fremdrift", "feature.ko", "plan.kapasitet",
+  "onske.registrert", "onske.besluttet", "onske.slettet",
 ] as const;
 export type EventCode = (typeof EVENT_CODES)[number];
 export type Cause = "bruker" | "avhengighet" | "ado" | "system";
 export type PlanEvent = {
-  targetType: "epic" | "feature" | "plan";
+  targetType: "epic" | "feature" | "plan" | "onske";
   targetId: string;
   targetLabel: string;
   laneKey: string | null;
@@ -236,6 +237,23 @@ export function diffPlans(before: Plan, after: Plan, opts: DiffOptions = {}): Pl
     if (g.text !== prev) ev.push({ targetType: "plan", targetId: "sprint:" + name, targetLabel: name, laneKey: null, code: "plan.sprintmaal", before: prev || null, after: g.text || null, cause: dc,
       summary: g.text ? "Sprintmål " + name + ": " + q(g.text) : "Sprintmål " + name + " fjernet" });
   }
+  // the intake (R7b): registered, decided, removed; never asks for a reason, the decision carries its own
+  const bw = new Map((before.wishes ?? []).map((w) => [w.id, w])), aw = new Map((after.wishes ?? []).map((w) => [w.id, w]));
+  const wbase = (w: Wish) => ({ targetType: "onske" as const, targetId: w.id, targetLabel: w.title, laneKey: null, cause: dc });
+  const decision = (w: Wish) => {
+    const forum = w.forum ? " · " + w.forum : "";
+    if (w.status === "utred") return "Utred nå: «" + w.title + "»" + (w.owner || w.sizeClass ? " · " + [w.owner, w.sizeClass].filter(Boolean).join(", ") : "") + forum;
+    if (w.status === "senere") return "Senere: «" + w.title + "»" + forum;
+    if (w.status === "nei") return "Nei: «" + w.title + "»" + (w.reason ? " – " + w.reason : "") + forum;
+    return "Tilbake til ubehandlet: «" + w.title + "»";
+  };
+  for (const w of after.wishes ?? []) {
+    const b = bw.get(w.id);
+    if (!b) { ev.push({ ...wbase(w), code: "onske.registrert", after: { status: w.status ?? "ubehandlet", source: w.source ?? null }, summary: "Nytt ønske «" + w.title + "» (" + (w.source ?? "annet") + ")" }); continue; }
+    if ((b.status ?? "ubehandlet") !== (w.status ?? "ubehandlet"))
+      ev.push({ ...wbase(w), code: "onske.besluttet", before: { status: b.status ?? "ubehandlet" }, after: { status: w.status ?? "ubehandlet", owner: w.owner ?? null, sizeClass: w.sizeClass ?? null, forum: w.forum ?? null, reason: w.reason ?? null }, summary: decision(w) });
+  }
+  for (const b of before.wishes ?? []) if (!aw.has(b.id)) ev.push({ ...wbase(b), code: "onske.slettet", before: { status: b.status ?? "ubehandlet" }, summary: "Ønske slettet: «" + b.title + "»" });
   return ev;
 }
 

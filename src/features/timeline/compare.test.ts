@@ -23,17 +23,17 @@ describe("summarizeNet", () => {
       path({ code: "feature.flyttet", changeset: { id: "a", at: "", editor: "GO", reason: null, reasonCode: "ingen", source: "bruker" } }),
       path({ code: "epic.maldato", changeset: { id: "b", at: "", editor: "GO", reason: "Telenor", reasonCode: "ekstern", source: "bruker" } }),
     ];
-    expect(summarizeNet(net, p)).toEqual({ maldatoer: 2, spenn: 1, byttetEpic: 1, prioriteringer: 2, flyttet: 1, nye: 1, fjernet: 2, mangler: 1 });
+    expect(summarizeNet(net, p)).toEqual({ maldatoer: 2, spenn: 1, byttetEpic: 1, prioriteringer: 2, flyttet: 1, nye: 1, fjernet: 2, onsker: 0, mangler: 1 });
   });
 });
 
 describe("summaryLine and sinceLabel", () => {
   it("lists only the non-zero parts in the spec's order and wording", () => {
-    const s = { maldatoer: 2, spenn: 3, byttetEpic: 1, prioriteringer: 2, flyttet: 0, nye: 0, fjernet: 0, mangler: 4 };
+    const s = { maldatoer: 2, spenn: 3, byttetEpic: 1, prioriteringer: 2, flyttet: 0, nye: 0, fjernet: 0, onsker: 0, mangler: 4 };
     expect(summaryLine("produktforum 5. nov", s)).toBe("Siden produktforum 5. nov: 2 måldatoer flyttet · 3 spenn utvidet · 1 feature byttet epic · 2 prioriteringer · 4 begrunnelser mangler");
-    expect(summaryLine("5. nov", { maldatoer: 1, spenn: 0, byttetEpic: 0, prioriteringer: 0, flyttet: 1, nye: 2, fjernet: 1, mangler: 0 }))
+    expect(summaryLine("5. nov", { maldatoer: 1, spenn: 0, byttetEpic: 0, prioriteringer: 0, flyttet: 1, nye: 2, fjernet: 1, onsker: 0, mangler: 0 }))
       .toBe("Siden 5. nov: 1 måldato flyttet · 1 feature flyttet senere · 2 nye · 1 fjernet");
-    expect(summaryLine("5. nov", { maldatoer: 0, spenn: 0, byttetEpic: 0, prioriteringer: 0, flyttet: 0, nye: 0, fjernet: 0, mangler: 0 })).toBe("Siden 5. nov: ingen endringer");
+    expect(summaryLine("5. nov", { maldatoer: 0, spenn: 0, byttetEpic: 0, prioriteringer: 0, flyttet: 0, nye: 0, fjernet: 0, onsker: 0, mangler: 0 })).toBe("Siden 5. nov: ingen endringer");
   });
   it("sinceLabel lowercases a baseline label's first letter and names a daily snapshot by its day", () => {
     expect(sinceLabel({ kind: "baseline", label: "Produktforum 5. nov", at: "2026-11-05T09:00:00.000Z", day: null })).toBe("produktforum 5. nov");
@@ -88,5 +88,14 @@ describe("sprint snapshots and the ADO sections", () => {
     ], (k) => k);
     expect(md).toContain("## ADO\n- x › Kapasitet: Pushet til ADO #4791 (Feature opprettet) — ADO (GO, 6. nov)");
     expect(md).toContain("## Sprintmål\n- Sprint 71: Sprintmål Sprint 71: «Tråder i beta» (GO, 6. nov)");
+  });
+});
+
+describe("summarizeNet: wishes", () => {
+  it("counts decided wishes and says so in the line", () => {
+    const s = summarizeNet([ev("onske.besluttet", { targetType: "onske", laneKey: null }), ev("onske.besluttet", { targetType: "onske", laneKey: null }), ev("onske.registrert", { targetType: "onske", laneKey: null })], []);
+    expect(s.onsker).toBe(2);
+    expect(summaryLine("produktforum 5. nov", s)).toContain("2 ønsker behandlet");
+    expect(summaryLine("x", summarizeNet([ev("onske.besluttet", { targetType: "onske", laneKey: null })], []))).toContain("1 ønske behandlet");
   });
 });

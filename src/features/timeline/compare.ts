@@ -6,7 +6,7 @@ import { osloDay } from "./history";
 
 export type PathChangeset = { id: string; at: string; editor: string | null; reason: string | null; reasonCode: string | null; source: string };
 export type PathEvent = PlanEvent & { at: string; editor: string | null; changeset: PathChangeset };
-export type CompareSummary = { maldatoer: number; spenn: number; byttetEpic: number; prioriteringer: number; flyttet: number; nye: number; fjernet: number; mangler: number };
+export type CompareSummary = { maldatoer: number; spenn: number; byttetEpic: number; prioriteringer: number; flyttet: number; nye: number; fjernet: number; onsker: number; mangler: number };
 type SnapshotLike = { id: string; kind: string; day: string | null; at: string | Date };
 
 const widened = (e: PlanEvent) => {
@@ -28,6 +28,7 @@ export function summarizeNet(net: PlanEvent[], path: PathEvent[]): CompareSummar
     flyttet: count((e) => e.code === "feature.flyttet" && later(e)),
     nye: count((e) => e.code === "feature.ny" || e.code === "epic.ny"),
     fjernet: count((e) => e.code === "feature.slettet" || e.code === "epic.slettet"),
+    onsker: count((e) => e.code === "onske.besluttet"),
     mangler: new Set(path.filter((e) => e.changeset?.reasonCode === "ingen").map((e) => e.changeset.id)).size,
   };
 }
@@ -41,6 +42,7 @@ export function summaryLine(label: string, s: CompareSummary): string {
   if (s.prioriteringer) parts.push(n(s.prioriteringer, "prioritering", "prioriteringer"));
   if (s.flyttet) parts.push(n(s.flyttet, "feature flyttet senere", "features flyttet senere"));
   if (s.nye) parts.push(n(s.nye, "ny", "nye"));
+  if (s.onsker) parts.push(n(s.onsker, "ønske behandlet", "ønsker behandlet"));
   if (s.fjernet) parts.push(n(s.fjernet, "fjernet", "fjernet"));
   if (s.mangler) parts.push(n(s.mangler, "begrunnelse mangler", "begrunnelser mangler"));
   return "Siden " + label + ": " + (parts.length ? parts.join(" · ") : "ingen endringer");

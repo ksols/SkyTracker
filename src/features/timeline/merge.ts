@@ -24,6 +24,32 @@ export const GROUP_PROPS: Record<TaskFieldGroup, string[]> = {
 };
 
 export type Sprint = { name: string; path: string; start: string; finish: string };
+/** The intake (R7b): a wish PreSales registered; produktforum decides it. Versioned like a lane (`v`). */
+export type WishSource = "egen-plan" | "investor" | "kunde" | "ledermote" | "annet";
+export type WishStatus = "ubehandlet" | "utred" | "senere" | "nei";
+export type Wish = {
+  id: string;
+  v?: number;
+  title: string;
+  note?: string;
+  source?: WishSource;
+  askedBy?: string;
+  /** YYYY-MM-DD */
+  askedOn?: string;
+  registeredBy?: string;
+  registeredAt?: string;
+  status?: WishStatus;
+  decidedAt?: string;
+  decidedBy?: string;
+  /** «Produktforum 5. nov»: typed once per session, kept on every decision taken in it. */
+  forum?: string;
+  reason?: string;
+  /** Utred nå: the owner and the size class the forum chose; the created task holds the dates. */
+  owner?: string;
+  sizeClass?: "S" | "M" | "L" | "XL";
+  /** The task on the shelf a yes created. */
+  featureId?: string;
+};
 /** What the last push wrote to ADO, field by field, so a refresh can tell «changed in ADO» from «changed here». */
 export type AdoSnapshot = Partial<Record<"title" | "description" | "state" | "targetDate" | "startDate", string | null>>;
 export type AdoConflict = { field: string; ours: string | null; theirs: string | null };
@@ -85,6 +111,8 @@ export type Plan = {
   tasks: PlanTask[];
   deleted?: Record<string, number>;
   deletedLanes?: Record<string, number>;
+  wishes?: Wish[];
+  deletedWishes?: Record<string, number>;
   sprints?: { at: string; items: Sprint[] };
   sprintGoals?: Record<string, { text: string; at: string }>;
   /** The sprint mix: the share of a sprint that goes to planned features (R5); the factor from raw weeks to elapsed time. */
@@ -130,6 +158,7 @@ function mergeTombstones(a?: Record<string, number>, b?: Record<string, number>)
 export function mergePlans(stored: Plan, incoming: Plan): Plan {
   const deleted = mergeTombstones(stored.deleted, incoming.deleted);
   const deletedLanes = mergeTombstones(stored.deletedLanes, incoming.deletedLanes);
+  const deletedWishes = mergeTombstones(stored.deletedWishes, incoming.deletedWishes);
 
   // lanes: union by key, versioned (incoming wins ties); a tombstone removes a
   // lane unless its version was bumped PAST the tombstone
@@ -145,6 +174,17 @@ export function mergePlans(stored: Plan, incoming: Plan): Plan {
     const tomb = deletedLanes[l.key];
     return tomb === undefined || (l.v ?? 0) > tomb;
   });
+
+  // wishes: like lanes, by id and version
+  const wishes: Wish[] = [];
+  const wishById = new Map((incoming.wishes ?? []).map((w) => [w.id, w]));
+  for (const s of stored.wishes ?? []) {
+    const i = wishById.get(s.id);
+    wishes.push(i && (i.v ?? 0) >= (s.v ?? 0) ? { ...i } : { ...s });
+    wishById.delete(s.id);
+  }
+  for (const i of wishById.values()) wishes.push({ ...i });
+  const liveWishes = wishes.filter((w) => { const tomb = deletedWishes[w.id]; return tomb === undefined || (w.v ?? 0) > tomb; });
 
   // tasks: union by id, stored order first, incoming-only appended
   const storedMap = new Map(stored.tasks.map((t) => [t.id, t]));
@@ -171,7 +211,7 @@ export function mergePlans(stored: Plan, incoming: Plan): Plan {
   const capacity = newer(stored.capacity, incoming.capacity);
   const sprintGoals: Record<string, { text: string; at: string }> = {};
   for (const src of [stored.sprintGoals, incoming.sprintGoals]) for (const [k, g] of Object.entries(src ?? {})) sprintGoals[k] = newer(sprintGoals[k], g)!;
-  const out: Plan = { ...stored, ...incoming, lanes: liveLanes, tasks, deleted, deletedLanes };
+  const out: Plan = { ...stored, ...incoming, lanes: liveLanes, tasks, deleted, deletedLanes, wishes: liveWishes, deletedWishes };
   delete out.sprints;
   delete out.sprintGoals;
   delete out.capacity;

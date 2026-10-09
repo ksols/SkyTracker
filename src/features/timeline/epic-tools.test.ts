@@ -5,7 +5,7 @@ import {
   isoWeek, weekSpan, windowLabel, epicWindowText, discoveryOverdue,
   shelfTasks, epicCounts, sizeClass, bufferLabel, rawLabel, previewPlacement,
   currentSprint, sprintDay, sprintLabel, progressFraction, progressSignal, epicProgressSignal, progressText,
-  resolveQueue, queueFloor, capacityFactor, elapsedWeeks,
+  resolveQueue, queueFloor, capacityFactor, elapsedWeeks, wishesByStatus, WISH_STATUS_LABEL, WISH_SOURCE_LABEL,
 } from "./epic-tools.js";
 import type { Plan, PlanTask } from "./merge";
 
@@ -412,5 +412,26 @@ describe("previewPlacement with the queue (stage 6)", () => {
     const quiet = previewPlacement(p, "wish", "y")!;               // dropped last in Y: still after Busy, pushes nothing
     expect(quiet.pushed).toEqual([]);
     expect(quiet.epics).toEqual([]);
+  });
+});
+
+describe("normalizePlan: wishes", () => {
+  it("keeps well-formed wishes, defaults status and source, drops the malformed ones, and groups by status", () => {
+    const p = normalizePlan({ lanes: [], tasks: [], deleted: {}, wishes: [
+      { id: "w1", title: "Kontaktkort for bedrifter", source: "kunde", askedBy: "Telenor", askedOn: "2026-10-01", registeredBy: "PreSales", registeredAt: "2026-10-02T10:00:00.000Z" },
+      { id: "w2", title: "Noe", status: "utred", source: "tull", owner: "thm", sizeClass: "M", featureId: "f1" },
+      { id: "w3", title: "   " }, { title: "uten id" }, "junk", { id: "w4", title: "Nei-sak", status: "nei", reason: "Utenfor strategien" },
+    ] });
+    expect(p.wishes!.map((w) => w.id)).toEqual(["w1", "w2", "w4"]);
+    expect(p.wishes![0].status).toBe("ubehandlet");
+    expect(p.wishes![1].source).toBe("annet");
+    expect(p.wishes![1].owner).toBe("THM");
+    expect(p.deletedWishes).toEqual({});
+    const g = wishesByStatus(p);
+    expect(g.ubehandlet.map((w) => w.id)).toEqual(["w1"]);
+    expect(g.utred.map((w) => w.id)).toEqual(["w2"]);
+    expect(g.nei.map((w) => w.id)).toEqual(["w4"]);
+    expect(WISH_STATUS_LABEL.utred).toBe("Utred nå");
+    expect(WISH_SOURCE_LABEL.kunde).toBe("Kunde");
   });
 });

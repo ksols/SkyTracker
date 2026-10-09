@@ -251,3 +251,28 @@ describe("diffPlans: an import from ADO", () => {
     expect(ev[0].summary.startsWith("Hentet")).toBe(false);
   });
 });
+
+describe("diffPlans: wishes (the intake)", () => {
+  const w = (id: string, over: Record<string, unknown> = {}) => ({ id, title: "Kontaktkort for bedrifter", status: "ubehandlet", source: "kunde", ...over });
+  const withWishes = (wishes: Record<string, unknown>[]) => normalizePlan({ lanes: [], tasks: [], deleted: {}, wishes });
+  it("a new wish is registered, a decision is logged with owner, class and forum, a no carries its reason, a removal is logged; none asks for a reason", () => {
+    const b = withWishes([w("a"), w("b", { title: "Levetid på meldinger" }), w("c", { title: "Maps" }), w("d", { title: "Vekk" })]);
+    const a = withWishes([w("n", { title: "Ny sak", source: "investor" }), w("a", { status: "utred", owner: "THM", sizeClass: "M", forum: "Produktforum 5. nov" }), w("b", { title: "Levetid på meldinger", status: "senere", forum: "Produktforum 5. nov" }), w("c", { title: "Maps", status: "nei", reason: "Utenfor strategien" })]);
+    const ev = diffPlans(b, a);
+    expect(ev.map((e) => [e.code, e.targetType, e.summary])).toEqual([
+      ["onske.registrert", "onske", "Nytt ønske «Ny sak» (investor)"],
+      ["onske.besluttet", "onske", "Utred nå: «Kontaktkort for bedrifter» · THM, M · Produktforum 5. nov"],
+      ["onske.besluttet", "onske", "Senere: «Levetid på meldinger» · Produktforum 5. nov"],
+      ["onske.besluttet", "onske", "Nei: «Maps» – Utenfor strategien"],
+      ["onske.slettet", "onske", "Ønske slettet: «Vekk»"],
+    ]);
+    expect(ev.every((e) => e.laneKey === null && e.cause === "bruker" && !needsReason(e))).toBe(true);
+    expect(ev[1].before).toEqual({ status: "ubehandlet" });
+    expect(ev[1].after).toEqual({ status: "utred", owner: "THM", sizeClass: "M", forum: "Produktforum 5. nov", reason: null });
+  });
+  it("an edit of the title or note is not an event; nothing changes → nothing", () => {
+    const b = withWishes([w("a")]);
+    const a = withWishes([w("a", { title: "Kontaktkort", note: "mer tekst" })]);
+    expect(diffPlans(b, a)).toEqual([]);
+  });
+});

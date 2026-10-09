@@ -1,4 +1,4 @@
-import type { Plan, PlanLane, PlanTask, Sprint } from "./merge";
+import type { Plan, PlanLane, PlanTask, Sprint, Wish, WishSource, WishStatus } from "./merge";
 
 export declare function progressFraction(p: PlanTask["progress"] | undefined | null): number | null;
 export declare function progressSignal(task: PlanTask, todayUnit: number): { code: "gronn" | "gul" | "rod"; done: number; elapsed: number } | null;
@@ -32,6 +32,12 @@ export declare const EPIC_STATES: EpicState[];
 export declare const STATE_LABEL: Record<FeatureState, string>;
 export declare const EPIC_STATE_LABEL: Record<EpicState, string>;
 export declare const OUTCOMES: ("nådd" | "ikke nådd" | "endret")[];
+export declare const WISH_SOURCES: WishSource[];
+export declare const WISH_SOURCE_LABEL: Record<WishSource, string>;
+export declare const WISH_STATUSES: WishStatus[];
+export declare const WISH_STATUS_LABEL: Record<WishStatus, string>;
+export declare const SIZE_CLASSES: ("S" | "M" | "L" | "XL")[];
+export declare function wishesByStatus(plan: Plan): Record<WishStatus, Wish[]>;
 export declare function shelfTasks(plan: Plan): PlanTask[];
 export declare function epicCounts(plan: Plan): { forslag: number; aktiv: number; avsluttet: number };
 export declare function sizeClass(task: PlanTask): "S" | "M" | "L" | "XL" | "";

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { mergePlans, type Plan, type PlanTask } from "./merge";
+import { mergePlans, type Plan, type PlanTask, type Wish } from "./merge";
 
 function task(over: Partial<PlanTask>): PlanTask {
   return { id: "t1", lane: "x", label: "Feature", kind: "estimate", start: 1, endLikely: 1.5, end: 2, deps: [], fv: {}, ...over };
@@ -136,5 +136,26 @@ describe("pinned and capacity (stage 6)", () => {
     const old = { mode: "transition" as const, at: "2026-10-01T00:00:00.000Z" }, fresh = { mode: "normal" as const, at: "2026-10-09T00:00:00.000Z" };
     expect(mergePlans(plan([], { capacity: fresh }), plan([], { capacity: old })).capacity).toEqual(fresh);
     expect(mergePlans(plan([], { capacity: old }), plan([], { capacity: fresh })).capacity).toEqual(fresh);
+  });
+});
+
+describe("mergePlans - wishes (the intake)", () => {
+  const wish = (id: string, over: Partial<Wish> = {}): Wish => ({ id, title: "Ønske " + id, status: "ubehandlet", v: 1, ...over });
+  it("unions by id, the higher version wins, incoming wins ties, incoming-only ones are appended", () => {
+    const stored = plan([], { wishes: [wish("a", { status: "nei", v: 3 }), wish("b")] });
+    const incoming = plan([], { wishes: [wish("a", { status: "utred", v: 2 }), wish("b", { title: "B omdøpt", v: 1 }), wish("c")] });
+    const m = mergePlans(stored, incoming);
+    expect(m.wishes!.map((w) => [w.id, w.status, w.title])).toEqual([["a", "nei", "Ønske a"], ["b", "ubehandlet", "B omdøpt"], ["c", "ubehandlet", "Ønske c"]]);
+  });
+  it("a tombstone removes a wish unless it was bumped past it", () => {
+    const stored = plan([], { wishes: [wish("a", { v: 2 }), wish("b", { v: 1 })], deletedWishes: { a: 2 } });
+    const incoming = plan([], { wishes: [wish("a", { v: 3 }), wish("b", { v: 1 })], deletedWishes: { b: 1 } });
+    const m = mergePlans(stored, incoming);
+    expect(m.wishes!.map((w) => w.id)).toEqual(["a"]);
+    expect(m.deletedWishes).toEqual({ a: 2, b: 1 });
+  });
+  it("plans without wishes merge to an empty list", () => {
+    const m = mergePlans(plan([]), plan([]));
+    expect(m.wishes).toEqual([]);
   });
 });
