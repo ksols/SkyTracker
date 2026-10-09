@@ -16,7 +16,7 @@ export const GROUP_PROPS: Record<TaskFieldGroup, string[]> = {
   tid: ["start", "end", "endLikely"],
   label: ["label"],
   deps: ["deps"],
-  meta: ["lane", "kind", "adoId", "order", "assignee", "specPath", "pinned"],
+  meta: ["lane", "kind", "adoId", "order", "assignee", "specPath", "pinned", "description"],
   state: ["state", "committedRange", "activatedAt", "deliveredAt"],
   est: ["raw", "bufferWeeks"],
   ado: ["ado"],
@@ -49,6 +49,8 @@ export type PlanTask = {
   activatedAt?: string;
   deliveredAt?: string;
   specPath?: string;
+  /** Free text: imported from ADO or typed; pushed as the ADO description instead of the generated lines. */
+  description?: string;
   /** The planner dragged it below the queue's floor: it keeps its place and still counts for the ones after it. */
   pinned?: boolean;
   ado?: TaskAdo;
@@ -69,6 +71,7 @@ export type PlanLane = {
   priority?: number;
   metric?: string;
   externalDate?: boolean;
+  description?: string;
   state?: "forslag" | "aktiv" | "avsluttet";
   closedReason?: string;
   closedAt?: string;

@@ -62,6 +62,7 @@ function normalizePlan(plan) {
     if (num(l.adoId, null) === null) delete l.adoId;
     if (typeof l.metric !== "string" || !l.metric.trim()) delete l.metric;
     if (!l.externalDate) delete l.externalDate;
+    if (typeof l.description !== "string" || !l.description.trim()) delete l.description; else l.description = l.description.trim().slice(0, 4000);
     if (!EPIC_STATES.includes(l.state)) l.state = "aktiv";
     if (typeof l.closedReason !== "string" || !l.closedReason.trim()) delete l.closedReason;
     if (!OUTCOMES.includes(l.outcome)) delete l.outcome;
@@ -87,6 +88,7 @@ function normalizePlan(plan) {
     }
     if (num(t.adoId, null) === null) delete t.adoId;
     if (typeof t.specPath !== "string" || !/^[A-Za-z0-9._-]+$/.test(t.specPath)) delete t.specPath;   // a folder under spec/ in Skytale.Specs
+    if (typeof t.description !== "string" || !t.description.trim()) delete t.description; else t.description = t.description.trim().slice(0, 4000);
     if (t.pinned) t.pinned = true; else delete t.pinned;   // the planner's override of the queue
     // progress: points (ADO or typed) or a percent; the source says who wrote it
     if (t.progress && typeof t.progress === "object") {
