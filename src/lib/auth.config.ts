@@ -1,15 +1,20 @@
 import type { NextAuthConfig } from "next-auth";
 import MicrosoftEntraID from "next-auth/providers/microsoft-entra-id";
+import { ADO_SCOPE } from "@/features/ado/config";
 
 // Edge-safe config: providers + pages + session strategy + callbacks.
 // NO database adapter, NO Prisma.
 // Imported by both `src/lib/auth.ts` (full Node runtime) and `src/middleware.ts` (Edge runtime).
+// The sign-in asks for the Azure DevOps scope instead of Graph's User.Read (spec §3 «ADO access»):
+// the access token then works against dev.azure.com as the signed-in person; the id token, the group
+// claim and the role are unchanged. The provider's Graph photo fetch gets a 401 and sets no image.
 export default {
   providers: [
     MicrosoftEntraID({
       clientId: process.env.AUTH_MICROSOFT_ENTRA_ID_ID,
       clientSecret: process.env.AUTH_MICROSOFT_ENTRA_ID_SECRET,
       issuer: process.env.AUTH_MICROSOFT_ENTRA_ID_ISSUER,
+      authorization: { params: { scope: "openid profile email offline_access " + ADO_SCOPE } },
     }),
   ],
   session: { strategy: "jwt" },

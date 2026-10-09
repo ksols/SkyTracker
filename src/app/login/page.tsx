@@ -1,6 +1,10 @@
 import { signIn } from "@/lib/auth";
 
-export default function LoginPage() {
+// `callbackUrl` brings the person back to where they were (the timeline's «Logg inn på nytt» link
+// uses it); only a same-site path is accepted.
+export default async function LoginPage({ searchParams }: { searchParams: Promise<{ callbackUrl?: string }> }) {
+  const { callbackUrl } = await searchParams;
+  const redirectTo = callbackUrl && callbackUrl.startsWith("/") && !callbackUrl.startsWith("//") ? callbackUrl : "/";
   return (
     <main className="flex-1 flex items-center justify-center p-6">
       <div className="max-w-sm w-full flex flex-col gap-6 text-center">
@@ -11,7 +15,7 @@ export default function LoginPage() {
         <form
           action={async () => {
             "use server";
-            await signIn("microsoft-entra-id", { redirectTo: "/" });
+            await signIn("microsoft-entra-id", { redirectTo });
           }}
         >
           <button
