@@ -50,12 +50,12 @@ describe("listImportable", () => {
     const c = client(ALL);
     const out = await listImportable(plan(), c, PEOPLE, NOW);
     expect(c.calls).toEqual([IMPORT_WIQL]);
-    expect(out.map((x) => x.id)).toEqual([4802, 4803, 4406, 4585, 4566, 4789, 4790, 4492, 4493]); // not 4491/4742 (held), not 1234 (Resolved)
+    expect(out.map((x) => x.id)).toEqual([4802, 4803, 4585, 4566, 4789, 4790, 4492, 4493]); // not 4491/4742 (held), not 1234 (Resolved), not 4406 (a QA Area hat)
   });
-  it("flags «QA Area» containers as not suggested and carries the parent's title even when the parent is closed", async () => {
+  it("leaves out the «QA Area» hats (QA's containers for bugs and issues) and carries the parent's title even when the parent is such a hat", async () => {
     const out = await listImportable(plan(), client(ALL), PEOPLE, NOW);
     const by = Object.fromEntries(out.map((x) => [x.id, x])) as Record<number, ImportCandidate>;
-    expect(by[4406].suggested).toBe(false);
+    expect(by[4406]).toBeUndefined();
     expect(by[4790].suggested).toBe(true);
     expect(by[4585].parentId).toBe(4413);
     expect(by[4585].parentTitle).toBe("QA Area: Platform / Build");

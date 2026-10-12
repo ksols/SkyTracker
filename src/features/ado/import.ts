@@ -26,7 +26,7 @@ export type ImportCandidate = {
   description: string;
   /** ADO's owned fields as the push's snapshot stores them. */
   snapshot: Snapshot;
-  /** False for «QA Area …» containers: listed, unchecked. */
+  /** Checked by default in the dialog (every listed item today; the «QA Area» hats are not listed at all). */
   suggested: boolean;
   /** What the item becomes, in words. */
   mapping: string;
@@ -97,6 +97,7 @@ export async function listImportable(plan: Plan, client: Pick<AdoClient, "wiql" 
     const state = str(w.fields["System.State"]) ?? "";
     if (SKIP_STATES.has(state)) continue;
     const title = str(w.fields["System.Title"]) ?? "#" + w.id;
+    if (/^QA Area/i.test(title)) continue;   // QA's hats for the bugs and issues they report: not features, never imported (GO 12.10)
     const parentId = parentOf(w);
     const parent = parentId ? byId.get(parentId) : undefined;
     const parentTitle = parentId ? laneNames.get(parentId) ?? (parent ? str(parent.fields["System.Title"]) : null) : null;
@@ -115,7 +116,7 @@ export async function listImportable(plan: Plan, client: Pick<AdoClient, "wiql" 
     out.push({
       id: w.id, type, title, state, assignedTo: who.name, assignedEmail: who.email, startDate, targetDate, parentId, parentTitle,
       description: htmlToText(typeof w.fields["System.Description"] === "string" ? (w.fields["System.Description"] as string) : ""),
-      snapshot: snapshotOf(w), suggested: !/^QA Area/i.test(title), mapping,
+      snapshot: snapshotOf(w), suggested: true, mapping,
     });
   }
   return out;
