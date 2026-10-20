@@ -50,13 +50,17 @@ describe("diffPlans: epics", () => {
     ]);
   });
 
-  it("one reorder = one epic.prioritet, placed before the lane it now precedes", () => {
+  it("a changed priority number = one epic.prioritet with the numbers; the epics it passes get none", () => {
     const b = one([lane("a", { priority: 1 }), lane("b", { priority: 2 }), lane("c", { priority: 3 })]);
-    const a = one([lane("a", { priority: 2 }), lane("b", { priority: 3 }), lane("c", { priority: 1 })]);
+    const a = one([lane("a", { priority: 1 }), lane("b", { priority: 2 }), lane("c", { priority: 1 })]);   // c shares 1 with a
     const ev = diffPlans(b, a);
-    expect(ev).toEqual([expect.objectContaining({ code: "epic.prioritet", targetId: "c", before: 3, after: 1, summary: "Prioritet: 3 → 1 (foran «Epic A»)" })]);
-    const last = diffPlans(a, b);
-    expect(last[0].summary).toBe("Prioritet: 1 → 3 (sist)");
+    expect(ev).toEqual([expect.objectContaining({ code: "epic.prioritet", targetId: "c", before: 3, after: 1, summary: "Prioritet: 3 → 1" })]);
+    expect(diffPlans(a, b)[0].summary).toBe("Prioritet: 1 → 3");
+  });
+  it("a new name that moves an epic among its equals is no priority change", () => {
+    const b = one([lane("a", { priority: 1, name: "Alfa" }), lane("b", { priority: 1, name: "Beta" })]);
+    const a = one([lane("a", { priority: 1, name: "Ceta" }), lane("b", { priority: 1, name: "Beta" })]);
+    expect(diffPlans(b, a).map((e) => e.code)).toEqual(["epic.navn"]);
   });
 });
 

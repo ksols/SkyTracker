@@ -133,10 +133,12 @@ function normalizePlan(plan) {
     if (!OUTCOMES.includes(l.outcome)) delete l.outcome;
     if (typeof l.closedAt !== "string" || !l.closedAt) delete l.closedAt;
   });
-  // priority = the order on the timeline (1 = top). Data, not array order, so it survives the merge.
-  let nextPri = Math.max(0, ...p.lanes.map((l) => num(l.priority, 0)));
-  p.lanes.forEach((l) => { if (num(l.priority, null) === null) l.priority = ++nextPri; });
-  p.lanes.sort((a, b) => a.priority - b.priority); // stable: equal priorities keep their order
+  // priority = produktforum's number (1 = top); several epics may share one, and those sort by name. Data, not array order,
+  // so it survives the merge. A missing or broken number goes after the highest.
+  const priOf = (l) => (Number.isInteger(l.priority) && l.priority >= 1 ? l.priority : null);
+  let nextPri = Math.max(0, ...p.lanes.map((l) => priOf(l) || 0));
+  p.lanes.forEach((l) => { if (priOf(l) === null) l.priority = ++nextPri; });
+  p.lanes.sort((a, b) => a.priority - b.priority || String(a.name || "").localeCompare(String(b.name || ""), "nb"));
   const laneKeys = new Set(p.lanes.map((l) => l.key));
   p.tasks = p.tasks.filter((t) => t && typeof t.id === "string" && (laneKeys.has(t.lane) || t.lane === BACKLOG));
   p.tasks.forEach((t) => {

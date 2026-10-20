@@ -169,9 +169,14 @@ describe("priority and order", () => {
     expect(p.tasks.map((t) => [t.id, t.order])).toEqual([["t3", 1], ["t1", 5], ["t2", 6]]);
   });
 
-  it("duplicate priorities keep array order (stable), nothing is renumbered", () => {
-    const p = normalizePlan({ lanes: [{ key: "a", name: "A", priority: 1 }, { key: "b", name: "B", priority: 1 }], tasks: [] });
-    expect(p.lanes.map((l) => [l.key, l.priority])).toEqual([["a", 1], ["b", 1]]);
+  it("a shared priority sorts by name (Norwegian order), nothing is renumbered", () => {
+    const p = normalizePlan({ lanes: [{ key: "b", name: "Øst", priority: 1 }, { key: "a", name: "Beta", priority: 2 }, { key: "c", name: "Alfa", priority: 1 }, { key: "d", name: "ærlig", priority: 1 }], tasks: [] });
+    expect(p.lanes.map((l) => [l.key, l.priority])).toEqual([["c", 1], ["d", 1], ["b", 1], ["a", 2]]);
+  });
+
+  it("a priority that is not a whole number from 1 is set after the highest", () => {
+    const p = normalizePlan({ lanes: [{ key: "a", name: "A", priority: 0 }, { key: "b", name: "B", priority: 2 }, { key: "c", name: "C", priority: 1.5 }], tasks: [] });
+    expect(p.lanes.map((l) => [l.key, l.priority])).toEqual([["b", 2], ["a", 3], ["c", 4]]);
   });
 
   it("strips an empty metric and a false externalDate, keeps real ones", () => {

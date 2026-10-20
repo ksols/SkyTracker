@@ -241,6 +241,7 @@
   .axis .delivery .pmark.st-rod{border-color:var(--bad);background:var(--bad)}
   .sw.delivery{width:10px;height:10px;transform:rotate(45deg);border:1px solid var(--ok);background:var(--ok-bg);border-radius:2px}
   .lane-label .chip.cust{background:var(--accent-soft);color:var(--text)}
+  .lane-label .chip.prio{font-weight:600;color:var(--text);font-variant-numeric:tabular-nums}   /* produktforum's number; several epics may share one */
   .chart .release-line{position:absolute;top:var(--axis-h);bottom:0;width:0;border-left:2px dashed var(--release);opacity:.55;z-index:3;pointer-events:none}
   .chart .release-line::after{content:attr(data-v);position:absolute;bottom:2px;left:4px;font-size:11px;line-height:14px;font-weight:600;color:var(--text-2);background:var(--surface);padding:0 4px;border-radius:3px;white-space:nowrap}   /* R14: the version at the bottom too */
   .chart .release-line.shipped{border-left-style:solid;opacity:.35}
@@ -389,7 +390,7 @@
 
   /* ---------- rekkefølge: dra rader i navnekolonnen ---------- */
   .grip{position:absolute;left:4px;top:50%;transform:translateY(-50%);width:12px;color:var(--text-4);font-size:12px;line-height:1;letter-spacing:-2px;cursor:grab;opacity:0;user-select:none}
-  .lane-label:hover .grip,.task-label:hover .grip{opacity:1}
+  .task-label:hover .grip{opacity:1}
   .lane-label{padding-left:20px}
   /* R17: the tree: a child sits one step in from its parent, with a line from the parent into each child (GO 16.10) */
   .task-label{padding-left:44px}
@@ -501,7 +502,7 @@
   body.forum .shelf-tip:not([hidden]){display:block}
   /* R17: wall mode: the plan, larger, without the desk's write chrome; the shelf keeps its placing actions (R15) */
   :root.forum{--row-h:54px;--lane-h:62px;--month-w:112px}   /* on the root, where cssNum() reads them */
-  body.forum #addEpicBtn,body.forum #addReleaseBtn,body.forum #registerBtn,body.forum .lane-label .add-feature,body.forum .lane-label .grip,body.forum .task-label .grip,body.forum #hint,body.forum #dirtyNote,body.forum #roBanner{display:none !important}
+  body.forum #addEpicBtn,body.forum #addReleaseBtn,body.forum #registerBtn,body.forum .lane-label .add-feature,body.forum .task-label .grip,body.forum #hint,body.forum #dirtyNote,body.forum #roBanner{display:none !important}
   body.forum .lane-label .ln{font-size:17px}
   body.forum .task-label .t{font-size:15px}
   body.forum .lane-label .lm,body.forum .task-label .d,body.forum .range-lbl,body.forum .status,body.forum .legend{font-size:14px}
@@ -725,8 +726,9 @@
         rå estimatet står urørt, så gjennomføringsevnen måles mot det som ble lovet. Antall aktive epics er et tall, ikke en grense:
         kapasiteten er planleggernes vurdering.</p></div>
       <div class="help-card"><h4>Prioritet</h4>
-        <p>Rekkefølgen på epicene er prioriteten produktforum har satt; rekkefølgen i en epic er byggerekkefølgen. Dra i <b>⋮⋮</b>
-        for å flytte en rad, eller sett tallet i redigeringen. Dra en feature til en annen epic for å flytte den dit. En utredning
+        <p>Prioriteten er tallet produktforum setter i redigeringen av epicen (<b>P1</b> på raden). Flere epics kan ha samme tall:
+        de står med laveste tall øverst, og med samme tall etter navn. Rekkefølgen i en epic er byggerekkefølgen: dra i <b>⋮⋮</b>
+        for å flytte en feature, også til en annen epic. En utredning
         som har passert sluttdatoen sin merkes <b>Utredning forsinket</b>. <b>Per person</b> viser én rad per eier med utredninger og features i rekkefølge: en utredning opptar eieren, så eierens features og senere utredninger legges etter den («i kø bak utredning …»). Nålen overstyrer. <b>Vis epics</b> øverst i lista går tilbake.</p></div>
       <div class="help-card"><h4>ADO og sprinter</h4>
         <p>Tidslinjen eier epics, features, estimater og avhengigheter; ADO speiler dem. <b>Lagre og push til ADO</b> i redigeringen oppretter
@@ -872,7 +874,7 @@
         <label class="ed-field"><span>Måltall (hva som er sant når epicen er levert)</span><input id="epMetric" type="text" placeholder="f.eks. 3 kunder i drift på 2.0"></label>
         <label class="ed-check"><input type="checkbox" id="epExternal"> Ekstern dato (NSR, Telenor, revisjon) – datoen er satt utenfra</label>
         <label class="ed-field"><span>ADO-id (Epic)</span><input id="epAdo" type="number" min="1" step="1" placeholder="valgfritt"></label>
-        <label class="ed-field"><span>Prioritet (1 = øverst på tidslinjen)</span><input id="epPriority" type="number" min="1" step="1"></label>
+        <label class="ed-field"><span>Prioritet (1 = øverst; flere epics kan ha samme tall)</span><input id="epPriority" type="number" min="1" step="1"></label>
         <div class="ed-row">
           <label class="ed-field"><span>Tilstand</span><select id="epState"><option value="forslag">Forslag – ikke valgt ennå</option><option value="aktiv">Aktiv – valgt i produktforum</option><option value="avsluttet">Avsluttet</option></select></label>
           <label class="ed-field" id="epOutcomeField"><span>Utfall</span><select id="epOutcome"><option value="nådd">Måltallet nådd</option><option value="ikke nådd">Ikke nådd</option><option value="endret">Endret underveis</option></select></label>
@@ -1130,11 +1132,10 @@ window.__bootTimeline = function(){
     });
   }
 
-  /* ================== rekkefølge: prioritet (epics) og order (features) ================== */
-  function moveLane(key, toIndex){           // toIndex: plass i listen uten raden selv (0 = øverst)
-    const keys = state.lanes.map(l => l.key).filter(k => k !== key);
-    keys.splice(Math.max(0, Math.min(keys.length, toIndex)), 0, key);
-    keys.forEach((k, i) => { const l = getLane(k); if(l.priority !== i + 1){ l.priority = i + 1; bumpLane(l); } });
+  /* ================== rekkefølge: prioritet (epics, et tall) og order (features, dra) ================== */
+  function setLanePriority(key, pri){       // produktforums tall; flere epics kan ha samme, og de står etter navn (normalizePlan)
+    const l = getLane(key);
+    l.priority = pri; bumpLane(l);
     state.example = false;
     normalizePlan(state);
   }
@@ -1364,7 +1365,8 @@ window.__bootTimeline = function(){
         : (lane.state === 'forslag' ? '<span class="chip st-forslag" title="Ikke valgt i produktforum ennå">Forslag</span>' : '') + '<span class="chip st-' + st.code + '">' + esc(STATUS_LABEL[st.code]) + '</span>';
       const cust = lane.virtual ? null : epicCustomers(state, lane.key);   // R16: the customers waiting on the epic through COO's deliveries
       const custChip = cust && (cust.all || cust.count) ? '<span class="chip cust" title="' + esc('Kunder som venter: ' + (cust.all ? 'alle kunder' + (cust.names.length ? ' (' + cust.names.join(', ') + ')' : '') : cust.names.join(', ')) + ' · via ' + cust.deliveries.map(d => d.name).join(', ')) + '">' + esc(epicCustomersText(cust)) + '</span>' : '';
-      lm.innerHTML = lane.virtual ? '<span class="goal">' + esc(personSummary(lane)) + '</span>' : stateChip + custChip + (esig ? '<span class="chip sig st-' + esig + '" title="Fremdrift mot tid, det dårligste av featurene (andre signal; teller ikke i fargen)">fremdrift</span>' : '') + (lane.ado && lane.ado.conflicts && lane.ado.conflicts.length ? '<span class="chip st-rod" title="Et felt er endret i ADO etter siste push – se øverst på siden">ADO-konflikt</span>' : '') +
+      const prioChip = '<span class="chip prio" title="Prioritet ' + lane.priority + ': satt i redigeringen; flere epics kan ha samme tall">P' + lane.priority + '</span>';
+      lm.innerHTML = lane.virtual ? '<span class="goal">' + esc(personSummary(lane)) + '</span>' : prioChip + stateChip + custChip + (esig ? '<span class="chip sig st-' + esig + '" title="Fremdrift mot tid, det dårligste av featurene (andre signal; teller ikke i fargen)">fremdrift</span>' : '') + (lane.ado && lane.ado.conflicts && lane.ado.conflicts.length ? '<span class="chip st-rod" title="Et felt er endret i ADO etter siste push – se øverst på siden">ADO-konflikt</span>' : '') +
         (lane.externalDate ? '<span class="chip ext-chip" title="Datoen er satt utenfra">Ekstern dato</span>' : '') +
         (overdue ? '<span class="chip st-gul">' + overdue + ' utredning' + (overdue > 1 ? 'er' : '') + ' forsinket</span>' : '') +
         '<span class="goal">' + esc((win ? win + ' · ' : '') + goalText(lane)) + '</span>' +
@@ -1373,17 +1375,12 @@ window.__bootTimeline = function(){
       add.title = 'Ny feature i denne epicen (utredning eller estimert velges i redigeringen)';
       add.addEventListener('click', e => { e.stopPropagation(); addFeature(lane.key, 'discovery'); });
       add.hidden = !!lane.virtual || !mayEdit();
-      const grip = el('span', 'grip', '⋮⋮');
-      grip.title = 'Dra for å endre prioritet';
-      grip.draggable = !lane.virtual;
-      grip.hidden = !!lane.virtual;
-      grip.addEventListener('dragstart', e => { rowDrag = { type: 'lane', key: lane.key }; e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', lane.key); ll.classList.add('dragging-row'); });
-      grip.addEventListener('dragend', () => { rowDrag = null; clearDropMarks(); });
+      // an epic's place comes from its priority number and its name, so epics are not dragged; a feature dropped here joins the epic
       ll.addEventListener('dragover', e => {
         if(!rowDrag) return;
         e.preventDefault();
         clearDropMarks();
-        ll.classList.add(rowDrag.type === 'lane' ? (dropHalf(e, ll) ? 'drop-before' : 'drop-after') : 'drop-into');
+        ll.classList.add('drop-into');
         clearPreviewChips();
         if(rowDrag.type === 'task' && getTask(rowDrag.id) && getTask(rowDrag.id).lane === BACKLOG){   // prisen før beslutningen
           const pv = previewPlacement(state, rowDrag.id, lane.key);
@@ -1394,24 +1391,15 @@ window.__bootTimeline = function(){
         if(!rowDrag) return;
         e.preventDefault();
         const d = rowDrag; rowDrag = null; clearDropMarks(); clearPreviewChips();
-        if(d.type === 'lane'){
-          if(d.key === lane.key) return;
-          const from = state.lanes.findIndex(v => v.key === d.key) + 1;
-          const keys = state.lanes.map(v => v.key).filter(k => k !== d.key);
-          const to = keys.indexOf(lane.key) + (dropHalf(e, ll) ? 0 : 1);
-          moveLane(d.key, to);
-          if(ASK_REASON_FOR.epicReordered && from !== to + 1) askReason([getLane(d.key).name + ': prioritet ' + from + ' → ' + (to + 1)]);
-        } else {
-          const t = getTask(d.id);
-          if(!t) return;
-          const fromLane = t.lane;
-          moveTask(d.id, lane.key, laneTasks(lane.key).filter(v => v.id !== d.id).length);
-          if(fromLane === BACKLOG) pendingNote.reasonCode = 'prioritering';   // forumet plasserer: forhåndsvalgt begrunnelse
-          if(fromLane !== lane.key && ASK_REASON_FOR.movedToOtherEpic) askReason([t.label + ': flyttet fra «' + (fromLane === BACKLOG ? 'Klar for veikart' : getLane(fromLane).name) + '» til «' + lane.name + '»']);
-        }
+        const t = getTask(d.id);
+        if(!t) return;
+        const fromLane = t.lane;
+        moveTask(d.id, lane.key, laneTasks(lane.key).filter(v => v.id !== d.id).length);
+        if(fromLane === BACKLOG) pendingNote.reasonCode = 'prioritering';   // forumet plasserer: forhåndsvalgt begrunnelse
+        if(fromLane !== lane.key && ASK_REASON_FOR.movedToOtherEpic) askReason([t.label + ': flyttet fra «' + (fromLane === BACKLOG ? 'Klar for veikart' : getLane(fromLane).name) + '» til «' + lane.name + '»']);
         save(); render();
       });
-      ll.append(grip, ln, lm, add);
+      ll.append(ln, lm, add);
       labels.appendChild(ll);
 
       const lb = el('div', 'lane-band');
@@ -2758,7 +2746,8 @@ window.__bootTimeline = function(){
   let epicKey = null;
   function addEpic(){
     const key = 'e' + Date.now().toString(36) + Math.random().toString(36).slice(2, 4);
-    state.lanes.push({ key, name: 'Ny epic', owner: OWNER_DEFAULT, v: 1, state: 'forslag' });   // et forslag til forumet velger det
+    const priority = Math.max(0, ...state.lanes.map(l => l.priority || 0)) + 1;   // nederst til forumet setter tallet
+    state.lanes.push({ key, name: 'Ny epic', owner: OWNER_DEFAULT, v: 1, state: 'forslag', priority });   // et forslag til forumet velger det
     newLaneKeys.add(key);
     render();
     openEpicEditor(key);
@@ -2777,7 +2766,7 @@ window.__bootTimeline = function(){
     $('epAdoNote').textContent = l.ado ? 'Sist pushet ' + whenText(l.ado.pushedAt) + (l.ado.conflicts && l.ado.conflicts.length ? ' · konflikt' : '') : (l.adoId ? 'ADO-id satt for hånd; ikke pushet herfra ennå' : 'Ikke pushet ennå');
     $('epMetric').value = l.metric || '';
     $('epExternal').checked = !!l.externalDate;
-    $('epPriority').value = state.lanes.findIndex(v => v.key === key) + 1;
+    $('epPriority').value = l.priority;
     $('epState').value = l.state || 'aktiv';
     $('epOutcome').value = l.outcome || 'nådd';
     $('epClosedReason').value = l.closedReason || '';
@@ -2834,11 +2823,10 @@ window.__bootTimeline = function(){
       changed = true;
     }
     const pri = parseInt($('epPriority').value, 10);
-    const cur = state.lanes.findIndex(v => v.key === epicKey) + 1;
+    const cur = l.priority;
     if(isFinite(pri) && pri >= 1 && pri !== cur){
-      const target = Math.min(state.lanes.length, pri);
-      moveLane(epicKey, target - 1);
-      if(ASK_REASON_FOR.epicReordered) lines.push(l.name + ': prioritet ' + cur + ' → ' + target);
+      setLanePriority(epicKey, pri);
+      if(ASK_REASON_FOR.epicReordered) lines.push(l.name + ': prioritet ' + cur + ' → ' + pri);
       changed = true;
     }
     if(ASK_REASON_FOR.goalChanged && typeof before.goalDate === 'number'){

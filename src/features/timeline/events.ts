@@ -78,8 +78,6 @@ export function movedKeys(before: string[], after: string[]): string[] {
   return b.filter((k) => !kept.has(k));
 }
 
-const laneKeysInOrder = (p: Plan) =>
-  p.lanes.map((l, i) => ({ l, i })).sort((x, y) => (x.l.priority ?? Infinity) - (y.l.priority ?? Infinity) || x.i - y.i).map((x) => x.l.key);
 const taskIdsInLane = (p: Plan, lane: string) =>
   p.tasks.map((t, i) => ({ t, i })).filter((x) => x.t.lane === lane).sort((x, y) => (x.t.order ?? Infinity) - (y.t.order ?? Infinity) || x.i - y.i).map((x) => x.t.id);
 
@@ -130,8 +128,6 @@ export function diffPlans(before: Plan, after: Plan, opts: DiffOptions = {}): Pl
   const named = (id: string) => ((at.get(id) ?? bt.get(id))?.kind === "discovery" ? "utredning " : "") + q(label(id));   // R8: «i kø bak utredning «X»»
 
   // ----- epics -----
-  const bKeys = laneKeysInOrder(before), aKeys = laneKeysInOrder(after);
-  const movedLanes = new Set(movedKeys(bKeys, aKeys));
   for (const l of after.lanes) {
     const b = bl.get(l.key);
     const base = { targetType: "epic" as const, targetId: l.key, targetLabel: l.name, laneKey: l.key, cause: dc };
@@ -145,11 +141,8 @@ export function diffPlans(before: Plan, after: Plan, opts: DiffOptions = {}): Pl
     if ((b.adoId ?? null) !== (l.adoId ?? null)) ev.push({ ...base, code: "epic.ado", before: b.adoId ?? null, after: l.adoId ?? null, summary: l.adoId ? "ADO-id: #" + l.adoId : "ADO-id fjernet" });
     if ((b.state ?? "aktiv") !== (l.state ?? "aktiv") || (b.outcome ?? null) !== (l.outcome ?? null) || (b.closedReason ?? null) !== (l.closedReason ?? null))
       ev.push({ ...base, code: "epic.tilstand", before: { state: b.state ?? "aktiv", outcome: b.outcome ?? null }, after: { state: l.state ?? "aktiv", outcome: l.outcome ?? null }, summary: epicStateSummary(b, l) });
-    if (movedLanes.has(l.key)) {
-      const from = bKeys.indexOf(l.key) + 1, to = aKeys.indexOf(l.key) + 1;
-      const next = aKeys[to];
-      ev.push({ ...base, code: "epic.prioritet", before: from, after: to, summary: `Prioritet: ${from} → ${to}` + (next ? ` (foran ${q(laneName(next))})` : " (sist)") });
-    }
+    if ((b.priority ?? null) !== (l.priority ?? null))   // the number produktforum set; epics may share one, so the place is not the change
+      ev.push({ ...base, code: "epic.prioritet", before: b.priority ?? null, after: l.priority ?? null, summary: `Prioritet: ${b.priority ?? "–"} → ${l.priority ?? "–"}` });
   }
   for (const b of before.lanes) if (!al.has(b.key)) {
     const count = before.tasks.filter((t) => t.lane === b.key).length;
